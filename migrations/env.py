@@ -18,7 +18,6 @@ if config.config_file_name is not None:
 
 target_metadata = Base.metadata
 
-# Set the database URL from settings
 config.set_main_option("sqlalchemy.url", settings.database_url)
 
 
