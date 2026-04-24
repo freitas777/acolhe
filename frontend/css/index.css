@@ -1,0 +1,224 @@
+:root {
+    --suap-green: #0A7F70;
+    --suap-green-dark: #086659;
+    --suap-green-light: #0B9D87;
+    --text-primary: #333333;
+    --text-secondary: #666666;
+    --white: #FFFFFF;
+    --gray-100: #f5f0f0;
+    --gray-200: #e0e0e0;
+    --gray-300: #cccccc;
+    --shadow-sm: 0 2px 4px rgba(0,0,0,0.1);
+    --shadow-md: 0 4px 8px rgba(0,0,0,0.1);
+    --shadow-lg: 0 8px 16px rgba(0,0,0,0.1);
+    --border-radius-sm: 4px;
+    --border-radius-md: 8px;
+    --border-radius-lg: 12px;
+    --transition: all 0.2s ease;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: linear-gradient(135deg, #f0f0f0 0%, #e0e0e0 100%);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-primary);
+}
+
+.login-container {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    width: 100%;
+    max-width: 100%;
+    padding: 1rem;
+}
+
+.login-card {
+    background: var(--white);
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--shadow-md);
+    padding: 2rem;
+    width: 100%;
+    max-width: 420px;
+    margin: auto;
+    text-align: center;
+}
+
+.logo-container {
+    margin-bottom: 2rem;
+}
+
+.logo {
+    width: 80px;
+    height: 80px;
+    background: var(--suap-green);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1.5rem;
+    color: var(--white);
+    font-size: 2rem;
+    font-weight: bold;
+}
+
+.logo-container h1 {
+    color: var(--suap-green);
+    margin-bottom: 0.5rem;
+    font-size: 1.75rem;
+    font-weight: 700;
+}
+
+.logo-container .subtitle {
+    color: var(--text-secondary);
+    margin-bottom: 2rem;
+    font-size: 1rem;
+    line-height: 1.5;
+}
+
+.login-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.form-group {
+    text-align: left;
+}
+
+.suap-button {
+    background: var(--suap-green);
+    color: var(--white);
+    border: none;
+    border-radius: var(--border-radius-sm);
+    padding: 1rem 1.5rem;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    transition: var(--transition);
+    box-shadow: var(--shadow-sm);
+}
+
+.suap-button:hover {
+    background: var(--suap-green-dark);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+}
+
+.suap-button:active {
+    transform: translateY(0);
+}
+
+.suap-button:disabled {
+    background: var(--gray-300);
+    cursor: not-allowed;
+}
+
+.suap-button svg {
+    width: 1.25rem;
+    height: 1.25rem;
+}
+
+.form-info {
+    background: rgba(10, 127, 112, 0.05);
+    border-left: 3px solid var(--suap-green);
+    padding: 1rem;
+    border-radius: var(--border-radius-sm);
+    margin-bottom: 1.5rem;
+    text-align: left;
+}
+
+.form-info p {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    line-height: 1.5;
+}
+
+.help-links {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+}
+
+.help-link {
+    color: var(--suap-green);
+    text-decoration: none;
+    font-size: 0.875rem;
+    transition: var(--transition);
+}
+
+.help-link:hover {
+    text-decoration: underline;
+}
+
+.error-message {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #d32f2f;
+    background: #ffebee;
+    border: 1px solid #ffcdd2;
+    border-radius: var(--border-radius-sm);
+    padding: 0.75rem 1rem;
+    margin-top: 1rem;
+    font-size: 0.875rem;
+}
+
+.error-message[hidden] {
+    display: none;
+}
+
+.error-message:not([hidden]) {
+    display: block;
+}
+
+.loading {
+    display: inline-block;
+    width: 1.25rem;
+    height: 1.25rem;
+    border: 3px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: var(--white);
+    animation: spin 1s linear infinite;
+}
+
+.loading[hidden] {
+    display: none;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@media (max-width: 480px) {
+    .login-container {
+        padding: 1rem;
+    }
+
+    .login-card {
+        padding: 1.5rem 1rem;
+    }
+}
+
+@media (min-width: 768px) {
+    .login-container {
+        padding: 2rem;
+    }
+}
