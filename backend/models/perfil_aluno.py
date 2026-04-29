@@ -25,9 +25,14 @@ class PerfilAluno(Base):
     __tablename__ = "perfis_aluno"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    
     aluno_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("alunos.id", ondelete="CASCADE"), nullable=False
+        Integer,
+        ForeignKey("alunos.id", ondelete="CASCADE"), 
+        nullable=False,
+        unique=True
     )
+    
     nivel_atencao: Mapped[Optional[NivelAtencao]] = mapped_column(
         Enum(NivelAtencao), nullable=True
     )

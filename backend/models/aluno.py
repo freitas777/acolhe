@@ -18,8 +18,12 @@ class Aluno(Base):
     )
 
     perfil = relationship(
-        "PerfilAluno", back_populates="aluno", uselist=False, cascade="all, delete-orphan"
+        "PerfilAluno",
+        back_populates="aluno",
+        uselist=False,
+        cascade="all, delete-orphan"
     )
+    
     conteudos = relationship("ConteudoGerado", back_populates="aluno")
 
     def __repr__(self):

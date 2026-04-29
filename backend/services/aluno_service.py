@@ -1,66 +1,95 @@
-from __future__ import annotations
-
-from typing import List
-
-from fastapi import Depends, HTTPException, status
-from sqlalchemy.orm import Session
-
-from backend.database import get_db
-from backend.repositories.aluno import AlunoRepository
-from backend.services.perfil_aluno_service import PerfilAlunoService
-from backend.schemas.aluno import AlunoCreate, AlunoResponse, AlunoUpdate
-from backend.schemas.perfil_aluno import PerfilAlunoCreate, PerfilAlunoResponse, PerfilAlunoUpdate
+from sqlalchemy.orm import Session, joinedload
+from backend.models.aluno import Aluno
+from backend.models.perfil_aluno import PerfilAluno
+from backend.schemas.aluno import AlunoCreate, AlunoUpdate
+from backend.schemas.perfil_aluno import PerfilAlunoCreate, PerfilAlunoUpdate
 
 
-class AlunoService: 
-    def __init__(self, db: Session = Depends(get_db)):
-        self.aluno_repository = AlunoRepository(db)
-        self.perfil_service = PerfilAlunoService(db)
+class AlunoService:
+    def __init__(self, db: Session):
+        self.db = db
 
-    def criar_aluno(self, aluno_data: AlunoCreate) -> AlunoResponse:
-        aluno = self.aluno_repository.create(aluno_data.model_dump())
-        return AlunoResponse.model_validate(aluno)
+    def criar_aluno(self, data: AlunoCreate) -> Aluno:
+        aluno = Aluno(**data.model_dump())
+        self.db.add(aluno)
+        self.db.commit()
+        self.db.refresh(aluno)
+        return aluno
 
-    def listar_alunos(self, skip: int = 0, limit: int = 100) -> List[AlunoResponse]:
-        alunos = self.aluno_repository.list_with_profile(skip=skip, limit=limit)
-        return [AlunoResponse.model_validate(aluno) for aluno in alunos]
-
-    def obter_aluno_por_id(self, aluno_id: int) -> AlunoResponse:
-        aluno = self.aluno_repository.get_with_profile(aluno_id)
+    def criar_perfil(self, aluno_id: int, data: PerfilAlunoCreate) -> PerfilAluno:
+        aluno = self.db.query(Aluno).filter(Aluno.id == aluno_id).first()
         if not aluno:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Aluno não encontrado"
-            )
-        return AlunoResponse.model_validate(aluno)
+            raise ValueError(f"Aluno {aluno_id} não encontrado")
 
-    def atualizar_aluno(self, aluno_id: int, aluno_data: AlunoUpdate) -> AlunoResponse:
-        aluno = self.aluno_repository.get_by_id(aluno_id)
-        if not aluno:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Aluno não encontrado"
-            )
-
-        update_data = aluno_data.model_dump(exclude_unset=True)
-        aluno_atualizado = self.aluno_repository.update(aluno_id, update_data)
+        perfil_existente = self.db.query(PerfilAluno).filter(
+            PerfilAluno.aluno_id == aluno_id
+        ).first()
+        if perfil_existente:
+            raise ValueError(f"Aluno {aluno_id} já possui um perfil")
         
-        return AlunoResponse.model_validate(aluno_atualizado)
+        # Cria perfil
+        perfil = PerfilAluno(aluno_id=aluno_id, **data.model_dump())
+        self.db.add(perfil)
+        self.db.commit()
+        self.db.refresh(perfil)
+        return perfil
 
-    def deletar_aluno(self, aluno_id: int) -> None:
-        aluno = self.aluno_repository.get_by_id(aluno_id)
+    def listar_alunos(self, skip: int = 0, limit: int = 100):
+        return (
+            self.db.query(Aluno)
+            .options(joinedload(Aluno.perfil))
+            .offset(skip)
+            .limit(limit)
+            .all()
+        )
+
+    def obter_aluno_por_id(self, aluno_id: int) -> Aluno:
+        aluno = (
+            self.db.query(Aluno)
+            .options(joinedload(Aluno.perfil))
+            .filter(Aluno.id == aluno_id)
+            .first()
+        )
         if not aluno:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Aluno não encontrado"
-            )
-        self.aluno_repository.delete(aluno_id)
+            raise ValueError(f"Aluno {aluno_id} não encontrado")
+        return aluno
 
-    def criar_perfil(self, aluno_id: int, perfil_data: PerfilAlunoCreate) -> PerfilAlunoResponse:
-        return self.perfil_service.criar_perfil(aluno_id, perfil_data)
+    def atualizar_aluno(self, aluno_id: int, data: AlunoUpdate) -> Aluno:
+        """Atualiza dados do aluno"""
+        aluno = self.obter_aluno_por_id(aluno_id)
+        if not aluno:
+            raise ValueError(f"Aluno {aluno_id} não encontrado")
+        
+        update_data = data.model_dump(exclude_unset=True)
+        for key, value in update_data.items():
+            setattr(aluno, key, value)
+        
+        self.db.commit()
+        self.db.refresh(aluno)
+        return aluno
 
-    def obter_perfil(self, aluno_id: int) -> PerfilAlunoResponse:
-        return self.perfil_service.obter_perfil_por_aluno(aluno_id)
+    def atualizar_perfil(self, aluno_id: int, data: PerfilAlunoUpdate) -> PerfilAluno:
+        perfil = (
+            self.db.query(PerfilAluno)
+            .filter(PerfilAluno.aluno_id == aluno_id)
+            .first()
+        )
+        if not perfil:
+            raise ValueError(f"Perfil do aluno {aluno_id} não encontrado")
+        
+        update_data = data.model_dump(exclude_unset=True)
+        for key, value in update_data.items():
+            setattr(perfil, key, value)
+        
+        self.db.commit()
+        self.db.refresh(perfil)
+        return perfil
 
-    def atualizar_perfil(self, aluno_id: int, perfil_data: PerfilAlunoUpdate) -> PerfilAlunoResponse:
-        return self.perfil_service.atualizar_perfil(aluno_id, perfil_data)
+    def deletar_aluno(self, aluno_id: int) -> bool:
+        aluno = self.db.query(Aluno).filter(Aluno.id == aluno_id).first()
+        if not aluno:
+            return False
+        
+        self.db.delete(aluno)
+        self.db.commit()
+        return True

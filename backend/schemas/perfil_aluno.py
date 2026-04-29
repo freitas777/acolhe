@@ -1,7 +1,5 @@
 from typing import Optional
-
 from pydantic import BaseModel
-
 from backend.models.perfil_aluno import NivelAtencao, PreferenciaAprendizado
 
 
@@ -23,7 +21,7 @@ class PerfilAlunoUpdate(BaseModel):
 
 class PerfilAlunoResponse(BaseModel):
     id: int
-    aluno_id: int
+    aluno_id: int  
     nivel_atencao: Optional[NivelAtencao] = None
     dificuldade_leitura: bool
     preferencia: Optional[PreferenciaAprendizado] = None
