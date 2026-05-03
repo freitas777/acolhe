@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Acolhe+ | Dashboard</title>
+  <link rel="stylesheet" href="/css/dashboard.css">
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="logo-container">
+          <div class="logo-icon">A+</div>
+          <h1 class="logo-title">Acolhe+</h1>
+        </div>
+        <button class="btn-new-chat" id="btn-new-chat" title="Nova conversa">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="5" x2="12" y2="19"/>
+            <line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+          <span>Nova Conversa</span>
+        </button>
+      </div>
+
+      <div class="conversations-list" id="conversations-list">
+        <!-- Conversas renderizadas aqui -->
+      </div>
+
+      <div class="sidebar-footer">
+        <div class="user-info-small">
+          <div class="user-avatar-small" id="user-avatar-small">??</div>
+          <div class="user-details-small">
+            <span class="user-name-small" id="user-name-small">Carregando...</span>
+            <span class="user-role-small" id="user-role-small">-</span>
+          </div>
+        </div>
+        <button class="btn-logout" id="btn-logout">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+            <polyline points="16 17 21 12 16 7"/>
+            <line x1="21" y1="12" x2="9" y2="12"/>
+          </svg>
+          <span>Sair</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- Header -->
+      <header class="chat-header">
+        <button class="btn-menu-mobile" id="btn-menu-mobile">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="3" y1="12" x2="21" y2="12"/>
+            <line x1="3" y1="6" x2="21" y2="6"/>
+            <line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+        </button>
+        <h2 class="chat-title" id="chat-title">Nova Conversa</h2>
+        <div class="header-actions">
+          <button class="btn-icon" id="btn-delete-conversation" title="Excluir conversa">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <!-- Messages Area -->
+      <div class="messages-container" id="messages-container">
+        <div class="messages-wrapper" id="messages-wrapper">
+          <!-- Estado vazio -->
+          <div class="empty-state" id="empty-state">
+            <div class="empty-state-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+              </svg>
+            </div>
+            <h3>Como posso te ajudar hoje?</h3>
+            <p>Envie uma mensagem para começar a conversa</p>
+          </div>
+          <!-- Mensagens renderizadas aqui -->
+        </div>
+      </div>
+
+      <!-- Input Area -->
+      <div class="input-container">
+        <div class="input-wrapper">
+          <textarea 
+            id="message-input" 
+            placeholder="Digite sua mensagem..." 
+            rows="1"
+            maxlength="4000"
+          ></textarea>
+          <button class="btn-send" id="btn-send" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="22" y1="2" x2="11" y2="13"/>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+            </svg>
+          </button>
+        </div>
+        <p class="input-hint">O Acolhe+ pode cometer erros. Verifique informações importantes.</p>
+      </div>
+    </main>
+  </div>
+
+  <!-- Scripts -->
+  <script src="/js.cookie.js"></script>
+  <script src="/settings.js"></script>
+  <script src="/js/client.js"></script>
+  <script src="/js/chat.store.js"></script>
+  <script src="/js/chat.service.js"></script>
+  <script src="/js/chat.ui.js"></script>
+  <script src="/js/dashboard.js"></script>
+</body>
+</html>
