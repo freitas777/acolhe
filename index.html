@@ -218,6 +218,28 @@
       document.getElementById('suap-login').disabled = true;
       document.getElementById('suap-login').style.opacity = '0.5';
     }
+
+    $(document).ready(function() {
+      // Verifica se há token no hash da URL (recém-logado)
+      if (window.location.hash && window.location.hash.includes('access_token')) {
+          console.log('🔑 Token detectado no hash, processando...');
+          
+          if (suap.isAuthenticated()) {
+              console.log('✅ Token válido, buscando dados...');
+              
+              suap.getResource(suap.getToken().getScope(), function(response) {
+                  console.log('✅ Dados:', response);
+                  localStorage.setItem('acolhe_user', JSON.stringify(response));
+                  window.location.href = '/dashboard';
+              });
+          } else {
+              console.log('❌ Token inválido');
+          }
+      } else {
+          // ✅ Sem hash = apenas mostra tela de login, SEM redirecionar
+          console.log('⏳ Tela de login pronta');
+      }
+    });
   </script>
 </body>
 </html>
