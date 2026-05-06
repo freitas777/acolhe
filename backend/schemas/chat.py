@@ -1,14 +1,24 @@
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional
+
 from pydantic import BaseModel, Field
 
 
-class ChatMessageCreate(BaseModel):
-    content: str = Field(..., min_length=1, max_length=4000)
-    conversation_id: Optional[str] = None
+class ConversaCriar(BaseModel):
+    titulo: str = Field(default="Nova conversa", max_length=255)
 
 
-class ChatMessageResponse(BaseModel):
+class ConversaResposta(BaseModel):
+    id: str
+    title: str
+    messages: list["MensagemResposta"] = []
+    created_at: datetime
+    user_id: Optional[int] = None
+
+    model_config = {"from_attributes": True}
+
+
+class MensagemResposta(BaseModel):
     id: str
     role: str
     content: str
@@ -17,26 +27,24 @@ class ChatMessageResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class ConversationCreate(BaseModel):
-    title: Optional[str] = "Nova conversa"
-
-
-class ConversationResponse(BaseModel):
-    id: str
-    title: str
-    messages: List[ChatMessageResponse]
-    created_at: datetime
-    user_id: int
-
-    model_config = {"from_attributes": True}
-
-
-class ChatRequest(BaseModel):
-    message: str
+class ChatRequisicao(BaseModel):
+    message: str = Field(..., min_length=1, max_length=4000)
     conversation_id: Optional[str] = None
 
 
-class ChatResponse(BaseModel):
-    user_message: ChatMessageResponse
-    assistant_message: Optional[ChatMessageResponse] = None
+class ChatResposta(BaseModel):
+    user_message: MensagemResposta
+    assistant_message: Optional[MensagemResposta] = None
     conversation_id: str
+
+
+class ConteudoEducacionalRequisicao(BaseModel):
+    tema: str = Field(..., min_length=1, max_length=300)
+    perfil_aluno: dict
+
+
+class ConteudoEducacionalResposta(BaseModel):
+    success: bool
+    tema: str
+    conteudo: str
+    gerado_em: str

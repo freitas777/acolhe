@@ -71,10 +71,17 @@ async def health():
     return {"status": "ok", "frontend_dir": str(FRONTEND_DIR)}
 
 # =====================
-# API CHAT
+# API ROUTERS
 # =====================
 from backend.routers.chat import router as chat_router
+from backend.routers.aluno import router as aluno_router
+from backend.routers.usuario import router as usuario_router
+from backend.routers.conteudo_gerado import router as conteudo_router
+
 app.include_router(chat_router)
+app.include_router(aluno_router)
+app.include_router(usuario_router)
+app.include_router(conteudo_router)
 
 # =====================
 # ARQUIVOS ESTÁTICOS
