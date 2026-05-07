@@ -6,6 +6,8 @@ class Settings(BaseSettings):
     suap_client_id: str
     suap_client_secret: str
     suap_redirect_uri: str
+    suap_base_url: str = "https://suap.ifrn.edu.br"
+    suap_scope: str = "identificacao email documentos_pessoais"
     secret_key: str
 
     gemini_api_key: str = ""

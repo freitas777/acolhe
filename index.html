@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -13,7 +13,7 @@
       <div class="logo-container">
         <div class="logo">A+</div>
         <h1>Acolhe+</h1>
-        <p class="subtitle">Sistema de Apoio à Educação Inclusiva</p>
+        <p class="subtitle">Sistema de Apoio a Educacao Inclusiva</p>
       </div>
 
       <div class="login-form">
@@ -39,207 +39,81 @@
         </div>
       </div>
 
-      <div id="test-status" class="test-status" style="
-        background: #f5f5f5;
-        border: 1px solid #ddd;
-        border-radius: 4px;
-        padding: 1rem;
-        margin-top: 1rem;
-        font-size: 0.85rem;
-        font-family: monospace;
-        max-height: 300px;
-        overflow-y: auto;
-      ">
-        <strong>Status dos Testes:</strong>
-        <div id="test-log"></div>
-      </div>
-
       <div id="error-message" class="error-message" hidden>
         <span id="error-text"></span>
       </div>
     </div>
   </div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
-  <script src="/js.cookie.js"></script>
-  <script src="/settings.js"></script>
+  <script src="/js/js.cookie.js"></script>
+  <script src="/js/settings.js"></script>
   <script src="/js/client.js"></script>
-  
-  <script>
-    const TestLog = {
-      element: null,
-      init() {
-        this.element = document.getElementById('test-log');
-      },
-      add(message, type = 'info') {
-        const colors = {
-          info: '#666',
-          success: '#28a745',
-          error: '#d32f2f',
-          warning: '#ffc107'
-        };
-        const timestamp = new Date().toLocaleTimeString('pt-BR');
-        const log = document.createElement('div');
-        log.style.color = colors[type];
-        log.style.margin = '0.25rem 0';
-        log.textContent = `[${timestamp}] ${message}`;
-        if (this.element) {
-          this.element.appendChild(log);
-          this.element.scrollTop = this.element.scrollHeight;
-        }
-        console.log(`%c[${type.toUpperCase()}] ${message}`, `color: ${colors[type]}`);
-      },
-      clear() {
-        if (this.element) this.element.innerHTML = '';
-      }
-    };
 
-    // ========================================
-    // INICIALIZAÇÃO
-    // ========================================
-    TestLog.init();
-    TestLog.add('Acolhe+ Login inicializado', 'info');
-    TestLog.add(`Redirect URI: ${REDIRECT_URI}`, 'info');
-    TestLog.add(`Client ID: ${CLIENT_ID.substring(0, 20)}...`, 'info');
+  <script>
+  (function() {
+    'use strict';
+
+    Cookies.remove('suapToken');
+    Cookies.remove('suapTokenExpirationTime');
+    Cookies.remove('suapScope');
 
     var suap = new SuapClient(SUAP_URL, CLIENT_ID, REDIRECT_URI, SCOPE);
     suap.init();
 
-    TestLog.add('SuapClient inicializado', 'success');
+    if (suap.isAuthenticated() && window.location.hash && window.location.hash.includes('access_token')) {
+      var accessToken = suap.getToken().getValue();
+
+      fetch('/auth/callback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          access_token: accessToken,
+          semestre: SEMESTRE_VIGENTE
+        })
+      })
+      .then(function(response) {
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        return response.json();
+      })
+      .then(function(data) {
+        localStorage.setItem('acolhe_user', JSON.stringify(data.usuario));
+        localStorage.setItem('acolhe_user_id', data.usuario.id);
+        localStorage.setItem('acolhe_access_token', accessToken);
+        window.location.replace('/disciplinas');
+      })
+      .catch(function(error) {
+        var errorEl = document.getElementById('error-message');
+        var errorText = document.getElementById('error-text');
+        if (errorEl && errorText) {
+          errorText.textContent = 'Erro ao autenticar: ' + error.message;
+          errorEl.hidden = false;
+        }
+      });
+    } else if (window.location.search && window.location.search.includes('error=')) {
+      var errorMatch = window.location.search.match(/error=([^&]+)/);
+      var errorMsg = errorMatch ? decodeURIComponent(errorMatch[1].replace(/\+/g, ' ')) : 'Erro desconhecido';
+      var errorEl = document.getElementById('error-message');
+      var errorText = document.getElementById('error-text');
+      if (errorEl && errorText) {
+        errorText.textContent = 'Erro do SUAP: ' + errorMsg;
+        errorEl.hidden = false;
+      }
+      window.history.replaceState({}, document.title, '/');
+    } else if (suap.isAuthenticated()) {
+      var savedUserId = localStorage.getItem('acolhe_user_id');
+      if (savedUserId) {
+        window.location.replace('/disciplinas');
+      }
+    }
 
     document.getElementById('suap-login').addEventListener('click', function(e) {
       e.preventDefault();
-      TestLog.add('Botão de login clicado', 'info');
-      
-      const loginUrl = suap.getLoginURL();
-      TestLog.add(`URL de login: ${loginUrl}`, 'info');
-      
-      TestLog.add('Redirecionando para SUAP...', 'warning');
-      setTimeout(() => {
-        suap.login();
-      }, 500);
+      Cookies.remove('suapToken');
+      Cookies.remove('suapTokenExpirationTime');
+      Cookies.remove('suapScope');
+      suap.login();
     });
-
-    // ========================================
-    // VERIFICA AUTENTICAÇÃO AO CARREGAR
-    // ========================================
-    $(document).ready(function() {
-      TestLog.add('DOM pronto', 'info');
-
-      // Verifica se há token no hash (recém-logado)
-      if (window.location.hash && window.location.hash.includes('access_token')) {
-        TestLog.add('Token detectado no hash da URL', 'success');
-        TestLog.add(`Hash completo: ${window.location.hash}`, 'info');
-
-        if (suap.isAuthenticated()) {
-          TestLog.add('Token válido (cookies verificados)', 'success');
-          
-          const token = suap.getToken();
-          TestLog.add(`Access Token: ${token.getValue().substring(0, 30)}...`, 'info');
-          TestLog.add(`Expires In: ${token.getExpirationTime()}`, 'info');
-          TestLog.add(`Scope: ${token.getScope()}`, 'info');
-
-          TestLog.add('Requisitando dados do SUAP: GET /api/rh/meus-dados/', 'warning');
-          
-          suap.getResource(suap.getToken().getScope(), function(response) {
-            TestLog.add('RESPOSTA DO SUAP RECEBIDA!', 'success');
-            TestLog.add('Dados do usuário:', 'info');
-            
-            // Mostra dados formatados
-            TestLog.add(`   • ID: ${response.id}`, 'info');
-            TestLog.add(`   • Nome: ${response.nome_usual}`, 'info');
-            TestLog.add(`   • Matrícula: ${response.matricula}`, 'info');
-            TestLog.add(`   • Email: ${response.email}`, 'info');
-            TestLog.add(`   • Vínculo: ${response.tipo_vinculo}`, 'info');
-            if (response.vinculo) {
-              TestLog.add(`   • Curso: ${response.vinculo.curso}`, 'info');
-              TestLog.add(`   • Campus: ${response.vinculo.campus}`, 'info');
-              TestLog.add(`   • Situação: ${response.vinculo.situacao}`, 'info');
-            }
-
-            localStorage.setItem('acolhe_user', JSON.stringify(response));
-            TestLog.add('Dados salvos no localStorage', 'success');
-
-            showUserData(response);
-            
-            window.history.replaceState({}, document.title, '/');
-            TestLog.add('Hash da URL limpo', 'info');
-
-          });
-        } else {
-          TestLog.add('Token INVÁLIDO ou expirado', 'error');
-          TestLog.add('Tente fazer login novamente', 'warning');
-        }
-      } else {
-        TestLog.add('Aguardando login do usuário...', 'info');
-        TestLog.add('Clique em "Entrar com SUAP" para testar', 'info');
-      }
-    });
-
-    function showUserData(user) {
-      const card = document.querySelector('.login-card');
-      
-      const userInfoDiv = document.createElement('div');
-      userInfoDiv.id = 'user-info-display';
-      userInfoDiv.style.cssText = `
-        background: #d4edda;
-        border: 1px solid #c3e6cb;
-        border-radius: 4px;
-        padding: 1rem;
-        margin-top: 1rem;
-        font-size: 0.9rem;
-      `;
-      
-      userInfoDiv.innerHTML = `
-        <strong style="color: #155724;">Login Realizado com Sucesso!</strong>
-        <div style="margin-top: 0.5rem; color: #155724;">
-          <div><strong>Nome:</strong> ${user.nome_usual}</div>
-          <div><strong>Matrícula:</strong> ${user.matricula}</div>
-          <div><strong>Email:</strong> ${user.email}</div>
-          <div><strong>Vínculo:</strong> ${user.tipo_vinculo}</div>
-          ${user.vinculo ? `
-            <div><strong>Curso:</strong> ${user.vinculo.curso}</div>
-            <div><strong>Campus:</strong> ${user.vinculo.campus}</div>
-          ` : ''}
-        </div>
-        <button onclick="location.reload()" style="
-          margin-top: 1rem;
-          padding: 0.5rem 1rem;
-          background: #155724;
-          color: white;
-          border: none;
-          border-radius: 4px;
-          cursor: pointer;
-        ">Testar Novamente</button>
-      `;
-      
-      card.appendChild(userInfoDiv);
-      
-      document.getElementById('suap-login').disabled = true;
-      document.getElementById('suap-login').style.opacity = '0.5';
-    }
-
-    $(document).ready(function() {
-      // Verifica se há token no hash da URL (recém-logado)
-      if (window.location.hash && window.location.hash.includes('access_token')) {
-          console.log('🔑 Token detectado no hash, processando...');
-          
-          if (suap.isAuthenticated()) {
-              console.log('✅ Token válido, buscando dados...');
-              
-              suap.getResource(suap.getToken().getScope(), function(response) {
-                  console.log('✅ Dados:', response);
-                  localStorage.setItem('acolhe_user', JSON.stringify(response));
-                  window.location.href = '/dashboard';
-              });
-          } else {
-              console.log('❌ Token inválido');
-          }
-      } else {
-          // ✅ Sem hash = apenas mostra tela de login, SEM redirecionar
-          console.log('⏳ Tela de login pronta');
-      }
-    });
+  })();
   </script>
 </body>
 </html>

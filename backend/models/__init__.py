@@ -4,6 +4,7 @@ from backend.models.perfil_aluno import PerfilAluno
 from backend.models.conteudo_gerado import ConteudoGerado
 from backend.models.conversa import Conversa
 from backend.models.mensagem import Mensagem
+from backend.models.disciplina import Disciplina
 
 __all__ = [
     "Usuario",
@@ -12,4 +13,5 @@ __all__ = [
     "ConteudoGerado",
     "Conversa",
     "Mensagem",
+    "Disciplina",
 ]
