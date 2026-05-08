@@ -5,7 +5,7 @@ import httpx
 
 from backend.config import settings
 from backend.services.auth_service import AuthService
-from backend.schemas.auth import LoginRequest, LoginResponse, UsuarioSUAPResponse, DisciplinaResponse
+from backend.schemas.auth import LoginRequest, LoginResponse, UsuarioSUAPResponse, DisciplinaResponse, AlunoAssistidoResponse
 
 router = APIRouter(prefix="/auth", tags=["Autenticação"])
 
@@ -57,11 +57,31 @@ async def me(usuario_id: int = 1, auth_service: AuthService = Depends()):
     return usuario
 
 @router.get("/disciplinas", response_model=list[DisciplinaResponse])
-async def disciplinas(usuario_id: int = 1, semestre: str = None, auth_service: AuthService = Depends()):
+async def disciplinas(usuario_id: int = 1, semestre: str = None, apenas_assistidos: bool = False, auth_service: AuthService = Depends()):
     try:
-        return auth_service.obter_disciplinas(usuario_id, semestre)
+        usuario = auth_service.obter_usuario_atual(usuario_id)
+        disciplinas_db = auth_service.obter_disciplinas(usuario.id, semestre)
+        result = []
+        for d in disciplinas_db:
+            qtd = auth_service.diario_aluno_repo.contar_por_disciplina(d.id)
+            if apenas_assistidos and qtd == 0:
+                continue
+            disc_resp = DisciplinaResponse.model_validate(d)
+            disc_resp.qtd_alunos_assistidos = qtd
+            result.append(disc_resp)
+        return result
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=f"Não foi possível buscar as disciplinas: {str(e)}",
+        )
+
+@router.get("/disciplinas/{disciplina_id}/alunos-assistidos", response_model=list[AlunoAssistidoResponse])
+async def alunos_assistidos(disciplina_id: int, auth_service: AuthService = Depends()):
+    try:
+        return auth_service.obter_alunos_assistidos(disciplina_id)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao buscar alunos assistidos: {str(e)}",
         )

@@ -88,12 +88,7 @@ body {
   font-weight: 700;
 }
 
-.topbar-center {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  text-align: center;
-}
+.topbar-center { flex: 1; text-align: center; }
 
 .page-title {
   font-size: 1.125rem;

@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Optional
 
 from sqlalchemy import String, Integer, ForeignKey, DateTime, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -11,8 +12,10 @@ class Disciplina(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     suap_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    diario_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     descricao: Mapped[str] = mapped_column(String(300), nullable=False)
     sigla: Mapped[str] = mapped_column(String(50), nullable=True)
+    codigo_turma: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     situacao: Mapped[str] = mapped_column(String(100), nullable=True)
     professor: Mapped[str] = mapped_column(String(200), nullable=True)
     semestre: Mapped[str] = mapped_column(String(10), nullable=False)
@@ -22,6 +25,7 @@ class Disciplina(Base):
     )
 
     usuario = relationship("Usuario", back_populates="disciplinas")
+    alunos_assistidos = relationship("DiarioAluno", back_populates="disciplina", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<Disciplina(id={self.id}, sigla={self.sigla}, semestre={self.semestre})>"
