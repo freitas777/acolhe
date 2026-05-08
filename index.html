@@ -1,0 +1,120 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Acolhe+ | Login</title>
+  <link rel="stylesheet" href="/css/index.css">
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="login-container">
+    <div class="login-card">
+      <div class="logo-container">
+        <div class="logo">A+</div>
+        <h1>Acolhe+</h1>
+        <p class="subtitle">Sistema de Apoio a Educacao Inclusiva</p>
+      </div>
+
+      <div class="login-form">
+        <div class="form-info">
+          <p>Utilize sua conta institucional do SUAP para acessar o sistema.</p>
+        </div>
+
+        <div class="form-group">
+          <button id="suap-login" class="suap-button" type="button">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 1.25rem; height: 1.25rem;">
+              <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+              <polyline points="10 17 15 12 10 7"/>
+              <line x1="15" y1="12" x2="3" y2="12"/>
+            </svg>
+            <span class="btn-text">Entrar com SUAP</span>
+          </button>
+        </div>
+
+        <div class="help-links">
+          <a href="https://suap.ifrn.edu.br/accounts/password/reset/" target="_blank" rel="noopener" class="help-link">
+            Esqueceu sua senha?
+          </a>
+        </div>
+      </div>
+
+      <div id="error-message" class="error-message" hidden>
+        <span id="error-text"></span>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/js.cookie.js"></script>
+  <script src="/js/settings.js"></script>
+  <script src="/js/client.js"></script>
+
+  <script>
+  (function() {
+    'use strict';
+
+    Cookies.remove('suapToken');
+    Cookies.remove('suapTokenExpirationTime');
+    Cookies.remove('suapScope');
+
+    var suap = new SuapClient(SUAP_URL, CLIENT_ID, REDIRECT_URI, SCOPE);
+    suap.init();
+
+    if (suap.isAuthenticated() && window.location.hash && window.location.hash.includes('access_token')) {
+      var accessToken = suap.getToken().getValue();
+
+      fetch('/auth/callback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          access_token: accessToken,
+          semestre: SEMESTRE_VIGENTE
+        })
+      })
+      .then(function(response) {
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        return response.json();
+      })
+      .then(function(data) {
+        localStorage.setItem('acolhe_user', JSON.stringify(data.usuario));
+        localStorage.setItem('acolhe_user_id', data.usuario.id);
+        localStorage.setItem('acolhe_access_token', accessToken);
+        localStorage.setItem('acolhe_tipo_perfil', data.tipo_perfil || data.usuario.tipo_perfil || 'aluno');
+        window.location.replace('/disciplinas');
+      })
+      .catch(function(error) {
+        var errorEl = document.getElementById('error-message');
+        var errorText = document.getElementById('error-text');
+        if (errorEl && errorText) {
+          errorText.textContent = 'Erro ao autenticar: ' + error.message;
+          errorEl.hidden = false;
+        }
+      });
+    } else if (window.location.search && window.location.search.includes('error=')) {
+      var errorMatch = window.location.search.match(/error=([^&]+)/);
+      var errorMsg = errorMatch ? decodeURIComponent(errorMatch[1].replace(/\+/g, ' ')) : 'Erro desconhecido';
+      var errorEl = document.getElementById('error-message');
+      var errorText = document.getElementById('error-text');
+      if (errorEl && errorText) {
+        errorText.textContent = 'Erro do SUAP: ' + errorMsg;
+        errorEl.hidden = false;
+      }
+      window.history.replaceState({}, document.title, '/');
+    } else if (suap.isAuthenticated()) {
+      var savedUserId = localStorage.getItem('acolhe_user_id');
+      if (savedUserId) {
+        window.location.replace('/disciplinas');
+      }
+    }
+
+    document.getElementById('suap-login').addEventListener('click', function(e) {
+      e.preventDefault();
+      Cookies.remove('suapToken');
+      Cookies.remove('suapTokenExpirationTime');
+      Cookies.remove('suapScope');
+      suap.login();
+    });
+  })();
+  </script>
+</body>
+</html>

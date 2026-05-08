@@ -28,3 +28,10 @@ class AlunoRepository(BaseRepository[Aluno]):
             .filter(Aluno.id == id)
             .first()
         )
+
+    def get_by_matricula(self, matricula: str) -> Aluno | None:
+        return (
+            self.db.query(Aluno)
+            .filter(Aluno.matricula == matricula)
+            .first()
+        )

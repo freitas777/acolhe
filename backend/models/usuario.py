@@ -8,6 +8,7 @@ from backend.database import Base
 
 
 class TipoPerfil(enum.Enum):
+    aluno = "aluno"
     professor = "professor"
     psicopedagogo = "psicopedagogo"
     admin = "admin"
@@ -20,14 +21,18 @@ class Usuario(Base):
     suap_id: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
     nome: Mapped[str] = mapped_column(String(200), nullable=False)
     email: Mapped[str] = mapped_column(String(200), nullable=False)
-    tipo_perfil: Mapped[TipoPerfil] = mapped_column(
-        Enum(TipoPerfil), nullable=False, default=TipoPerfil.professor
+    matricula: Mapped[str] = mapped_column(String(50), nullable=True)
+    campus: Mapped[str] = mapped_column(String(200), nullable=True)
+    tipo_vinculo: Mapped[str] = mapped_column(String(100), nullable=True)
+    tipo_perfil: Mapped[str] = mapped_column(
+        String(50), nullable=False, default="aluno"
     )
     criado_em: Mapped[datetime] = mapped_column(
         nullable=False, default=datetime.utcnow
     )
 
     conteudos = relationship("ConteudoGerado", back_populates="usuario")
+    disciplinas = relationship("Disciplina", back_populates="usuario", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<Usuario(id={self.id}, nome={self.nome}, tipo={self.tipo_perfil.value})>"

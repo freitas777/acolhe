@@ -1,22 +1,28 @@
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Literal
 
 from pydantic import BaseModel
 
-from backend.models.usuario import TipoPerfil
+TipoPerfilStr = Literal["aluno", "professor", "psicopedagogo", "admin"]
 
 
 class UsuarioCreate(BaseModel):
     suap_id: str
     nome: str
     email: str
-    tipo_perfil: TipoPerfil = TipoPerfil.professor
+    matricula: Optional[str] = None
+    campus: Optional[str] = None
+    tipo_vinculo: Optional[str] = None
+    tipo_perfil: TipoPerfilStr = "aluno"
 
 
 class UsuarioUpdate(BaseModel):
     nome: Optional[str] = None
     email: Optional[str] = None
-    tipo_perfil: Optional[TipoPerfil] = None
+    matricula: Optional[str] = None
+    campus: Optional[str] = None
+    tipo_vinculo: Optional[str] = None
+    tipo_perfil: Optional[TipoPerfilStr] = None
 
 
 class UsuarioResponse(BaseModel):
@@ -24,7 +30,10 @@ class UsuarioResponse(BaseModel):
     suap_id: str
     nome: str
     email: str
-    tipo_perfil: TipoPerfil
+    matricula: Optional[str] = None
+    campus: Optional[str] = None
+    tipo_vinculo: Optional[str] = None
+    tipo_perfil: str
     criado_em: datetime
 
     model_config = {"from_attributes": True}

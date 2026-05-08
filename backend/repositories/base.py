@@ -22,7 +22,7 @@ class BaseRepository(Generic[ModelType]):
         self.db.refresh(instance)
         return instance
 
-    def get_by_id(self, id: int) -> Optional[ModelType]:
+    def get_by_id(self, id: int | str) -> Optional[ModelType]:
         return self.db.get(self.model, id)
 
     def list_all(
@@ -40,7 +40,7 @@ class BaseRepository(Generic[ModelType]):
         result = self.db.execute(stmt)
         return result.unique().scalars().all()
 
-    def update(self, id: int, data: dict[str, Any]) -> Optional[ModelType]:
+    def update(self, id: int | str, data: dict[str, Any]) -> Optional[ModelType]:
         instance = self.get_by_id(id)
         if instance is None:
             return None
@@ -50,7 +50,7 @@ class BaseRepository(Generic[ModelType]):
         self.db.refresh(instance)
         return instance
 
-    def delete(self, id: int) -> bool:
+    def delete(self, id: int | str) -> bool:
         instance = self.get_by_id(id)
         if instance is None:
             return False
