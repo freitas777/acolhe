@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Session, selectinload
 
 from backend.models.aluno import Aluno
@@ -34,4 +35,19 @@ class AlunoRepository(BaseRepository[Aluno]):
             self.db.query(Aluno)
             .filter(Aluno.matricula == matricula)
             .first()
+        )
+
+    def buscar_por_nome_ou_matricula(self, query: str) -> list[Aluno]:
+        termo = f"%{query}%"
+        return (
+            self.db.query(Aluno)
+            .filter(
+                or_(
+                    Aluno.nome.ilike(termo),
+                    Aluno.matricula.ilike(termo),
+                )
+            )
+            .options(selectinload(Aluno.perfil))
+            .limit(50)
+            .all()
         )

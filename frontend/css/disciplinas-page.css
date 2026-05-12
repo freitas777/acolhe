@@ -393,5 +393,20 @@ body {
 }
 
 @media (min-width: 769px) and (max-width: 1024px) {
-  .disciplinas-grid { grid-template-columns: repeat(2, 1fr); }
+.disciplinas-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+.napne-banner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    background: #FFF3E0;
+    border: 1px solid #FFE0B2;
+    border-radius: 12px;
+    color: #E65100;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.4;
 }

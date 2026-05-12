@@ -90,7 +90,21 @@
     if (nameEl) nameEl.textContent = name;
     var titleEl = document.querySelector('.page-title');
     if (titleEl) {
-      titleEl.textContent = tipoPerfil === 'professor' ? 'Meus Diarios' : 'Minhas Disciplinas';
+        if (tipoPerfil === 'professor') {
+            titleEl.textContent = 'Meus Diarios';
+        } else if (tipoPerfil === 'servidor') {
+            titleEl.textContent = 'Meus Diarios';
+        } else {
+            titleEl.textContent = 'Minhas Disciplinas';
+        }
+    }
+
+    if (tipoPerfil === 'servidor') {
+        var napneBanner = document.createElement('div');
+        napneBanner.className = 'napne-banner';
+        napneBanner.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;flex-shrink:0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>Voce ainda nao tem acesso ao Painel NAPNE. Solicite ao Administrador do Sistema a liberacao do seu perfil.</span>';
+        var mainEl = document.querySelector('.disciplinas-page');
+        if (mainEl) mainEl.insertBefore(napneBanner, mainEl.firstChild);
     }
   }
 
@@ -101,7 +115,7 @@
     }
     showLoading();
     var url = '/auth/disciplinas?usuario_id=' + userId + '&semestre=' + SEMESTRE_VIGENTE;
-  if (tipoPerfil === 'professor') url += '&apenas_assistidos=true';
+  if (tipoPerfil === 'professor' || tipoPerfil === 'servidor') url += '&apenas_assistidos=true';
   fetch(url, {
       headers: { 'Authorization': 'Bearer ' + accessToken }
     })
@@ -185,7 +199,7 @@
     if (!grid) return;
     grid.innerHTML = '';
 
-    var isProfessor = tipoPerfil === 'professor';
+    var isProfessor = tipoPerfil === 'professor' || tipoPerfil === 'servidor';
     var colors = ['#0A7F70', '#1565C0', '#6A1B9A', '#C62828', '#E65100', '#2E7D32', '#00838F', '#4527A0', '#AD1457', '#00695C'];
 
     disciplinas.forEach(function(disc, index) {

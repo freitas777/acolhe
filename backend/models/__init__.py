@@ -6,6 +6,7 @@ from backend.models.conversa import Conversa
 from backend.models.mensagem import Mensagem
 from backend.models.disciplina import Disciplina
 from backend.models.diario_aluno import DiarioAluno
+from backend.models.pendencia_validacao import PendenciaValidacao
 
 __all__ = [
     "Usuario",
@@ -16,4 +17,5 @@ __all__ = [
     "Mensagem",
     "Disciplina",
     "DiarioAluno",
+    "PendenciaValidacao",
 ]
