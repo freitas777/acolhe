@@ -12,8 +12,10 @@ from backend.repositories.usuario import UsuarioRepository
 from backend.repositories.disciplina import DisciplinaRepository
 from backend.repositories.diario_aluno import DiarioAlunoRepository
 from backend.repositories.aluno import AlunoRepository
+from backend.models.pendencia_validacao import PendenciaValidacao
+from backend.repositories.pendencia_validacao import PendenciaValidacaoRepository
 from backend.services.suap_service import SUAPService
-from backend.schemas.auth import UsuarioSUAPResponse, DisciplinaResponse, AlunoAssistidoResponse
+from backend.schemas.auth import UsuarioSUAPResponse, DisciplinaResponse, AlunoAssistidoResponse, PendenciaResponse
 from backend.database import get_db
 from fastapi import Depends, HTTPException, status
 
@@ -27,6 +29,7 @@ class AuthService:
         self.disciplina_repo = DisciplinaRepository(db)
         self.diario_aluno_repo = DiarioAlunoRepository(db)
         self.aluno_repo = AlunoRepository(db)
+        self.pendencia_repo = PendenciaValidacaoRepository(db)
         self.suap_service = SUAPService()
 
     async def login_com_suap(self, token: str, semestre: str = "2026.1") -> dict:
@@ -38,12 +41,18 @@ class AuthService:
         matricula = meus_dados.get("matricula", "")
         tipo_vinculo = meus_dados.get("tipo_vinculo", "")
         campus = ""
+        setor = ""
         if meus_dados.get("vinculo"):
             campus = meus_dados["vinculo"].get("campus", "")
+            setor = meus_dados["vinculo"].get("setor", "") or meus_dados["vinculo"].get("lotacao", "")
 
         tipo_perfil = "aluno"
         if tipo_vinculo and tipo_vinculo.lower() not in ("aluno", "estudante"):
-            tipo_perfil = "professor"
+            tipo_perfil = "servidor"
+
+        usuario_existente = self.usuario_repo.get_by_suap_id(suap_id)
+        if usuario_existente and usuario_existente.aprovado_napne:
+            tipo_perfil = "psicopedagogo"
 
         usuario = self.usuario_repo.get_by_suap_id(suap_id)
         if usuario:
@@ -53,8 +62,10 @@ class AuthService:
                 "matricula": matricula,
                 "tipo_vinculo": tipo_vinculo,
                 "campus": campus,
-                "tipo_perfil": tipo_perfil,
+                "setor": setor,
             }
+            if tipo_perfil in ("psicopedagogo", "servidor"):
+                update_data["tipo_perfil"] = tipo_perfil
             for key, value in update_data.items():
                 setattr(usuario, key, value)
             self.db.commit()
@@ -67,12 +78,15 @@ class AuthService:
                 "matricula": matricula,
                 "tipo_vinculo": tipo_vinculo,
                 "campus": campus,
+                "setor": setor,
                 "tipo_perfil": tipo_perfil,
             }
             usuario = self.usuario_repo.create(usuario_data)
 
         try:
-            if tipo_perfil == "professor":
+            if tipo_perfil == "psicopedagogo":
+                pass
+            elif tipo_perfil in ("professor", "servidor"):
                 await self._sincronizar_diarios_professor(usuario, token, semestre)
             else:
                 disciplinas_raw = await self.suap_service.get_disciplinas(token, semestre)
@@ -206,3 +220,55 @@ class AuthService:
 
     def obter_alunos_assistidos(self, disciplina_id: int) -> list[DiarioAluno]:
         return self.diario_aluno_repo.listar_por_disciplina(disciplina_id)
+
+    def obter_pendencias(self) -> list[PendenciaValidacao]:
+        return self.pendencia_repo.listar_pendentes()
+
+    def obter_alunos_ativos(self) -> list[Aluno]:
+        return self.aluno_repo.list_all(limit=1000)
+
+    def buscar_alunos(self, query: str) -> list[Aluno]:
+        return self.aluno_repo.buscar_por_nome_ou_matricula(query)
+
+    def validar_pendencia(self, pendencia_id: int, validado_por_id: int, acao: str) -> PendenciaValidacao:
+        pendencia = self.pendencia_repo.get_by_id(pendencia_id)
+        if not pendencia:
+            raise HTTPException(status_code=404, detail="Pendência não encontrada")
+        if pendencia.status != "pendente":
+            raise HTTPException(status_code=400, detail="Pendência já foi processada")
+        from datetime import datetime
+        update_data = {
+            "status": acao,
+            "validado_por_id": validado_por_id,
+            "validado_em": datetime.utcnow(),
+        }
+        return self.pendencia_repo.update(pendencia_id, update_data)
+
+    def criar_pendencia(self, aluno_id: int, indicado_por_id: int, motivo: str = None) -> PendenciaValidacao:
+        aluno = self.aluno_repo.get_by_id(aluno_id)
+        if not aluno:
+            raise HTTPException(status_code=404, detail="Aluno não encontrado")
+        existing = self.pendencia_repo.get_pendente_por_aluno(aluno_id)
+        if existing:
+            raise HTTPException(status_code=400, detail="Já existe pendência pendente para este aluno")
+        return self.pendencia_repo.create({
+            "aluno_id": aluno_id,
+            "indicado_por_id": indicado_por_id,
+            "motivo": motivo,
+            "status": "pendente",
+        })
+
+    def atualizar_perfil_usuario(self, usuario_id: int, novo_perfil: str) -> Usuario:
+        usuario = self.usuario_repo.get_by_id(usuario_id)
+        if not usuario:
+            raise HTTPException(status_code=404, detail="Usuário não encontrado")
+        if novo_perfil == "psicopedagogo":
+            usuario.tipo_perfil = "psicopedagogo"
+            usuario.aprovado_napne = True
+        else:
+            usuario.tipo_perfil = novo_perfil
+            if novo_perfil != "psicopedagogo":
+                usuario.aprovado_napne = False
+        self.db.commit()
+        self.db.refresh(usuario)
+        return usuario

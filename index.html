@@ -80,7 +80,14 @@
         localStorage.setItem('acolhe_user_id', data.usuario.id);
         localStorage.setItem('acolhe_access_token', accessToken);
         localStorage.setItem('acolhe_tipo_perfil', data.tipo_perfil || data.usuario.tipo_perfil || 'aluno');
-        window.location.replace('/disciplinas');
+        var perfil = data.tipo_perfil || data.usuario.tipo_perfil || 'aluno';
+        var redirectUrl = '/disciplinas';
+        if (perfil === 'psicopedagogo' || perfil === 'admin') {
+            redirectUrl = '/painel';
+        } else if (perfil === 'servidor') {
+            redirectUrl = '/disciplinas';
+        }
+        window.location.replace(redirectUrl);
       })
       .catch(function(error) {
         var errorEl = document.getElementById('error-message');
@@ -101,10 +108,15 @@
       }
       window.history.replaceState({}, document.title, '/');
     } else if (suap.isAuthenticated()) {
-      var savedUserId = localStorage.getItem('acolhe_user_id');
-      if (savedUserId) {
-        window.location.replace('/disciplinas');
-      }
+        var savedUserId = localStorage.getItem('acolhe_user_id');
+        var savedPerfil = localStorage.getItem('acolhe_tipo_perfil') || 'aluno';
+        if (savedUserId) {
+            var redirectUrl = '/disciplinas';
+            if (savedPerfil === 'psicopedagogo' || savedPerfil === 'admin') {
+                redirectUrl = '/painel';
+            }
+            window.location.replace(redirectUrl);
+        }
     }
 
     document.getElementById('suap-login').addEventListener('click', function(e) {
