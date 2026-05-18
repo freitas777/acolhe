@@ -4,6 +4,7 @@ from urllib.parse import urlencode
 import httpx
 
 from backend.config import settings
+from backend.dependencies import AuthData, get_current_usuario
 from backend.services.auth_service import AuthService
 from backend.schemas.auth import LoginRequest, LoginResponse, UsuarioSUAPResponse, DisciplinaResponse, AlunoAssistidoResponse
 
@@ -52,14 +53,18 @@ async def callback(request: LoginRequest, auth_service: AuthService = Depends())
         )
 
 @router.get("/me", response_model=UsuarioSUAPResponse)
-async def me(usuario_id: int = 1, auth_service: AuthService = Depends()):
-    usuario = auth_service.obter_usuario_atual(usuario_id)
-    return usuario
+async def me(auth_data: AuthData = Depends(get_current_usuario)):
+    return auth_data.usuario
 
 @router.get("/disciplinas", response_model=list[DisciplinaResponse])
-async def disciplinas(usuario_id: int = 1, semestre: str = None, apenas_assistidos: bool = False, auth_service: AuthService = Depends()):
+async def disciplinas(
+    semestre: str = None,
+    apenas_assistidos: bool = False,
+    auth_data: AuthData = Depends(get_current_usuario),
+    auth_service: AuthService = Depends(),
+):
     try:
-        usuario = auth_service.obter_usuario_atual(usuario_id)
+        usuario = auth_data.usuario
         disciplinas_db = auth_service.obter_disciplinas(usuario.id, semestre)
         result = []
         for d in disciplinas_db:
@@ -77,7 +82,11 @@ async def disciplinas(usuario_id: int = 1, semestre: str = None, apenas_assistid
         )
 
 @router.get("/disciplinas/{disciplina_id}/alunos-assistidos", response_model=list[AlunoAssistidoResponse])
-async def alunos_assistidos(disciplina_id: int, auth_service: AuthService = Depends()):
+async def alunos_assistidos(
+    disciplina_id: int,
+    auth_data: AuthData = Depends(get_current_usuario),
+    auth_service: AuthService = Depends(),
+):
     try:
         return auth_service.obter_alunos_assistidos(disciplina_id)
     except Exception as e:

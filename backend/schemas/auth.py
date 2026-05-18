@@ -85,6 +85,9 @@ class AlunoResumoResponse(BaseModel):
     id: int
     nome: str
     matricula: Optional[str] = None
+    curso: Optional[str] = None
+    campus: Optional[str] = None
+    status_acompanhamento: Optional[str] = None
     diagnostico: Optional[str] = None
     criado_em: datetime
 

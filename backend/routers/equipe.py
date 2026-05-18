@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
+from backend.dependencies import AuthData, get_current_usuario, require_napne
 from backend.services.auth_service import AuthService
 from backend.schemas.auth import (
     PendenciaResponse,
@@ -15,7 +16,10 @@ router = APIRouter(prefix="/equipe", tags=["Equipe NAPNE"])
 
 
 @router.get("/pendencias", response_model=list[PendenciaResponse])
-async def listar_pendencias(auth_service: AuthService = Depends()):
+async def listar_pendencias(
+    auth_data: AuthData = Depends(get_current_usuario),
+    auth_service: AuthService = Depends(),
+):
     pendencias = auth_service.obter_pendencias()
     result = []
     for p in pendencias:
@@ -38,12 +42,12 @@ async def listar_pendencias(auth_service: AuthService = Depends()):
 @router.post("/pendencias", response_model=PendenciaResponse, status_code=status.HTTP_201_CREATED)
 async def criar_pendencia(
     request: PendenciaCreateRequest,
-    usuario_id: int = 1,
+    auth_data: AuthData = Depends(require_napne),
     auth_service: AuthService = Depends(),
 ):
     if request.motivo is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Motivo é obrigatório")
-    pendencia = auth_service.criar_pendencia(request.aluno_id, usuario_id, request.motivo)
+    pendencia = auth_service.criar_pendencia(request.aluno_id, auth_data.usuario.id, request.motivo)
     return PendenciaResponse(
         id=pendencia.id,
         aluno_id=pendencia.aluno_id,
@@ -62,12 +66,12 @@ async def criar_pendencia(
 async def validar_pendencia(
     pendencia_id: int,
     request: PendenciaValidacaoRequest,
-    usuario_id: int = 1,
+    auth_data: AuthData = Depends(require_napne),
     auth_service: AuthService = Depends(),
 ):
     if request.acao not in ("validado", "rejeitado"):
         raise HTTPException(status_code=400, detail="Ação deve ser 'validado' ou 'rejeitado'")
-    pendencia = auth_service.validar_pendencia(pendencia_id, usuario_id, request.acao)
+    pendencia = auth_service.validar_pendencia(pendencia_id, auth_data.usuario.id, request.acao)
     return PendenciaResponse(
         id=pendencia.id,
         aluno_id=pendencia.aluno_id,
@@ -83,7 +87,10 @@ async def validar_pendencia(
 
 
 @router.get("/alunos-ativos", response_model=list[AlunoResumoResponse])
-async def listar_alunos_ativos(auth_service: AuthService = Depends()):
+async def listar_alunos_ativos(
+    auth_data: AuthData = Depends(get_current_usuario),
+    auth_service: AuthService = Depends(),
+):
     alunos = auth_service.obter_alunos_ativos()
     result = []
     for a in alunos:
@@ -91,6 +98,9 @@ async def listar_alunos_ativos(auth_service: AuthService = Depends()):
             id=a.id,
             nome=a.nome,
             matricula=a.matricula,
+            curso=a.curso,
+            campus=a.campus,
+            status_acompanhamento=a.status_acompanhamento,
             diagnostico=a.perfil.diagnostico if a.perfil else None,
             criado_em=a.criado_em,
         ))
@@ -98,7 +108,11 @@ async def listar_alunos_ativos(auth_service: AuthService = Depends()):
 
 
 @router.get("/alunos-busca", response_model=list[AlunoResumoResponse])
-async def buscar_alunos(q: str = "", auth_service: AuthService = Depends()):
+async def buscar_alunos(
+    q: str = "",
+    auth_data: AuthData = Depends(get_current_usuario),
+    auth_service: AuthService = Depends(),
+):
     if not q or len(q) < 2:
         return []
     alunos = auth_service.buscar_alunos(q)
@@ -108,6 +122,9 @@ async def buscar_alunos(q: str = "", auth_service: AuthService = Depends()):
             id=a.id,
             nome=a.nome,
             matricula=a.matricula,
+            curso=a.curso,
+            campus=a.campus,
+            status_acompanhamento=a.status_acompanhamento,
             diagnostico=a.perfil.diagnostico if a.perfil else None,
             criado_em=a.criado_em,
         ))
@@ -118,8 +135,11 @@ async def buscar_alunos(q: str = "", auth_service: AuthService = Depends()):
 async def atualizar_perfil(
     usuario_id: int,
     request: AtualizarPerfilRequest,
+    auth_data: AuthData = Depends(get_current_usuario),
     auth_service: AuthService = Depends(),
 ):
+    if auth_data.usuario.tipo_perfil not in ("psicopedagogo", "admin"):
+        raise HTTPException(status_code=403, detail="Apenas psicopedagogos ou admins podem alterar perfis")
     if request.tipo_perfil not in ("aluno", "professor", "psicopedagogo", "admin", "servidor"):
         raise HTTPException(status_code=400, detail="Perfil inválido")
     usuario = auth_service.atualizar_perfil_usuario(usuario_id, request.tipo_perfil)

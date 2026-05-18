@@ -49,6 +49,10 @@ async def disciplinas():
 async def painel():
     return FileResponse(str(FRONTEND_DIR / "painel.html"))
 
+@app.get("/importacao")
+async def importacao():
+    return FileResponse(str(FRONTEND_DIR / "importacao.html"))
+
 @app.get("/health")
 async def health():
     return {"status": "ok", "frontend_dir": str(FRONTEND_DIR)}
@@ -62,6 +66,7 @@ from backend.routers.usuario import router as usuario_router
 from backend.routers.conteudo_gerado import router as conteudo_router
 from backend.routers.auth import router as auth_router
 from backend.routers.equipe import router as equipe_router
+from backend.routers.importacao import router as importacao_router
 
 app.include_router(chat_router)
 app.include_router(aluno_router)
@@ -69,6 +74,7 @@ app.include_router(usuario_router)
 app.include_router(conteudo_router)
 app.include_router(auth_router)
 app.include_router(equipe_router)
+app.include_router(importacao_router)
 
 # =====================
 # ARQUIVOS ESTÁTICOS
