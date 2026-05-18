@@ -37,6 +37,13 @@ class AlunoRepository(BaseRepository[Aluno]):
             .first()
         )
 
+    def get_by_suap_id(self, suap_id: str) -> Aluno | None:
+        return (
+            self.db.query(Aluno)
+            .filter(Aluno.suap_id == suap_id)
+            .first()
+        )
+
     def buscar_por_nome_ou_matricula(self, query: str) -> list[Aluno]:
         termo = f"%{query}%"
         return (
@@ -49,5 +56,21 @@ class AlunoRepository(BaseRepository[Aluno]):
             )
             .options(selectinload(Aluno.perfil))
             .limit(50)
+            .all()
+        )
+
+    def get_all_matriculas(self) -> set[str]:
+        results = self.db.query(Aluno.matricula).filter(Aluno.matricula.isnot(None)).all()
+        return {r[0] for r in results if r[0]}
+
+    def get_all_suap_ids(self) -> set[str]:
+        results = self.db.query(Aluno.suap_id).filter(Aluno.suap_id.isnot(None)).all()
+        return {r[0] for r in results if r[0]}
+
+    def listar_por_status(self, status_acompanhamento: str) -> list[Aluno]:
+        return (
+            self.db.query(Aluno)
+            .filter(Aluno.status_acompanhamento == status_acompanhamento)
+            .options(selectinload(Aluno.perfil))
             .all()
         )

@@ -43,8 +43,15 @@ body {
 }
 
 .topbar-center {
-    flex: 1;
-    text-align: center;
+	flex: 1;
+	text-align: center;
+}
+
+.topbar-left {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	min-width: 180px;
 }
 
 .topbar-logo {
@@ -145,6 +152,34 @@ body {
     margin: 0 auto;
     padding: 24px;
     width: 100%;
+}
+
+.painel-nav {
+    margin-bottom: 20px;
+}
+
+.nav-importacao {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    background: #0A7F70;
+    color: #fff;
+    border-radius: 8px;
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 600;
+    transition: background 0.2s, transform 0.1s;
+}
+
+.nav-importacao:hover {
+    background: #086659;
+    transform: translateY(-1px);
+}
+
+.nav-importacao svg {
+    width: 18px;
+    height: 18px;
 }
 
 .painel-section {

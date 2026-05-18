@@ -14,6 +14,15 @@ class Aluno(Base):
     nome: Mapped[str] = mapped_column(String(200), nullable=False)
     matricula: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, unique=True)
     suap_id: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, unique=True)
+    curso: Mapped[Optional[str]] = mapped_column(String(300), nullable=True)
+    campus: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    foto_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    email: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    cpf: Mapped[Optional[str]] = mapped_column(String(14), nullable=True)
+    status_acompanhamento: Mapped[str] = mapped_column(
+        String(50), nullable=False, default="aguardando_indicacao"
+    )
+    data_importacao: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     observacoes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     criado_em: Mapped[datetime] = mapped_column(
         nullable=False, default=datetime.utcnow

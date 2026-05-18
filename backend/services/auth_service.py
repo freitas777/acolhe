@@ -34,17 +34,28 @@ class AuthService:
 
     async def login_com_suap(self, token: str, semestre: str = "2026.1") -> dict:
         meus_dados = await self.suap_service.get_meus_dados(token)
+        eu_dados = await self.suap_service.get_eu(token)
 
         suap_id = str(meus_dados.get("id", ""))
-        nome = meus_dados.get("nome_usual", "")
-        email = meus_dados.get("email", "")
-        matricula = meus_dados.get("matricula", "")
-        tipo_vinculo = meus_dados.get("tipo_vinculo", "")
-        campus = ""
+        nome = eu_dados.get("nome_usual", "") or eu_dados.get("nome", "") or meus_dados.get("nome", "")
+        email = eu_dados.get("email", "") or meus_dados.get("email", "")
+        campus = eu_dados.get("campus", "")
+
+        matricula = ""
+        tipo_vinculo = ""
         setor = ""
-        if meus_dados.get("vinculo"):
-            campus = meus_dados["vinculo"].get("campus", "")
-            setor = meus_dados["vinculo"].get("setor", "") or meus_dados["vinculo"].get("lotacao", "")
+        try:
+            vinculos = await self.suap_service.get_meus_vinculos(token)
+            if vinculos:
+                primeiro = vinculos[0]
+                matricula = primeiro.get("identificador", "")
+                tipo_vinculo = primeiro.get("tipo", "")
+                if not campus:
+                    campus = primeiro.get("campus", "") or ""
+                detalhe = primeiro.get("detalhamento") or {}
+                setor = detalhe.get("cargo", "") or detalhe.get("modalidade", "") or ""
+        except Exception as e:
+            logger.warning(f"Falha ao obter vinculos do SUAP: {e}")
 
         tipo_perfil = "aluno"
         if tipo_vinculo and tipo_vinculo.lower() not in ("aluno", "estudante"):
@@ -222,7 +233,19 @@ class AuthService:
         return self.diario_aluno_repo.listar_por_disciplina(disciplina_id)
 
     def obter_pendencias(self) -> list[PendenciaValidacao]:
-        return self.pendencia_repo.listar_pendentes()
+        pendencias = self.pendencia_repo.listar_pendentes()
+        aluno_ids_com_pendencia = {p.aluno_id for p in pendencias}
+        aguardando = self.aluno_repo.listar_por_status("aguardando_indicacao")
+        for aluno in aguardando:
+            if aluno.id not in aluno_ids_com_pendencia:
+                pendencia = self.pendencia_repo.create({
+                    "aluno_id": aluno.id,
+                    "status": "pendente",
+                    "motivo": "Aguardando indicacao",
+                    "criado_em": aluno.data_importacao or aluno.criado_em,
+                })
+                pendencias.append(pendencia)
+        return pendencias
 
     def obter_alunos_ativos(self) -> list[Aluno]:
         return self.aluno_repo.list_all(limit=1000)
@@ -242,7 +265,14 @@ class AuthService:
             "validado_por_id": validado_por_id,
             "validado_em": datetime.utcnow(),
         }
-        return self.pendencia_repo.update(pendencia_id, update_data)
+        pendencia = self.pendencia_repo.update(pendencia_id, update_data)
+        if acao == "validado" and pendencia.aluno_id:
+            aluno = self.aluno_repo.get_by_id(pendencia.aluno_id)
+            if aluno and aluno.status_acompanhamento == "aguardando_indicacao":
+                aluno.status_acompanhamento = "ativo"
+                self.db.commit()
+                self.db.refresh(aluno)
+        return pendencia
 
     def criar_pendencia(self, aluno_id: int, indicado_por_id: int, motivo: str = None) -> PendenciaValidacao:
         aluno = self.aluno_repo.get_by_id(aluno_id)
