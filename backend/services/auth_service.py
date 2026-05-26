@@ -135,11 +135,7 @@ class AuthService:
 
         self.disciplina_repo.deletar_por_usuario_e_semestre(usuario.id, semestre)
 
-        alunos_assistidos_db = self.aluno_repo.list_all(limit=10000)
-        assistidos_by_matricula = {}
-        for a in alunos_assistidos_db:
-            if a.matricula:
-                assistidos_by_matricula[a.matricula] = a
+        assistidos_by_matricula = self.aluno_repo.get_matricula_lookup()
 
         for diario in diarios_raw:
             diario_id = diario.get("id", 0)
@@ -233,22 +229,10 @@ class AuthService:
         return self.diario_aluno_repo.listar_por_disciplina(disciplina_id)
 
     def obter_pendencias(self) -> list[PendenciaValidacao]:
-        pendencias = self.pendencia_repo.listar_pendentes()
-        aluno_ids_com_pendencia = {p.aluno_id for p in pendencias}
-        aguardando = self.aluno_repo.listar_por_status("aguardando_indicacao")
-        for aluno in aguardando:
-            if aluno.id not in aluno_ids_com_pendencia:
-                pendencia = self.pendencia_repo.create({
-                    "aluno_id": aluno.id,
-                    "status": "pendente",
-                    "motivo": "Aguardando indicacao",
-                    "criado_em": aluno.data_importacao or aluno.criado_em,
-                })
-                pendencias.append(pendencia)
-        return pendencias
+        return self.pendencia_repo.listar_pendentes()
 
     def obter_alunos_ativos(self) -> list[Aluno]:
-        return self.aluno_repo.list_all(limit=1000)
+        return self.aluno_repo.listar_por_status("ativo")
 
     def buscar_alunos(self, query: str) -> list[Aluno]:
         return self.aluno_repo.buscar_por_nome_ou_matricula(query)
@@ -266,10 +250,13 @@ class AuthService:
             "validado_em": datetime.utcnow(),
         }
         pendencia = self.pendencia_repo.update(pendencia_id, update_data)
-        if acao == "validado" and pendencia.aluno_id:
+        if acao in ("validado", "rejeitado") and pendencia.aluno_id:
             aluno = self.aluno_repo.get_by_id(pendencia.aluno_id)
-            if aluno and aluno.status_acompanhamento == "aguardando_indicacao":
-                aluno.status_acompanhamento = "ativo"
+            if aluno:
+                if acao == "validado" and aluno.status_acompanhamento == "aguardando_indicacao":
+                    aluno.status_acompanhamento = "ativo"
+                elif acao == "rejeitado":
+                    aluno.status_acompanhamento = "rejeitado"
                 self.db.commit()
                 self.db.refresh(aluno)
         return pendencia

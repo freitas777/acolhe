@@ -14,6 +14,7 @@ from backend.database import get_db
 from backend.dependencies import AuthData, get_current_usuario, require_napne
 from backend.models.aluno import Aluno
 from backend.repositories.aluno import AlunoRepository
+from backend.repositories.pendencia_validacao import PendenciaValidacaoRepository
 from backend.schemas.aluno import AlunoSUAPSearchResult, ImportarAlunoRequest, AlunoResponse
 from backend.services.suap_service import SUAPService
 
@@ -89,11 +90,7 @@ async def buscar_alunos(
     aluno_repo = AlunoRepository(db)
     usuario_campus = auth_data.usuario.campus or ""
 
-    existing_alunos = aluno_repo.list_all(limit=10000)
-    existing_by_matricula: dict[str, Aluno] = {}
-    for a in existing_alunos:
-        if a.matricula:
-            existing_by_matricula[a.matricula] = a
+    existing_by_matricula = aluno_repo.get_matricula_lookup()
 
     results: list[AlunoSUAPSearchResult] = []
     seen: set[str] = set()
@@ -372,4 +369,13 @@ async def importar_aluno(
         "data_importacao": datetime.utcnow(),
     })
     logger.info(f"[IMPORTAR] Aluno {novo.nome} ({novo.matricula}) importado com sucesso (id={novo.id})")
+
+    pendencia_repo = PendenciaValidacaoRepository(db)
+    pendencia_repo.create({
+        "aluno_id": novo.id,
+        "status": "pendente",
+        "motivo": "Aguardando indicacao",
+        "criado_em": novo.data_importacao or novo.criado_em,
+    })
+
     return novo

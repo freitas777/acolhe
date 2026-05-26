@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
+from backend.dependencies import AuthData, get_current_usuario
 from backend.schemas.chat import (
     ChatRequisicao,
     ChatResposta,
@@ -28,6 +29,7 @@ def _service(db: Session = Depends(get_db)) -> ChatService:
 )
 async def criar_conversa(
     dados: ConversaCriar,
+    auth_data: AuthData = Depends(get_current_usuario),
     service: ChatService = Depends(_service),
 ):
     return service.criar_conversa(dados)
@@ -38,6 +40,7 @@ async def criar_conversa(
     response_model=list[ConversaResposta],
 )
 async def listar_conversas(
+    auth_data: AuthData = Depends(get_current_usuario),
     service: ChatService = Depends(_service),
 ):
     return service.listar_conversas()
@@ -46,6 +49,7 @@ async def listar_conversas(
 @router.post("/send", response_model=ChatResposta)
 async def enviar_mensagem(
     dados: ChatRequisicao,
+    auth_data: AuthData = Depends(get_current_usuario),
     service: ChatService = Depends(_service),
 ):
     return await service.enviar_mensagem(dados)
@@ -57,6 +61,7 @@ async def enviar_mensagem(
 )
 async def gerar_conteudo_educacional(
     dados: ConteudoEducacionalRequisicao,
+    auth_data: AuthData = Depends(get_current_usuario),
     service: ChatService = Depends(_service),
 ):
     return await service.gerar_conteudo_educacional(dados)
@@ -68,6 +73,7 @@ async def gerar_conteudo_educacional(
 )
 async def deletar_conversa(
     conversa_id: str,
+    auth_data: AuthData = Depends(get_current_usuario),
     service: ChatService = Depends(_service),
 ):
     service.deletar_conversa(conversa_id)
