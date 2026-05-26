@@ -15,7 +15,10 @@ class PendenciaValidacaoRepository(BaseRepository[PendenciaValidacao]):
         return (
             self.db.query(PendenciaValidacao)
             .filter(PendenciaValidacao.status == "pendente")
-            .options(selectinload(PendenciaValidacao.aluno))
+            .options(
+                selectinload(PendenciaValidacao.aluno),
+                selectinload(PendenciaValidacao.indicado_por),
+            )
             .order_by(PendenciaValidacao.criado_em.desc())
             .all()
         )

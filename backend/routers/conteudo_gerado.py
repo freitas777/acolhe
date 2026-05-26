@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
+from backend.dependencies import AuthData, get_current_usuario, require_napne
 from backend.repositories.aluno import AlunoRepository
 from backend.repositories.conteudo_gerado import ConteudoGeradoRepository
 from backend.schemas.conteudo_gerado import (
@@ -30,7 +31,11 @@ def _aluno_repo(db: Session) -> AlunoRepository:
     response_model=ConteudoGeradoResponse,
     status_code=status.HTTP_201_CREATED,
 )
-def create_conteudo(data: ConteudoGeradoCreate, db: Session = Depends(get_db)):
+def create_conteudo(
+    data: ConteudoGeradoCreate,
+    auth_data: AuthData = Depends(require_napne),
+    db: Session = Depends(get_db),
+):
     aluno = _aluno_repo(db).get_by_id(data.aluno_id)
     if not aluno:
         raise HTTPException(status_code=404, detail="Aluno nao encontrado")
@@ -44,6 +49,7 @@ def list_conteudos(
     aluno_id: Optional[int] = None,
     skip: int = 0,
     limit: int = 100,
+    auth_data: AuthData = Depends(get_current_usuario),
     db: Session = Depends(get_db),
 ):
     if aluno_id:
@@ -52,7 +58,11 @@ def list_conteudos(
 
 
 @router.get("/{conteudo_id}", response_model=ConteudoGeradoResponse)
-def get_conteudo(conteudo_id: int, db: Session = Depends(get_db)):
+def get_conteudo(
+    conteudo_id: int,
+    auth_data: AuthData = Depends(get_current_usuario),
+    db: Session = Depends(get_db),
+):
     conteudo = _conteudo_repo(db).get_by_id(conteudo_id)
     if not conteudo:
         raise HTTPException(
@@ -63,7 +73,10 @@ def get_conteudo(conteudo_id: int, db: Session = Depends(get_db)):
 
 @router.put("/{conteudo_id}", response_model=ConteudoGeradoResponse)
 def update_conteudo(
-    conteudo_id: int, data: ConteudoGeradoUpdate, db: Session = Depends(get_db)
+    conteudo_id: int,
+    data: ConteudoGeradoUpdate,
+    auth_data: AuthData = Depends(require_napne),
+    db: Session = Depends(get_db),
 ):
     payload = data.model_dump(exclude_none=True)
     updated = _conteudo_repo(db).update(conteudo_id, payload)
@@ -77,7 +90,11 @@ def update_conteudo(
 @router.delete(
     "/{conteudo_id}", status_code=status.HTTP_204_NO_CONTENT
 )
-def delete_conteudo(conteudo_id: int, db: Session = Depends(get_db)):
+def delete_conteudo(
+    conteudo_id: int,
+    auth_data: AuthData = Depends(require_napne),
+    db: Session = Depends(get_db),
+):
     deleted = _conteudo_repo(db).delete(conteudo_id)
     if not deleted:
         raise HTTPException(

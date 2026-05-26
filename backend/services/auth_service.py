@@ -135,11 +135,7 @@ class AuthService:
 
         self.disciplina_repo.deletar_por_usuario_e_semestre(usuario.id, semestre)
 
-        alunos_assistidos_db = self.aluno_repo.list_all(limit=10000)
-        assistidos_by_matricula = {}
-        for a in alunos_assistidos_db:
-            if a.matricula:
-                assistidos_by_matricula[a.matricula] = a
+        assistidos_by_matricula = self.aluno_repo.get_matricula_lookup()
 
         for diario in diarios_raw:
             diario_id = diario.get("id", 0)

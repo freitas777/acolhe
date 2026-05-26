@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 
 import httpx
 from fastapi import Depends, Header, HTTPException, Request, status
@@ -13,6 +14,9 @@ from backend.repositories.usuario import UsuarioRepository
 from backend.services.suap_service import SUAPService
 
 logger = logging.getLogger(__name__)
+
+_AUTH_CACHE: dict[str, tuple[float, str]] = {}
+_AUTH_CACHE_TTL = 300
 
 
 class AuthData(BaseModel):
@@ -44,22 +48,47 @@ async def get_current_usuario(
             detail="Token de autorização não fornecido.",
         )
 
+    now = time.time()
+    cached_entry = _AUTH_CACHE.get(suap_token)
+    if cached_entry and (now - cached_entry[0]) < _AUTH_CACHE_TTL:
+        usuario_repo_cache = UsuarioRepository(db)
+        usuario = usuario_repo_cache.get_by_suap_id(cached_entry[1])
+        if usuario:
+            auth_data = AuthData(usuario=usuario, suap_token=suap_token)
+            request.state._auth_data = auth_data
+            return auth_data
+
     suap_service = SUAPService()
     try:
         meus_dados = await suap_service.get_meus_dados(suap_token)
     except httpx.HTTPStatusError as e:
         if e.response.status_code in (401, 403):
+            _AUTH_CACHE.pop(suap_token, None)
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Token inválido ou expirado. Faça login novamente.",
             )
         logger.warning(f"Erro HTTP SUAP ao validar token: {e}")
+        if cached_entry:
+            usuario_repo_fallback = UsuarioRepository(db)
+            usuario = usuario_repo_fallback.get_by_suap_id(cached_entry[1])
+            if usuario:
+                auth_data = AuthData(usuario=usuario, suap_token=suap_token)
+                request.state._auth_data = auth_data
+                return auth_data
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="SUAP indisponível. Tente novamente em alguns segundos.",
         )
     except Exception as e:
         logger.warning(f"Erro de conexão ao validar token SUAP: {e}")
+        if cached_entry:
+            usuario_repo_fallback = UsuarioRepository(db)
+            usuario = usuario_repo_fallback.get_by_suap_id(cached_entry[1])
+            if usuario:
+                auth_data = AuthData(usuario=usuario, suap_token=suap_token)
+                request.state._auth_data = auth_data
+                return auth_data
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="SUAP indisponível. Tente novamente em alguns segundos.",
@@ -92,12 +121,13 @@ async def get_current_usuario(
         logger.warning(f"Nao foi possivel atualizar campus do usuario {usuario.id}: {e}")
 
     auth_data = AuthData(usuario=usuario, suap_token=suap_token)
+    _AUTH_CACHE[suap_token] = (now, suap_id)
     request.state._auth_data = auth_data
     return auth_data
 
 
 def require_napne(auth_data: AuthData = Depends(get_current_usuario)) -> AuthData:
-    if auth_data.usuario.tipo_perfil not in ("psicopedagogo", "servidor", "admin", "aluno"):
+    if auth_data.usuario.tipo_perfil not in ("psicopedagogo", "servidor", "admin"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Acesso restrito a membros do NAPNE ou servidores autorizados.",

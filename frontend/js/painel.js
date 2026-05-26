@@ -48,8 +48,11 @@
         fetch('/equipe/pendencias', {
             headers: { 'Authorization': 'Bearer ' + accessToken }
         })
-        .then(function(r) { return r.json(); })
-        .then(function(pendencias) {
+      .then(function(r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      })
+      .then(function(pendencias) {
             if (countEl) countEl.textContent = pendencias.length;
             if (!pendencias || pendencias.length === 0) {
                 listEl.innerHTML = '<div class="empty-col"><p>Nenhuma pendencia no momento</p></div>';
@@ -115,12 +118,15 @@
         var countEl = document.getElementById('ativos-count');
         if (!listEl) return;
 
-        fetch('/equipe/alunos-ativos', {
-            headers: { 'Authorization': 'Bearer ' + accessToken }
-        })
-        .then(function(r) { return r.json(); })
-        .then(function(alunos) {
-            if (countEl) countEl.textContent = alunos.length;
+    fetch('/equipe/alunos-ativos', {
+      headers: { 'Authorization': 'Bearer ' + accessToken }
+    })
+      .then(function(r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      })
+      .then(function(alunos) {
+        if (countEl) countEl.textContent = alunos.length;
             if (!alunos || alunos.length === 0) {
                 listEl.innerHTML = '<div class="empty-col"><p>Nenhum aluno ativo registrado</p></div>';
                 return;
@@ -154,11 +160,14 @@
             return;
         }
 
-        fetch('/equipe/alunos-busca?q=' + encodeURIComponent(query), {
-            headers: { 'Authorization': 'Bearer ' + accessToken }
-        })
-        .then(function(r) { return r.json(); })
-        .then(function(alunos) {
+    fetch('/equipe/alunos-busca?q=' + encodeURIComponent(query), {
+      headers: { 'Authorization': 'Bearer ' + accessToken }
+    })
+      .then(function(r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      })
+      .then(function(alunos) {
             if (!alunos || alunos.length === 0) {
                 resultsEl.innerHTML = '<div class="search-empty">Nenhum aluno encontrado</div>';
                 resultsEl.hidden = false;

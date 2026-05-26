@@ -90,11 +90,7 @@ async def buscar_alunos(
     aluno_repo = AlunoRepository(db)
     usuario_campus = auth_data.usuario.campus or ""
 
-    existing_alunos = aluno_repo.list_all(limit=10000)
-    existing_by_matricula: dict[str, Aluno] = {}
-    for a in existing_alunos:
-        if a.matricula:
-            existing_by_matricula[a.matricula] = a
+    existing_by_matricula = aluno_repo.get_matricula_lookup()
 
     results: list[AlunoSUAPSearchResult] = []
     seen: set[str] = set()

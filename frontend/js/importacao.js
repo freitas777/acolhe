@@ -133,11 +133,14 @@
 
     fetch('/importacao/buscar?' + params, { headers: authHeaders() })
       .then(function(r) {
-        if (r.status === 401 || r.status === 403) {
+        if (r.status === 401) {
           localStorage.removeItem('acolhe_access_token');
           localStorage.removeItem('acolhe_user');
           window.location.href = '/';
           throw new Error('Sessao expirada');
+        }
+        if (r.status === 403) {
+          throw new Error('Acesso negado. Apenas membros do NAPNE podem importar alunos.');
         }
         if (r.status === 502) {
           return r.json().then(function(data) {
@@ -164,17 +167,20 @@
         showCount(results.length);
         renderResults(results);
       })
-   .catch(function(err) {
-     isSearching = false;
-     hideLoading();
-     if (err.message === 'Sessao expirada') return;
-     
+      .catch(function(err) {
+        isSearching = false;
+        hideLoading();
+        if (err.message === 'Sessao expirada') return;
+
         var msg = err.message || '';
-	if (msg.indexOf('[SUAP_MODULE_ERROR]') !== -1) {
-		showSuapAlert();
-		showEmptyState();
-	}
-   });
+        if (msg.indexOf('[SUAP_MODULE_ERROR]') !== -1) {
+          showSuapAlert();
+          showEmptyState();
+        } else if (msg.indexOf('Acesso negado') !== -1 || msg.indexOf('indispon') !== -1) {
+          showToast(msg, 'error');
+          showEmptyState();
+        }
+      });
   }
 
   function renderResults(results) {
@@ -259,10 +265,13 @@
       body: JSON.stringify({ matricula: matricula })
     })
       .then(function(r) {
-        if (r.status === 401 || r.status === 403) {
+        if (r.status === 401) {
           localStorage.removeItem('acolhe_access_token');
           window.location.href = '/';
           throw new Error('Sessao expirada');
+        }
+        if (r.status === 403) {
+          throw new Error('Acesso negado. Apenas membros do NAPNE podem importar alunos.');
         }
         if (r.status === 409) {
           return r.json().then(function(data) {

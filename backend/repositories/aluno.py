@@ -67,6 +67,14 @@ class AlunoRepository(BaseRepository[Aluno]):
         results = self.db.query(Aluno.suap_id).filter(Aluno.suap_id.isnot(None)).all()
         return {r[0] for r in results if r[0]}
 
+    def get_matricula_lookup(self) -> dict[str, Aluno]:
+        rows = (
+            self.db.query(Aluno)
+            .filter(Aluno.matricula.isnot(None))
+            .all()
+        )
+        return {a.matricula: a for a in rows if a.matricula}
+
     def listar_por_status(self, status_acompanhamento: str) -> list[Aluno]:
         return (
             self.db.query(Aluno)

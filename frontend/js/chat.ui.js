@@ -312,13 +312,13 @@ const ChatUI = {
 
     const errorDiv = document.createElement('div');
     errorDiv.className = 'message error-message';
-    errorDiv.innerHTML = `
-      <div class="message-content" style="width: 100%;">
-        <div class="message-text" style="color: var(--color-error);">
-          ⚠️ ${message}
-        </div>
-      </div>
-    `;
+        errorDiv.innerHTML = `
+            <div class="message-content" style="width: 100%;">
+                <div class="message-text" style="color: var(--color-error);">
+                    ⚠️ ${this.escapeHtml(message)}
+                </div>
+            </div>
+        `;
 
     wrapper.appendChild(errorDiv);
     this.scrollToBottom();
