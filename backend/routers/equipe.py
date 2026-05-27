@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session, selectinload
 
+from backend.database import get_db
 from backend.dependencies import AuthData, get_current_usuario, require_napne
 from backend.services.auth_service import AuthService
 from backend.schemas.auth import (
@@ -10,7 +12,9 @@ from backend.schemas.auth import (
     AlunoResumoResponse,
     UsuarioSUAPResponse,
 )
+from backend.schemas.perfil_aluno import PerfilAlunoCreate, PerfilAlunoUpdate, PerfilAlunoResponse
 from backend.models.aluno import Aluno
+from backend.models.perfil_aluno import PerfilAluno
 
 router = APIRouter(prefix="/equipe", tags=["Equipe NAPNE"])
 
@@ -144,3 +148,48 @@ async def atualizar_perfil(
         raise HTTPException(status_code=400, detail="Perfil inválido")
     usuario = auth_service.atualizar_perfil_usuario(usuario_id, request.tipo_perfil)
     return UsuarioSUAPResponse.model_validate(usuario)
+
+
+@router.get("/alunos/{aluno_id}/perfil", response_model=PerfilAlunoResponse)
+async def obter_perfil_aluno(
+    aluno_id: int,
+    auth_data: AuthData = Depends(get_current_usuario),
+    db: Session = Depends(get_db),
+):
+    aluno = db.query(Aluno).options(selectinload(Aluno.perfil)).filter(Aluno.id == aluno_id).first()
+    if not aluno:
+        raise HTTPException(status_code=404, detail="Aluno nao encontrado")
+    if not aluno.perfil:
+        return PerfilAlunoResponse(
+            id=0,
+            aluno_id=aluno_id,
+            nivel_atencao=None,
+            dificuldade_leitura=False,
+            preferencia=None,
+            interesses=None,
+            diagnostico=None,
+        )
+    return PerfilAlunoResponse.model_validate(aluno.perfil)
+
+
+@router.put("/alunos/{aluno_id}/perfil", response_model=PerfilAlunoResponse)
+async def criar_ou_atualizar_perfil_aluno(
+    aluno_id: int,
+    request: PerfilAlunoCreate,
+    auth_data: AuthData = Depends(require_napne),
+    db: Session = Depends(get_db),
+):
+    aluno = db.query(Aluno).options(selectinload(Aluno.perfil)).filter(Aluno.id == aluno_id).first()
+    if not aluno:
+        raise HTTPException(status_code=404, detail="Aluno nao encontrado")
+    perfil = aluno.perfil
+    if not perfil:
+        perfil = PerfilAluno(aluno_id=aluno_id)
+        db.add(perfil)
+        db.flush()
+    update_data = request.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(perfil, key, value)
+    db.commit()
+    db.refresh(perfil)
+    return PerfilAlunoResponse.model_validate(perfil)

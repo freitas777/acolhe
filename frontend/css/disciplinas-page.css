@@ -198,6 +198,28 @@ body {
 
 .btn-logout svg { width: 18px; height: 18px; }
 
+.btn-nav {
+    padding: 0.5rem;
+    background: transparent;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+}
+
+.btn-nav:hover {
+    background: var(--suap-green);
+    border-color: var(--suap-green);
+    color: white;
+}
+
+.btn-nav svg { width: 18px; height: 18px; }
+
 .semestre-badge {
   display: inline-flex;
   align-items: center;

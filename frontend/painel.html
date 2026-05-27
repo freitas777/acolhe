@@ -90,10 +90,67 @@
         </div>
     </main>
 
-    <div class="toast" id="toast" role="alert" hidden>
-        <span id="toast-icon"></span>
-        <span id="toast-message"></span>
+<div class="modal-overlay" id="profile-modal" hidden>
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modal-aluno-name">Perfil do Aluno</h2>
+      <button class="modal-close" id="modal-close" title="Fechar">&times;</button>
     </div>
+    <form id="profile-form" class="modal-body">
+      <input type="hidden" id="profile-aluno-id">
+
+      <div class="form-group">
+        <label for="profile-nivel-atencao">Nivel de Atencao</label>
+        <select id="profile-nivel-atencao">
+          <option value="">-- Nenhum --</option>
+          <option value="alto">Alto</option>
+          <option value="medio">Medio</option>
+          <option value="baixo">Baixo</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="profile-dificuldade-leitura">Dificuldade de Leitura</label>
+        <select id="profile-dificuldade-leitura">
+          <option value="false">Nao</option>
+          <option value="true">Sim</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="profile-preferencia">Preferencia de Aprendizado</label>
+        <select id="profile-preferencia">
+          <option value="">-- Nenhum --</option>
+          <option value="visual">Visual</option>
+          <option value="auditivo">Auditivo</option>
+          <option value="cinestesico">Cinestesico</option>
+          <option value="leitura_escrita">Leitura/Escrita</option>
+          <option value="misto">Misto</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="profile-interesses">Interesses</label>
+        <textarea id="profile-interesses" rows="3" placeholder="Interesses do aluno..."></textarea>
+      </div>
+
+      <div class="form-group">
+        <label for="profile-diagnostico">Diagnostico</label>
+        <input type="text" id="profile-diagnostico" maxlength="200" placeholder="Diagnostico (opcional)">
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-modal-cancel" id="modal-cancel">Cancelar</button>
+        <button type="submit" class="btn-modal-save">Salvar Perfil</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="alert" hidden>
+  <span id="toast-icon"></span>
+  <span id="toast-message"></span>
+</div>
 
     <script src="/js/js.cookie.js"></script>
     <script src="/js/settings.js"></script>
