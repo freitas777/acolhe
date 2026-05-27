@@ -113,43 +113,55 @@
         });
     }
 
-    function loadAlunosAtivos() {
-        var listEl = document.getElementById('ativos-list');
-        var countEl = document.getElementById('ativos-count');
-        if (!listEl) return;
+  function loadAlunosAtivos() {
+  var listEl = document.getElementById('ativos-list');
+  var countEl = document.getElementById('ativos-count');
+  if (!listEl) return;
 
-    fetch('/equipe/alunos-ativos', {
-      headers: { 'Authorization': 'Bearer ' + accessToken }
-    })
-      .then(function(r) {
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        return r.json();
-      })
-      .then(function(alunos) {
-        if (countEl) countEl.textContent = alunos.length;
-            if (!alunos || alunos.length === 0) {
-                listEl.innerHTML = '<div class="empty-col"><p>Nenhum aluno ativo registrado</p></div>';
-                return;
-            }
-            listEl.innerHTML = '';
-            alunos.forEach(function(a) {
-                var initials = a.nome.split(' ').map(function(n){ return n[0]; }).slice(0,2).join('').toUpperCase();
-                var item = document.createElement('div');
-                item.className = 'aluno-ativo-item';
-                item.innerHTML =
-                    '<div class="ativo-avatar">' + escapeHtml(initials) + '</div>' +
-                    '<div class="ativo-info">' +
-                        '<div class="ativo-nome">' + escapeHtml(a.nome) + '</div>' +
-                        (a.matricula ? '<div class="ativo-matricula">' + escapeHtml(a.matricula) + '</div>' : '') +
-                        (a.diagnostico ? '<div class="ativo-diagnostico">' + escapeHtml(a.diagnostico) + '</div>' : '') +
-                    '</div>';
-                listEl.appendChild(item);
-            });
-        })
-        .catch(function(err) {
-            listEl.innerHTML = '<div class="empty-col"><p>Erro ao carregar alunos</p></div>';
-        });
+  fetch('/equipe/alunos-ativos', {
+    headers: { 'Authorization': 'Bearer ' + accessToken }
+  })
+  .then(function(r) {
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  })
+  .then(function(alunos) {
+    if (countEl) countEl.textContent = alunos.length;
+    if (!alunos || alunos.length === 0) {
+      listEl.innerHTML = '<div class="empty-col"><p>Nenhum aluno ativo registrado</p></div>';
+      return;
     }
+    listEl.innerHTML = '';
+    alunos.forEach(function(a) {
+      var initials = a.nome.split(' ').map(function(n){ return n[0]; }).slice(0,2).join('').toUpperCase();
+      var item = document.createElement('div');
+      item.className = 'aluno-ativo-item';
+      item.setAttribute('data-aluno-id', a.id);
+      item.setAttribute('data-aluno-nome', a.nome);
+      item.innerHTML =
+        '<div class="ativo-avatar">' + escapeHtml(initials) + '</div>' +
+        '<div class="ativo-info">' +
+        '<div class="ativo-nome">' + escapeHtml(a.nome) + '</div>' +
+        (a.matricula ? '<div class="ativo-matricula">' + escapeHtml(a.matricula) + '</div>' : '') +
+        (a.diagnostico ? '<div class="ativo-diagnostico">' + escapeHtml(a.diagnostico) + '</div>' : '') +
+        '</div>' +
+        '<button class="btn-profile" title="Editar perfil" data-aluno-id="' + a.id + '" data-aluno-nome="' + escapeHtml(a.nome) + '">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>' +
+        '</button>';
+      listEl.appendChild(item);
+    });
+
+    listEl.querySelectorAll('.btn-profile').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        openProfileModal(parseInt(btn.dataset.alunoId), btn.dataset.alunoNome);
+      });
+    });
+  })
+  .catch(function(err) {
+    listEl.innerHTML = '<div class="empty-col"><p>Erro ao carregar alunos</p></div>';
+  });
+}
 
     function handleSearch(query) {
         var resultsEl = document.getElementById('search-results');
@@ -216,7 +228,83 @@
         return div.innerHTML;
     }
 
-    function setupEventListeners() {
+    function openProfileModal(alunoId, alunoNome) {
+  var modal = document.getElementById('profile-modal');
+  var nameEl = document.getElementById('modal-aluno-name');
+  var idEl = document.getElementById('profile-aluno-id');
+  if (!modal || !idEl) return;
+
+  idEl.value = alunoId;
+  if (nameEl) nameEl.textContent = 'Perfil: ' + (alunoNome || 'Aluno');
+
+  document.getElementById('profile-nivel-atencao').value = '';
+  document.getElementById('profile-dificuldade-leitura').value = 'false';
+  document.getElementById('profile-preferencia').value = '';
+  document.getElementById('profile-interesses').value = '';
+  document.getElementById('profile-diagnostico').value = '';
+
+  modal.hidden = false;
+
+  fetch('/equipe/alunos/' + alunoId + '/perfil', {
+    headers: { 'Authorization': 'Bearer ' + accessToken }
+  })
+  .then(function(r) {
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  })
+  .then(function(perfil) {
+    if (perfil.nivel_atencao) document.getElementById('profile-nivel-atencao').value = perfil.nivel_atencao;
+    document.getElementById('profile-dificuldade-leitura').value = String(perfil.dificuldade_leitura || false);
+    if (perfil.preferencia) document.getElementById('profile-preferencia').value = perfil.preferencia;
+    if (perfil.interesses) document.getElementById('profile-interesses').value = perfil.interesses;
+    if (perfil.diagnostico) document.getElementById('profile-diagnostico').value = perfil.diagnostico;
+  })
+  .catch(function() {
+    showToast('Erro ao carregar perfil', 'error');
+  });
+}
+
+function closeProfileModal() {
+  var modal = document.getElementById('profile-modal');
+  if (modal) modal.hidden = true;
+}
+
+function saveProfile(e) {
+  e.preventDefault();
+  var alunoId = document.getElementById('profile-aluno-id').value;
+  if (!alunoId) return;
+
+  var payload = {
+    nivel_atencao: document.getElementById('profile-nivel-atencao').value || null,
+    dificuldade_leitura: document.getElementById('profile-dificuldade-leitura').value === 'true',
+    preferencia: document.getElementById('profile-preferencia').value || null,
+    interesses: document.getElementById('profile-interesses').value || null,
+    diagnostico: document.getElementById('profile-diagnostico').value || null,
+  };
+
+  fetch('/equipe/alunos/' + alunoId + '/perfil', {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + accessToken
+    },
+    body: JSON.stringify(payload)
+  })
+  .then(function(r) {
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  })
+  .then(function() {
+    showToast('Perfil salvo com sucesso', 'success');
+    closeProfileModal();
+    loadAlunosAtivos();
+  })
+  .catch(function(err) {
+    showToast('Erro ao salvar perfil: ' + err.message, 'error');
+  });
+}
+
+function setupEventListeners() {
         var searchInput = document.getElementById('search-input');
         if (searchInput) {
             searchInput.addEventListener('input', function() {
@@ -238,20 +326,34 @@
             });
         }
 
-        var btnLogout = document.getElementById('btn-logout');
-        if (btnLogout) {
-            btnLogout.addEventListener('click', function() {
-                if (confirm('Deseja realmente sair?')) {
-                    if (suap.isAuthenticated()) suap.getToken().revoke();
-                    localStorage.removeItem('acolhe_access_token');
-                    localStorage.removeItem('acolhe_user');
-                    localStorage.removeItem('acolhe_user_id');
-                    localStorage.removeItem('acolhe_tipo_perfil');
-                    window.location.replace('/');
-                }
-            });
+    var btnLogout = document.getElementById('btn-logout');
+    if (btnLogout) {
+      btnLogout.addEventListener('click', function() {
+        if (confirm('Deseja realmente sair?')) {
+          if (suap.isAuthenticated()) suap.getToken().revoke();
+          localStorage.removeItem('acolhe_access_token');
+          localStorage.removeItem('acolhe_user');
+          localStorage.removeItem('acolhe_user_id');
+          localStorage.removeItem('acolhe_tipo_perfil');
+          window.location.replace('/');
         }
+      });
     }
+
+    var modalClose = document.getElementById('modal-close');
+    if (modalClose) modalClose.addEventListener('click', closeProfileModal);
+
+    var modalCancel = document.getElementById('modal-cancel');
+    if (modalCancel) modalCancel.addEventListener('click', closeProfileModal);
+
+    var profileModal = document.getElementById('profile-modal');
+    if (profileModal) profileModal.addEventListener('click', function(e) {
+      if (e.target === profileModal) closeProfileModal();
+    });
+
+    var profileForm = document.getElementById('profile-form');
+    if (profileForm) profileForm.addEventListener('submit', saveProfile);
+  }
 
     document.addEventListener('DOMContentLoaded', init);
 })();
