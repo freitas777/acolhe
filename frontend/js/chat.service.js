@@ -17,11 +17,10 @@ const ChatService = {
 
     // ✅ MODO COM BACKEND + IA
     try {
-      const response = await fetch(`${this.API_BASE_URL}/api/chat/send`, {
+      const response = await acolheFetch(`${this.API_BASE_URL}/api/chat/send`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('acolhe_access_token')}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           message: trimmedContent,
@@ -71,11 +70,10 @@ const ChatService = {
    */
   async generateEducationalContent(tema, perfilAluno) {
     try {
-      const response = await fetch(`${this.API_BASE_URL}/api/chat/educational-content`, {
+      const response = await acolheFetch(`${this.API_BASE_URL}/api/chat/educational-content`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('acolhe_access_token')}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           tema: tema,
@@ -101,11 +99,7 @@ const ChatService = {
    */
   async loadConversations() {
     try {
-      const response = await fetch(`${this.API_BASE_URL}/api/chat/conversations`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('acolhe_access_token')}`
-        }
-      });
+      const response = await acolheFetch(`${this.API_BASE_URL}/api/chat/conversations`);
 
       if (response.ok) {
         const conversations = await response.json();
@@ -123,11 +117,10 @@ const ChatService = {
    */
   async createNewConversation() {
     try {
-      const response = await fetch(`${this.API_BASE_URL}/api/chat/conversations`, {
+      const response = await acolheFetch(`${this.API_BASE_URL}/api/chat/conversations`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('acolhe_access_token')}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ title: 'Nova conversa' })
       });
@@ -148,11 +141,8 @@ const ChatService = {
    */
   async deleteConversation(id) {
     try {
-      await fetch(`${this.API_BASE_URL}/api/chat/conversations/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('acolhe_access_token')}`
-        }
+      await acolheFetch(`${this.API_BASE_URL}/api/chat/conversations/${id}`, {
+        method: 'DELETE'
       });
     } catch (error) {
       console.error('Erro ao deletar no backend:', error);

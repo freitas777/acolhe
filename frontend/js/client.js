@@ -1,3 +1,98 @@
+function acolheDecodeJWTPayload(token) {
+ try {
+  var parts = token.split('.');
+  if (parts.length !== 3) return null;
+  var b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+  while (b64.length % 4) b64 += '=';
+  return JSON.parse(decodeURIComponent(escape(atob(b64))));
+ } catch(e) { return null; }
+}
+
+function acolheIsTokenExpired(token) {
+ if (token.indexOf('.') === -1) return false;
+ var payload = acolheDecodeJWTPayload(token);
+ if (!payload || !payload.exp) return false;
+ return (payload.exp * 1000) < Date.now();
+}
+
+function acolheIsAuthenticated() {
+ var token = localStorage.getItem('acolhe_access_token');
+ var userId = localStorage.getItem('acolhe_user_id');
+ if (!token || !userId) return false;
+ if (acolheIsTokenExpired(token)) {
+  localStorage.removeItem('acolhe_access_token');
+  localStorage.removeItem('acolhe_user');
+  localStorage.removeItem('acolhe_user_id');
+  localStorage.removeItem('acolhe_tipo_perfil');
+  localStorage.removeItem('acolhe_senha_temporaria');
+  return false;
+ }
+ return true;
+}
+
+function acolheLogout() {
+ localStorage.removeItem('acolhe_access_token');
+ localStorage.removeItem('acolhe_user');
+ localStorage.removeItem('acolhe_user_id');
+ localStorage.removeItem('acolhe_tipo_perfil');
+ localStorage.removeItem('acolhe_senha_temporaria');
+ var suap = window._suapClient;
+  if (suap && suap.isAuthenticated && suap.isAuthenticated()) {
+    suap.logout();
+  } else {
+    if (typeof Cookies !== 'undefined') {
+      Cookies.remove('suapToken');
+      Cookies.remove('suapTokenExpirationTime');
+      Cookies.remove('suapScope');
+    }
+    window.location.replace('/');
+  }
+}
+
+function acolheRequireAuth() {
+  if (!acolheIsAuthenticated()) {
+    window.location.replace('/');
+    return false;
+  }
+  return true;
+}
+
+function acolheGetToken() {
+  return localStorage.getItem('acolhe_access_token') || '';
+}
+
+function acolheRequireRole(allowedRoles) {
+ if (!acolheRequireAuth()) return false;
+ var perfil = localStorage.getItem('acolhe_tipo_perfil') || 'aluno';
+ if (allowedRoles.indexOf(perfil) === -1) {
+  if (perfil === 'aluno') {
+   window.location.replace('/portal');
+  } else if (perfil === 'psicopedagogo' || perfil === 'admin' || perfil === 'servidor') {
+   window.location.replace('/painel');
+  } else {
+   window.location.replace('/disciplinas');
+  }
+  return false;
+ }
+ return true;
+}
+
+function acolheFetch(url, options) {
+ options = options || {};
+ var token = acolheGetToken();
+ if (token) {
+  options.headers = options.headers || {};
+  options.headers['Authorization'] = 'Bearer ' + token;
+ }
+ return fetch(url, options).then(function(r) {
+  if (r.status === 401) {
+   acolheLogout();
+   return Promise.reject(new Error('Sessao expirada. Faca login novamente.'));
+  }
+  return r;
+ });
+}
+
 var Token = function(value, expirationTimeInSeconds, scope) {
   var startTime = new Date().getTime();
   var finishTime = new Date(startTime + expirationTimeInSeconds * 1000);

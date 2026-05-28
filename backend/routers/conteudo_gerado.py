@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
-from backend.dependencies import AuthData, get_current_usuario, require_napne
+from backend.dependencies import AuthData, get_current_usuario, require_napne, require_admin
 from backend.repositories.aluno import AlunoRepository
 from backend.repositories.conteudo_gerado import ConteudoGeradoRepository
 from backend.schemas.conteudo_gerado import (
@@ -46,11 +46,11 @@ def create_conteudo(
 
 @router.get("/", response_model=list[ConteudoGeradoResponse])
 def list_conteudos(
-    aluno_id: Optional[int] = None,
-    skip: int = 0,
-    limit: int = 100,
-    auth_data: AuthData = Depends(get_current_usuario),
-    db: Session = Depends(get_db),
+ aluno_id: Optional[int] = None,
+ skip: int = 0,
+ limit: int = 100,
+ auth_data: AuthData = Depends(require_napne),
+ db: Session = Depends(get_db),
 ):
     if aluno_id:
         return _conteudo_repo(db).list_by_aluno(aluno_id)
@@ -59,9 +59,9 @@ def list_conteudos(
 
 @router.get("/{conteudo_id}", response_model=ConteudoGeradoResponse)
 def get_conteudo(
-    conteudo_id: int,
-    auth_data: AuthData = Depends(get_current_usuario),
-    db: Session = Depends(get_db),
+ conteudo_id: int,
+ auth_data: AuthData = Depends(require_napne),
+ db: Session = Depends(get_db),
 ):
     conteudo = _conteudo_repo(db).get_by_id(conteudo_id)
     if not conteudo:
@@ -88,12 +88,12 @@ def update_conteudo(
 
 
 @router.delete(
-    "/{conteudo_id}", status_code=status.HTTP_204_NO_CONTENT
+ "/{conteudo_id}", status_code=status.HTTP_204_NO_CONTENT
 )
 def delete_conteudo(
-    conteudo_id: int,
-    auth_data: AuthData = Depends(require_napne),
-    db: Session = Depends(get_db),
+ conteudo_id: int,
+ auth_data: AuthData = Depends(require_admin),
+ db: Session = Depends(get_db),
 ):
     deleted = _conteudo_repo(db).delete(conteudo_id)
     if not deleted:

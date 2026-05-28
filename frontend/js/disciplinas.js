@@ -1,22 +1,15 @@
 (function() {
-  'use strict';
+'use strict';
 
-  var suap = new SuapClient(SUAP_URL, CLIENT_ID, REDIRECT_URI, SCOPE);
-  suap.init();
+if (!acolheRequireAuth()) return;
 
-  if (!suap.isAuthenticated()) {
-    window.location.href = '/';
-    return;
-  }
-
-  var accessToken = localStorage.getItem('acolhe_access_token') || suap.getToken().getValue();
   var userId = localStorage.getItem('acolhe_user_id');
   var currentUser = null;
   var tipoPerfil = localStorage.getItem('acolhe_tipo_perfil') || 'aluno';
   var currentView = 'grid';
 
   function init() {
-    if (!userId && accessToken) {
+    if (!userId && acolheGetToken()) {
       syncWithBackend(function() {
         loadUserInfo();
         loadDisciplinas();
@@ -32,10 +25,10 @@
 
   function syncWithBackend(callback) {
     showLoading();
-    fetch('/auth/callback', {
+    acolheFetch('/auth/callback', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ access_token: accessToken, semestre: SEMESTRE_VIGENTE })
+      body: JSON.stringify({ access_token: acolheGetToken(), semestre: SEMESTRE_VIGENTE })
     })
     .then(function(response) {
       if (!response.ok) throw new Error('HTTP ' + response.status);
@@ -60,24 +53,15 @@
   }
 
   function loadUserInfo() {
-    var savedUser = localStorage.getItem('acolhe_user');
-    if (savedUser) {
-      try {
-        currentUser = JSON.parse(savedUser);
-        tipoPerfil = currentUser.tipo_perfil || localStorage.getItem('acolhe_tipo_perfil') || 'aluno';
-      } catch (e) {}
-    }
-    if (!currentUser) {
-      suap.getResource(suap.getToken().getScope(), function(response) {
-        if (response) {
-          currentUser = response;
-          localStorage.setItem('acolhe_user', JSON.stringify(response));
-          updateUserInfoUI();
-        }
-      });
-    }
-    updateUserInfoUI();
+  var savedUser = localStorage.getItem('acolhe_user');
+  if (savedUser) {
+    try {
+      currentUser = JSON.parse(savedUser);
+      tipoPerfil = currentUser.tipo_perfil || localStorage.getItem('acolhe_tipo_perfil') || 'aluno';
+    } catch (e) {}
   }
+  updateUserInfoUI();
+}
 
   function updateUserInfoUI() {
     if (!currentUser) return;
@@ -116,9 +100,7 @@
     showLoading();
     var url = '/auth/disciplinas?usuario_id=' + userId + '&semestre=' + SEMESTRE_VIGENTE;
   if (tipoPerfil === 'professor' || tipoPerfil === 'servidor') url += '&apenas_assistidos=true';
-  fetch(url, {
-      headers: { 'Authorization': 'Bearer ' + accessToken }
-    })
+  acolheFetch(url)
     .then(function(response) {
       if (!response.ok) throw new Error('HTTP ' + response.status);
       return response.json();
@@ -141,18 +123,18 @@
     if (btnSync) btnSync.disabled = true;
     showLoading();
 
-    if (!accessToken) {
-      showToast('Token de acesso nao encontrado. Faca login novamente.', 'error');
-      renderEmpty('Erro de autenticacao', 'Faca login novamente para sincronizar');
-      if (btnSync) btnSync.disabled = false;
-      return;
-    }
+  if (!acolheGetToken()) {
+    showToast('Token de acesso nao encontrado. Faca login novamente.', 'error');
+    renderEmpty('Erro de autenticacao', 'Faca login novamente para sincronizar');
+    if (btnSync) btnSync.disabled = false;
+    return;
+  }
 
-    fetch('/auth/callback', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ access_token: accessToken, semestre: SEMESTRE_VIGENTE })
-    })
+  acolheFetch('/auth/callback', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ access_token: acolheGetToken(), semestre: SEMESTRE_VIGENTE })
+  })
     .then(function(response) {
       if (!response.ok) {
         return response.json().then(function(err) {
@@ -279,9 +261,7 @@
       loadDisciplinas();
     });
 
-    fetch('/auth/disciplinas/' + disciplinaId + '/alunos-assistidos', {
-      headers: { 'Authorization': 'Bearer ' + accessToken }
-    })
+  acolheFetch('/auth/disciplinas/' + disciplinaId + '/alunos-assistidos')
     .then(function(response) {
       if (!response.ok) throw new Error('HTTP ' + response.status);
       return response.json();
@@ -390,17 +370,10 @@
   }
 
   function handleLogout() {
-    if (confirm('Deseja realmente sair?')) {
-      if (suap.isAuthenticated()) {
-        suap.getToken().revoke();
-      }
-      localStorage.removeItem('acolhe_access_token');
-      localStorage.removeItem('acolhe_user');
-      localStorage.removeItem('acolhe_user_id');
-      localStorage.removeItem('acolhe_tipo_perfil');
-      window.location.replace('/');
-    }
+  if (confirm('Deseja realmente sair?')) {
+    acolheLogout();
   }
+}
 
   document.addEventListener('DOMContentLoaded', init);
 })();

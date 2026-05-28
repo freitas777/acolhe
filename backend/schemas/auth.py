@@ -21,6 +21,7 @@ class UsuarioSUAPResponse(BaseModel):
     setor: Optional[str] = None
     aprovado_napne: bool = False
     criado_em: datetime
+    senha_temporaria: Optional[bool] = None
 
     model_config = {"from_attributes": True}
 
@@ -98,3 +99,27 @@ class LoginResponse(BaseModel):
     usuario: UsuarioSUAPResponse
     tipo_perfil: str = "aluno"
     disciplinas: List[DisciplinaResponse] = []
+    token: str = ""
+
+
+class LocalLoginRequest(BaseModel):
+    email: str
+    senha: str
+
+
+class ConviteRequest(BaseModel):
+    email: str
+    nome: str
+    tipo_perfil: str = "psicopedagogo"
+
+
+class ConviteResponse(BaseModel):
+    email: str
+    senha_temporaria: str
+    tipo_perfil: str
+    usuario_id: int
+
+
+class AlterarSenhaRequest(BaseModel):
+    senha_atual: str
+    nova_senha: str

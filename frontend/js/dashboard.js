@@ -1,15 +1,9 @@
 ﻿(function() {
-  'use strict';
+'use strict';
 
-  var suap = new SuapClient(SUAP_URL, CLIENT_ID, REDIRECT_URI, SCOPE);
-  suap.init();
+if (!acolheRequireAuth()) return;
 
-  if (!suap.isAuthenticated()) {
-    window.location.href = '/';
-    return;
-  }
-
-  var currentUser = null;
+var currentUser = null;
 
   async function init() {
     ChatStore.init();
@@ -20,29 +14,12 @@
   }
 
   async function loadUserData() {
-    var savedUser = localStorage.getItem('acolhe_user');
-    if (savedUser) {
-      currentUser = JSON.parse(savedUser);
-    }
-    if (!currentUser && suap.isAuthenticated()) {
-      try {
-        await new Promise(function(resolve, reject) {
-          suap.getResource(suap.getToken().getScope(), function(response) {
-            if (response) {
-              currentUser = response;
-              localStorage.setItem('acolhe_user', JSON.stringify(response));
-              resolve();
-            } else {
-              reject(new Error('Falha ao carregar dados'));
-            }
-          });
-        });
-      } catch (error) {
-        console.error('Erro ao carregar dados do usuario:', error);
-      }
-    }
-    ChatUI.updateUserInfo(currentUser);
+  var savedUser = localStorage.getItem('acolhe_user');
+  if (savedUser) {
+    currentUser = JSON.parse(savedUser);
   }
+  ChatUI.updateUserInfo(currentUser);
+}
 
   function setupEventListeners() {
     if (ChatUI.elements.btnNewChat) {
@@ -173,14 +150,10 @@
   }
 
   function handleLogout() {
-    if (confirm('Deseja realmente sair?')) {
-      suap.logout();
-      localStorage.removeItem('acolhe_access_token');
-      localStorage.removeItem('acolhe_user');
-      localStorage.removeItem('acolhe_user_id');
-      window.location.href = '/';
-    }
+  if (confirm('Deseja realmente sair?')) {
+    acolheLogout();
   }
+}
 
   function renderInitialState() {
     var conversations = ChatService.getConversationsHistory();

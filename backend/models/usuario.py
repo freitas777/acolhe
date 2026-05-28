@@ -34,6 +34,7 @@ class Usuario(Base):
         nullable=False, default=datetime.utcnow
     )
 
+    conta_local = relationship("ContaLocal", back_populates="usuario", uselist=False, cascade="all, delete-orphan")
     conteudos = relationship("ConteudoGerado", back_populates="usuario")
     disciplinas = relationship("Disciplina", back_populates="usuario", cascade="all, delete-orphan")
     pendencias_validadas = relationship("PendenciaValidacao", back_populates="validado_por", foreign_keys="PendenciaValidacao.validado_por_id")
