@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
-from backend.dependencies import AuthData, get_current_usuario
+from backend.dependencies import AuthData, get_current_usuario, require_napne
 from backend.schemas.chat import (
     ChatRequisicao,
     ChatResposta,
@@ -28,11 +28,11 @@ def _service(db: Session = Depends(get_db)) -> ChatService:
     status_code=status.HTTP_201_CREATED,
 )
 async def criar_conversa(
-    dados: ConversaCriar,
-    auth_data: AuthData = Depends(get_current_usuario),
-    service: ChatService = Depends(_service),
+ dados: ConversaCriar,
+ auth_data: AuthData = Depends(get_current_usuario),
+ service: ChatService = Depends(_service),
 ):
-    return service.criar_conversa(dados)
+ return service.criar_conversa(dados, usuario_id=auth_data.usuario.id)
 
 
 @router.get(
@@ -40,19 +40,19 @@ async def criar_conversa(
     response_model=list[ConversaResposta],
 )
 async def listar_conversas(
-    auth_data: AuthData = Depends(get_current_usuario),
-    service: ChatService = Depends(_service),
+ auth_data: AuthData = Depends(get_current_usuario),
+ service: ChatService = Depends(_service),
 ):
-    return service.listar_conversas()
+ return service.listar_conversas(usuario_id=auth_data.usuario.id)
 
 
 @router.post("/send", response_model=ChatResposta)
 async def enviar_mensagem(
-    dados: ChatRequisicao,
-    auth_data: AuthData = Depends(get_current_usuario),
-    service: ChatService = Depends(_service),
+ dados: ChatRequisicao,
+ auth_data: AuthData = Depends(get_current_usuario),
+ service: ChatService = Depends(_service),
 ):
-    return await service.enviar_mensagem(dados)
+ return await service.enviar_mensagem(dados, usuario_id=auth_data.usuario.id)
 
 
 @router.post(
@@ -60,9 +60,9 @@ async def enviar_mensagem(
     response_model=ConteudoEducacionalResposta,
 )
 async def gerar_conteudo_educacional(
-    dados: ConteudoEducacionalRequisicao,
-    auth_data: AuthData = Depends(get_current_usuario),
-    service: ChatService = Depends(_service),
+ dados: ConteudoEducacionalRequisicao,
+ auth_data: AuthData = Depends(require_napne),
+ service: ChatService = Depends(_service),
 ):
     return await service.gerar_conteudo_educacional(dados)
 
@@ -72,8 +72,14 @@ async def gerar_conteudo_educacional(
     status_code=status.HTTP_204_NO_CONTENT,
 )
 async def deletar_conversa(
-    conversa_id: str,
-    auth_data: AuthData = Depends(get_current_usuario),
-    service: ChatService = Depends(_service),
+ conversa_id: str,
+ auth_data: AuthData = Depends(get_current_usuario),
+ service: ChatService = Depends(_service),
 ):
-    service.deletar_conversa(conversa_id)
+ conversa = service.conversa_repo.get_by_id(conversa_id)
+ if not conversa:
+  raise HTTPException(status_code=404, detail="Conversa nao encontrada")
+ if conversa.usuario_id and conversa.usuario_id != auth_data.usuario.id:
+  if auth_data.usuario.tipo_perfil not in ("psicopedagogo", "admin"):
+   raise HTTPException(status_code=403, detail="Voce nao pode deletar esta conversa.")
+ service.deletar_conversa(conversa_id)

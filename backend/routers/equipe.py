@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, selectinload
 
 from backend.database import get_db
-from backend.dependencies import AuthData, get_current_usuario, require_napne
+from backend.dependencies import AuthData, get_current_usuario, require_napne, require_psicopedagogo_or_admin
 from backend.services.auth_service import AuthService
 from backend.schemas.auth import (
     PendenciaResponse,
@@ -14,15 +14,61 @@ from backend.schemas.auth import (
 )
 from backend.schemas.perfil_aluno import PerfilAlunoCreate, PerfilAlunoUpdate, PerfilAlunoResponse
 from backend.models.aluno import Aluno
+from backend.models.usuario import Usuario
 from backend.models.perfil_aluno import PerfilAluno
+from backend.models.conta_local import ContaLocal
 
 router = APIRouter(prefix="/equipe", tags=["Equipe NAPNE"])
 
 
+@router.get("/membros")
+async def listar_membros(
+    auth_data: AuthData = Depends(require_napne),
+    db: Session = Depends(get_db),
+):
+    membros = db.query(Usuario).filter(
+        Usuario.tipo_perfil.in_(["psicopedagogo", "servidor", "admin"])
+    ).order_by(Usuario.nome).all()
+    result = []
+    for m in membros:
+        conta = db.query(ContaLocal).filter(ContaLocal.usuario_id == m.id).first()
+        result.append({
+            "id": m.id,
+            "nome": m.nome,
+            "email": m.email,
+            "tipo_perfil": m.tipo_perfil,
+            "aprovado_napne": m.aprovado_napne,
+            "tem_conta_local": conta is not None,
+            "conta_ativa": conta.ativo if conta else None,
+            "senha_temporaria": conta.senha_temporaria if conta else None,
+        })
+    return result
+
+
+@router.put("/membros/{usuario_id}/desativar")
+async def desativar_membro(
+    usuario_id: int,
+    auth_data: AuthData = Depends(require_napne),
+    db: Session = Depends(get_db),
+):
+    if auth_data.usuario.tipo_perfil != "admin":
+        raise HTTPException(status_code=403, detail="Apenas admins podem desativar membros.")
+    if auth_data.usuario.id == usuario_id:
+        raise HTTPException(status_code=400, detail="Voce nao pode desativar sua propria conta.")
+    usuario = db.query(Usuario).filter(Usuario.id == usuario_id).first()
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuario nao encontrado.")
+    conta = db.query(ContaLocal).filter(ContaLocal.usuario_id == usuario_id).first()
+    if conta:
+        conta.ativo = False
+        db.commit()
+    return {"detail": "Conta desativada com sucesso."}
+
+
 @router.get("/pendencias", response_model=list[PendenciaResponse])
 async def listar_pendencias(
-    auth_data: AuthData = Depends(get_current_usuario),
-    auth_service: AuthService = Depends(),
+ auth_data: AuthData = Depends(require_napne),
+ auth_service: AuthService = Depends(),
 ):
     pendencias = auth_service.obter_pendencias()
     result = []
@@ -92,8 +138,8 @@ async def validar_pendencia(
 
 @router.get("/alunos-ativos", response_model=list[AlunoResumoResponse])
 async def listar_alunos_ativos(
-    auth_data: AuthData = Depends(get_current_usuario),
-    auth_service: AuthService = Depends(),
+ auth_data: AuthData = Depends(require_napne),
+ auth_service: AuthService = Depends(),
 ):
     alunos = auth_service.obter_alunos_ativos()
     result = []
@@ -113,9 +159,9 @@ async def listar_alunos_ativos(
 
 @router.get("/alunos-busca", response_model=list[AlunoResumoResponse])
 async def buscar_alunos(
-    q: str = "",
-    auth_data: AuthData = Depends(get_current_usuario),
-    auth_service: AuthService = Depends(),
+ q: str = "",
+ auth_data: AuthData = Depends(require_napne),
+ auth_service: AuthService = Depends(),
 ):
     if not q or len(q) < 2:
         return []
@@ -137,24 +183,22 @@ async def buscar_alunos(
 
 @router.put("/usuarios/{usuario_id}/perfil", response_model=UsuarioSUAPResponse)
 async def atualizar_perfil(
-    usuario_id: int,
-    request: AtualizarPerfilRequest,
-    auth_data: AuthData = Depends(get_current_usuario),
-    auth_service: AuthService = Depends(),
+ usuario_id: int,
+ request: AtualizarPerfilRequest,
+ auth_data: AuthData = Depends(require_psicopedagogo_or_admin),
+ auth_service: AuthService = Depends(),
 ):
-    if auth_data.usuario.tipo_perfil not in ("psicopedagogo", "admin"):
-        raise HTTPException(status_code=403, detail="Apenas psicopedagogos ou admins podem alterar perfis")
-    if request.tipo_perfil not in ("aluno", "professor", "psicopedagogo", "admin", "servidor"):
-        raise HTTPException(status_code=400, detail="Perfil inválido")
-    usuario = auth_service.atualizar_perfil_usuario(usuario_id, request.tipo_perfil)
-    return UsuarioSUAPResponse.model_validate(usuario)
+ if request.tipo_perfil not in ("aluno", "professor", "psicopedagogo", "admin", "servidor"):
+  raise HTTPException(status_code=400, detail="Perfil invalido")
+ usuario = auth_service.atualizar_perfil_usuario(usuario_id, request.tipo_perfil)
+ return UsuarioSUAPResponse.model_validate(usuario)
 
 
 @router.get("/alunos/{aluno_id}/perfil", response_model=PerfilAlunoResponse)
 async def obter_perfil_aluno(
-    aluno_id: int,
-    auth_data: AuthData = Depends(get_current_usuario),
-    db: Session = Depends(get_db),
+ aluno_id: int,
+ auth_data: AuthData = Depends(require_napne),
+ db: Session = Depends(get_db),
 ):
     aluno = db.query(Aluno).options(selectinload(Aluno.perfil)).filter(Aluno.id == aluno_id).first()
     if not aluno:

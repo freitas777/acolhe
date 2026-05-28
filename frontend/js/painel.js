@@ -1,25 +1,26 @@
 (function() {
-    'use strict';
+'use strict';
 
-    var suap = new SuapClient(SUAP_URL, CLIENT_ID, REDIRECT_URI, SCOPE);
-    suap.init();
+ if (!acolheRequireRole(['psicopedagogo', 'servidor', 'admin'])) return;
 
-    if (!suap.isAuthenticated()) {
-        window.location.href = '/';
-        return;
-    }
-
-    var accessToken = localStorage.getItem('acolhe_access_token') || suap.getToken().getValue();
-    var userId = localStorage.getItem('acolhe_user_id');
+ var userId = localStorage.getItem('acolhe_user_id');
     var currentUser = null;
     var searchTimeout = null;
 
-    function init() {
-        loadUserInfo();
-        loadPendencias();
-        loadAlunosAtivos();
-        setupEventListeners();
-    }
+function init() {
+ loadUserInfo();
+ loadEquipe();
+ loadPendencias();
+ loadAlunosAtivos();
+ setupEventListeners();
+ checkSenhaTemporaria();
+}
+
+function checkSenhaTemporaria() {
+ if (localStorage.getItem('acolhe_senha_temporaria') === 'true') {
+  openSenhaModal(true);
+ }
+}
 
     function loadUserInfo() {
         var savedUser = localStorage.getItem('acolhe_user');
@@ -40,14 +41,55 @@
         if (nameEl) nameEl.textContent = name;
     }
 
-    function loadPendencias() {
+    function loadEquipe() {
+  var listEl = document.getElementById('equipe-list');
+  var countEl = document.getElementById('equipe-count');
+  if (!listEl) return;
+
+ acolheFetch('/equipe/membros')
+  .then(function(r) {
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  })
+  .then(function(membros) {
+    if (countEl) countEl.textContent = membros.length;
+    if (!membros || membros.length === 0) {
+      listEl.innerHTML = '<div class="empty-col"><p>Nenhum membro na equipe</p></div>';
+      return;
+    }
+    listEl.innerHTML = '';
+    membros.forEach(function(m) {
+      var initials = (m.nome || '?').split(' ').map(function(n){ return n[0]; }).slice(0,2).join('').toUpperCase();
+      var tipoLabel = {admin: 'Admin', psicopedagogo: 'Psicopedagogo', servidor: 'Servidor'}[m.tipo_perfil] || m.tipo_perfil;
+      var statusHtml = '';
+      if (m.senha_temporaria) {
+        statusHtml = '<span class="membro-badge badge-pendente">Senha temporaria</span>';
+      } else if (!m.conta_ativa) {
+        statusHtml = '<span class="membro-badge badge-inativo">Inativo</span>';
+      }
+      var item = document.createElement('div');
+      item.className = 'equipe-item';
+      item.innerHTML =
+        '<div class="ativo-avatar">' + escapeHtml(initials) + '</div>' +
+        '<div class="ativo-info">' +
+        '<div class="ativo-nome">' + escapeHtml(m.nome) + '</div>' +
+        '<div class="ativo-matricula">' + escapeHtml(tipoLabel) + ' &middot; ' + escapeHtml(m.email) + '</div>' +
+        statusHtml +
+        '</div>';
+      listEl.appendChild(item);
+    });
+  })
+  .catch(function(err) {
+    listEl.innerHTML = '<div class="empty-col"><p>Erro ao carregar equipe</p></div>';
+  });
+}
+
+function loadPendencias() {
         var listEl = document.getElementById('pendencias-list');
         var countEl = document.getElementById('pendencias-count');
         if (!listEl) return;
 
-        fetch('/equipe/pendencias', {
-            headers: { 'Authorization': 'Bearer ' + accessToken }
-        })
+ acolheFetch('/equipe/pendencias')
       .then(function(r) {
         if (!r.ok) throw new Error('HTTP ' + r.status);
         return r.json();
@@ -90,15 +132,12 @@
         });
     }
 
-    function validarPendencia(pendenciaId, acao) {
-        fetch('/equipe/pendencias/' + pendenciaId, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer ' + accessToken
-            },
-            body: JSON.stringify({ acao: acao })
-        })
+function validarPendencia(pendenciaId, acao) {
+ acolheFetch('/equipe/pendencias/' + pendenciaId, {
+ method: 'PUT',
+ headers: { 'Content-Type': 'application/json' },
+ body: JSON.stringify({ acao: acao })
+ })
         .then(function(r) {
             if (!r.ok) throw new Error('HTTP ' + r.status);
             return r.json();
@@ -118,9 +157,7 @@
   var countEl = document.getElementById('ativos-count');
   if (!listEl) return;
 
-  fetch('/equipe/alunos-ativos', {
-    headers: { 'Authorization': 'Bearer ' + accessToken }
-  })
+ acolheFetch('/equipe/alunos-ativos')
   .then(function(r) {
     if (!r.ok) throw new Error('HTTP ' + r.status);
     return r.json();
@@ -172,9 +209,7 @@
             return;
         }
 
-    fetch('/equipe/alunos-busca?q=' + encodeURIComponent(query), {
-      headers: { 'Authorization': 'Bearer ' + accessToken }
-    })
+ acolheFetch('/equipe/alunos-busca?q=' + encodeURIComponent(query))
       .then(function(r) {
         if (!r.ok) throw new Error('HTTP ' + r.status);
         return r.json();
@@ -245,9 +280,7 @@
 
   modal.hidden = false;
 
-  fetch('/equipe/alunos/' + alunoId + '/perfil', {
-    headers: { 'Authorization': 'Bearer ' + accessToken }
-  })
+ acolheFetch('/equipe/alunos/' + alunoId + '/perfil')
   .then(function(r) {
     if (!r.ok) throw new Error('HTTP ' + r.status);
     return r.json();
@@ -282,13 +315,10 @@ function saveProfile(e) {
     diagnostico: document.getElementById('profile-diagnostico').value || null,
   };
 
-  fetch('/equipe/alunos/' + alunoId + '/perfil', {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer ' + accessToken
-    },
-    body: JSON.stringify(payload)
+ acolheFetch('/equipe/alunos/' + alunoId + '/perfil', {
+ method: 'PUT',
+ headers: { 'Content-Type': 'application/json' },
+ body: JSON.stringify(payload)
   })
   .then(function(r) {
     if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -304,8 +334,137 @@ function saveProfile(e) {
   });
 }
 
-function setupEventListeners() {
-        var searchInput = document.getElementById('search-input');
+function openInviteModal() {
+  var modal = document.getElementById('invite-modal');
+  if (!modal) return;
+  document.getElementById('invite-nome').value = '';
+  document.getElementById('invite-email').value = '';
+  document.getElementById('invite-tipo').value = 'psicopedagogo';
+  var resultEl = document.getElementById('invite-result');
+  if (resultEl) resultEl.hidden = true;
+  var actionsEl = document.getElementById('invite-actions');
+  if (actionsEl) actionsEl.hidden = false;
+  var submitBtn = document.getElementById('invite-submit');
+  if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Convidar'; }
+  modal.hidden = false;
+}
+
+function closeInviteModal() {
+  var modal = document.getElementById('invite-modal');
+  if (modal) modal.hidden = true;
+}
+
+function handleInvite(e) {
+  e.preventDefault();
+  var nome = document.getElementById('invite-nome').value.trim();
+  var email = document.getElementById('invite-email').value.trim();
+  var tipo = document.getElementById('invite-tipo').value;
+  var btn = document.getElementById('invite-submit');
+  var errorEl = document.getElementById('error-message');
+  var errorText = document.getElementById('error-text');
+
+  if (!nome || !email) {
+    showToast('Preencha nome e email.', 'warning');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Enviando...';
+
+ acolheFetch('/auth/convite', {
+ method: 'POST',
+ headers: { 'Content-Type': 'application/json' },
+ body: JSON.stringify({ nome: nome, email: email, tipo_perfil: tipo })
+  })
+  .then(function(r) {
+    if (!r.ok) return r.json().then(function(d) { throw new Error(d.detail || 'HTTP ' + r.status); });
+    return r.json();
+  })
+  .then(function(data) {
+    document.getElementById('invite-result-email').textContent = data.email;
+    document.getElementById('invite-result-senha').textContent = data.senha_temporaria;
+    document.getElementById('invite-result').hidden = false;
+    document.getElementById('invite-actions').hidden = true;
+    showToast('Convite criado com sucesso!', 'success');
+    loadEquipe();
+  })
+  .catch(function(err) {
+    showToast('Erro: ' + err.message, 'error');
+    btn.disabled = false;
+    btn.textContent = 'Convidar';
+  });
+}
+
+function openSenhaModal(forceTemp) {
+ var modal = document.getElementById('senha-modal');
+ if (!modal) return;
+ document.getElementById('senha-atual').value = '';
+ document.getElementById('senha-nova').value = '';
+ document.getElementById('senha-nova-conf').value = '';
+ var noticeEl = document.getElementById('senha-temp-notice');
+ var isTemp = !!forceTemp;
+ if (noticeEl) noticeEl.hidden = !isTemp;
+ var cancelBtn = document.getElementById('senha-cancel');
+ if (cancelBtn) cancelBtn.style.display = isTemp ? 'none' : '';
+ var submitBtn = document.getElementById('senha-submit');
+ if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Alterar Senha'; }
+ modal.hidden = false;
+}
+
+function closeSenhaModal() {
+ var modal = document.getElementById('senha-modal');
+ if (modal) modal.hidden = true;
+ if (localStorage.getItem('acolhe_senha_temporaria') === 'true') {
+  acolheLogout();
+ }
+}
+
+function handleAlterarSenha(e) {
+ e.preventDefault();
+ var senhaAtual = document.getElementById('senha-atual').value;
+ var senhaNova = document.getElementById('senha-nova').value;
+ var senhaConf = document.getElementById('senha-nova-conf').value;
+ var btn = document.getElementById('senha-submit');
+
+ if (!senhaAtual || !senhaNova) {
+  showToast('Preencha todos os campos.', 'warning');
+  return;
+ }
+ if (senhaNova.length < 6) {
+  showToast('A nova senha deve ter pelo menos 6 caracteres.', 'warning');
+  return;
+ }
+ if (senhaNova !== senhaConf) {
+  showToast('As senhas nao coincidem.', 'warning');
+  return;
+ }
+
+ btn.disabled = true;
+ btn.textContent = 'Alterando...';
+
+ acolheFetch('/auth/alterar-senha', {
+ method: 'PUT',
+ headers: { 'Content-Type': 'application/json' },
+ body: JSON.stringify({ senha_atual: senhaAtual, nova_senha: senhaNova })
+ })
+ .then(function(r) {
+  if (!r.ok) return r.json().then(function(d) { throw new Error(d.detail || 'HTTP ' + r.status); });
+  return r.json();
+ })
+ .then(function() {
+  localStorage.setItem('acolhe_senha_temporaria', 'false');
+  showToast('Senha alterada com sucesso!', 'success');
+  closeSenhaModal();
+  loadEquipe();
+ })
+ .catch(function(err) {
+  showToast('Erro: ' + err.message, 'error');
+  btn.disabled = false;
+  btn.textContent = 'Alterar Senha';
+ });
+}
+
+function setupEventListeners() {        var searchInput = document.getElementById('search-input');
         if (searchInput) {
             searchInput.addEventListener('input', function() {
                 clearTimeout(searchTimeout);
@@ -326,19 +485,14 @@ function setupEventListeners() {
             });
         }
 
-    var btnLogout = document.getElementById('btn-logout');
-    if (btnLogout) {
-      btnLogout.addEventListener('click', function() {
-        if (confirm('Deseja realmente sair?')) {
-          if (suap.isAuthenticated()) suap.getToken().revoke();
-          localStorage.removeItem('acolhe_access_token');
-          localStorage.removeItem('acolhe_user');
-          localStorage.removeItem('acolhe_user_id');
-          localStorage.removeItem('acolhe_tipo_perfil');
-          window.location.replace('/');
-        }
-      });
-    }
+  var btnLogout = document.getElementById('btn-logout');
+  if (btnLogout) {
+    btnLogout.addEventListener('click', function() {
+      if (confirm('Deseja realmente sair?')) {
+        acolheLogout();
+      }
+    });
+  }
 
     var modalClose = document.getElementById('modal-close');
     if (modalClose) modalClose.addEventListener('click', closeProfileModal);
@@ -351,9 +505,43 @@ function setupEventListeners() {
       if (e.target === profileModal) closeProfileModal();
     });
 
-    var profileForm = document.getElementById('profile-form');
-    if (profileForm) profileForm.addEventListener('submit', saveProfile);
-  }
+  var profileForm = document.getElementById('profile-form');
+  if (profileForm) profileForm.addEventListener('submit', saveProfile);
+
+  var btnInvite = document.getElementById('btn-invite');
+  if (btnInvite) btnInvite.addEventListener('click', openInviteModal);
+
+  var inviteModalClose = document.getElementById('invite-modal-close');
+  if (inviteModalClose) inviteModalClose.addEventListener('click', closeInviteModal);
+
+  var inviteCancel = document.getElementById('invite-cancel');
+  if (inviteCancel) inviteCancel.addEventListener('click', closeInviteModal);
+
+  var inviteModal = document.getElementById('invite-modal');
+  if (inviteModal) inviteModal.addEventListener('click', function(e) {
+    if (e.target === inviteModal) closeInviteModal();
+  });
+
+  var inviteForm = document.getElementById('invite-form');
+  if (inviteForm) inviteForm.addEventListener('submit', handleInvite);
+
+  var btnSenha = document.getElementById('btn-senha');
+  if (btnSenha) btnSenha.addEventListener('click', openSenhaModal);
+
+  var senhaModalClose = document.getElementById('senha-modal-close');
+  if (senhaModalClose) senhaModalClose.addEventListener('click', closeSenhaModal);
+
+  var senhaCancel = document.getElementById('senha-cancel');
+  if (senhaCancel) senhaCancel.addEventListener('click', closeSenhaModal);
+
+  var senhaModal = document.getElementById('senha-modal');
+  if (senhaModal) senhaModal.addEventListener('click', function(e) {
+   if (e.target === senhaModal) closeSenhaModal();
+  });
+
+  var senhaForm = document.getElementById('senha-form');
+  if (senhaForm) senhaForm.addEventListener('submit', handleAlterarSenha);
+ }
 
     document.addEventListener('DOMContentLoaded', init);
 })();

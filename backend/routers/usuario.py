@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
-from backend.dependencies import AuthData, get_current_usuario, require_napne
+from backend.dependencies import AuthData, get_current_usuario, require_napne, require_psicopedagogo_or_admin, require_admin
 from backend.services.usuario_service import UsuarioService
 from backend.schemas.usuario import UsuarioCreate, UsuarioResponse, UsuarioUpdate
 
@@ -16,14 +16,14 @@ def _service(db: Session) -> UsuarioService:
 
 
 @router.post(
-    "/",
-    response_model=UsuarioResponse,
-    status_code=status.HTTP_201_CREATED,
+ "/",
+ response_model=UsuarioResponse,
+ status_code=status.HTTP_201_CREATED,
 )
 def create_usuario(
-    data: UsuarioCreate,
-    auth_data: AuthData = Depends(require_napne),
-    db: Session = Depends(get_db),
+ data: UsuarioCreate,
+ auth_data: AuthData = Depends(require_psicopedagogo_or_admin),
+ db: Session = Depends(get_db),
 ):
     service = _service(db)
     return service.criar_usuario(data)
@@ -42,9 +42,9 @@ def list_usuarios(
 
 @router.get("/{usuario_id}", response_model=UsuarioResponse)
 def get_usuario(
-    usuario_id: int,
-    auth_data: AuthData = Depends(get_current_usuario),
-    db: Session = Depends(get_db),
+ usuario_id: int,
+ auth_data: AuthData = Depends(require_napne),
+ db: Session = Depends(get_db),
 ):
     service = _service(db)
     return service.obter_usuario_por_id(usuario_id)
@@ -52,10 +52,10 @@ def get_usuario(
 
 @router.put("/{usuario_id}", response_model=UsuarioResponse)
 def update_usuario(
-    usuario_id: int,
-    data: UsuarioUpdate,
-    auth_data: AuthData = Depends(require_napne),
-    db: Session = Depends(get_db),
+ usuario_id: int,
+ data: UsuarioUpdate,
+ auth_data: AuthData = Depends(require_psicopedagogo_or_admin),
+ db: Session = Depends(get_db),
 ):
     service = _service(db)
     return service.atualizar_usuario(usuario_id, data)
@@ -63,9 +63,9 @@ def update_usuario(
 
 @router.delete("/{usuario_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_usuario(
-    usuario_id: int,
-    auth_data: AuthData = Depends(require_napne),
-    db: Session = Depends(get_db),
+ usuario_id: int,
+ auth_data: AuthData = Depends(require_admin),
+ db: Session = Depends(get_db),
 ):
     service = _service(db)
     service.deletar_usuario(usuario_id)

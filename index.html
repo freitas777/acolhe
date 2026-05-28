@@ -16,28 +16,47 @@
         <p class="subtitle">Sistema de Apoio a Educacao Inclusiva</p>
       </div>
 
-      <div class="login-form">
-        <div class="form-info">
-          <p>Utilize sua conta institucional do SUAP para acessar o sistema.</p>
-        </div>
+  <div class="login-tabs">
+ <button class="login-tab active" id="tab-suap" data-tab="suap">SUAP</button>
+ <button class="login-tab" id="tab-napne" data-tab="napne">Equipe NAPNE</button>
+ </div>
 
-        <div class="form-group">
-          <button id="suap-login" class="suap-button" type="button">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 1.25rem; height: 1.25rem;">
-              <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
-              <polyline points="10 17 15 12 10 7"/>
-              <line x1="15" y1="12" x2="3" y2="12"/>
-            </svg>
-            <span class="btn-text">Entrar com SUAP</span>
-          </button>
-        </div>
+ <div class="login-panel" id="panel-suap">
+ <div class="form-info">
+ <p>Alunos e professores: utilize sua conta institucional do SUAP.</p>
+ </div>
+ <div class="form-group">
+ <button id="suap-login" class="suap-button" type="button">
+ <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 1.25rem; height: 1.25rem;">
+ <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+ <polyline points="10 17 15 12 10 7"/>
+ <line x1="15" y1="12" x2="3" y2="12"/>
+ </svg>
+ <span class="btn-text">Entrar com SUAP</span>
+ </button>
+ </div>
+ <div class="help-links">
+ <a href="https://suap.ifrn.edu.br/accounts/password/reset/" target="_blank" rel="noopener" class="help-link">
+ Esqueceu sua senha?
+ </a>
+ </div>
+ </div>
 
-        <div class="help-links">
-          <a href="https://suap.ifrn.edu.br/accounts/password/reset/" target="_blank" rel="noopener" class="help-link">
-            Esqueceu sua senha?
-          </a>
-        </div>
-      </div>
+ <div class="login-panel" id="panel-napne" hidden>
+ <form id="local-login-form" class="local-login-form">
+ <div class="form-group">
+ <label for="local-email">Email</label>
+ <input type="email" id="local-email" placeholder="seu@email.com" required autocomplete="email">
+ </div>
+ <div class="form-group">
+ <label for="local-senha">Senha</label>
+ <input type="password" id="local-senha" placeholder="Senha" required autocomplete="current-password">
+ </div>
+ <div class="form-group">
+ <button type="submit" class="suap-button local-login-btn" id="local-login-btn">Entrar</button>
+ </div>
+ </form>
+ </div>
 
       <div id="error-message" class="error-message" hidden>
         <span id="error-text"></span>
@@ -50,83 +69,145 @@
   <script src="/js/client.js"></script>
 
   <script>
-  (function() {
-    'use strict';
+(function() {
+'use strict';
 
-    Cookies.remove('suapToken');
-    Cookies.remove('suapTokenExpirationTime');
-    Cookies.remove('suapScope');
+function isAlreadyAuthenticated() {
+  var savedToken = localStorage.getItem('acolhe_access_token');
+  var savedUserId = localStorage.getItem('acolhe_user_id');
+  return !!(savedToken && savedUserId);
+}
 
-    var suap = new SuapClient(SUAP_URL, CLIENT_ID, REDIRECT_URI, SCOPE);
-    suap.init();
+  function redirectByPerfil() {
+  var savedPerfil = localStorage.getItem('acolhe_tipo_perfil') || 'aluno';
+  var redirectUrl = '/disciplinas';
+  if (savedPerfil === 'psicopedagogo' || savedPerfil === 'admin' || savedPerfil === 'servidor') {
+    redirectUrl = '/painel';
+  } else if (savedPerfil === 'aluno') {
+    redirectUrl = '/portal';
+  }
+  window.location.replace(redirectUrl);
+}
 
-    if (suap.isAuthenticated() && window.location.hash && window.location.hash.includes('access_token')) {
-      var accessToken = suap.getToken().getValue();
+Cookies.remove('suapToken');
+Cookies.remove('suapTokenExpirationTime');
+Cookies.remove('suapScope');
 
-      fetch('/auth/callback', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          access_token: accessToken,
-          semestre: SEMESTRE_VIGENTE
-        })
-      })
-      .then(function(response) {
-        if (!response.ok) throw new Error('HTTP ' + response.status);
-        return response.json();
-      })
-      .then(function(data) {
-        localStorage.setItem('acolhe_user', JSON.stringify(data.usuario));
-        localStorage.setItem('acolhe_user_id', data.usuario.id);
-        localStorage.setItem('acolhe_access_token', accessToken);
-        localStorage.setItem('acolhe_tipo_perfil', data.tipo_perfil || data.usuario.tipo_perfil || 'aluno');
-        var perfil = data.tipo_perfil || data.usuario.tipo_perfil || 'aluno';
-        var redirectUrl = '/disciplinas';
-        if (perfil === 'psicopedagogo' || perfil === 'admin') {
-            redirectUrl = '/painel';
-        } else if (perfil === 'servidor') {
-            redirectUrl = '/disciplinas';
-        }
-        window.location.replace(redirectUrl);
-      })
-      .catch(function(error) {
-        var errorEl = document.getElementById('error-message');
-        var errorText = document.getElementById('error-text');
-        if (errorEl && errorText) {
-          errorText.textContent = 'Erro ao autenticar: ' + error.message;
-          errorEl.hidden = false;
-        }
-      });
-    } else if (window.location.search && window.location.search.includes('error=')) {
-      var errorMatch = window.location.search.match(/error=([^&]+)/);
-      var errorMsg = errorMatch ? decodeURIComponent(errorMatch[1].replace(/\+/g, ' ')) : 'Erro desconhecido';
-      var errorEl = document.getElementById('error-message');
-      var errorText = document.getElementById('error-text');
-      if (errorEl && errorText) {
-        errorText.textContent = 'Erro do SUAP: ' + errorMsg;
-        errorEl.hidden = false;
-      }
-      window.history.replaceState({}, document.title, '/');
-    } else if (suap.isAuthenticated()) {
-        var savedUserId = localStorage.getItem('acolhe_user_id');
-        var savedPerfil = localStorage.getItem('acolhe_tipo_perfil') || 'aluno';
-        if (savedUserId) {
-            var redirectUrl = '/disciplinas';
-            if (savedPerfil === 'psicopedagogo' || savedPerfil === 'admin') {
-                redirectUrl = '/painel';
-            }
-            window.location.replace(redirectUrl);
-        }
+var suap = new SuapClient(SUAP_URL, CLIENT_ID, REDIRECT_URI, SCOPE);
+suap.init();
+
+if (suap.isAuthenticated() && window.location.hash && window.location.hash.includes('access_token')) {
+  var accessToken = suap.getToken().getValue();
+
+  fetch('/auth/callback', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      access_token: accessToken,
+      semestre: SEMESTRE_VIGENTE
+    })
+  })
+  .then(function(response) {
+    if (!response.ok) throw new Error('HTTP ' + response.status);
+    return response.json();
+  })
+ .then(function(data) {
+  localStorage.setItem('acolhe_user', JSON.stringify(data.usuario));
+  localStorage.setItem('acolhe_user_id', data.usuario.id);
+  localStorage.setItem('acolhe_access_token', data.token || accessToken);
+  localStorage.setItem('acolhe_tipo_perfil', data.tipo_perfil || data.usuario.tipo_perfil || 'aluno');
+  localStorage.setItem('acolhe_senha_temporaria', data.usuario.senha_temporaria ? 'true' : 'false');
+  redirectByPerfil();
+ })
+  .catch(function(error) {
+    var errorEl = document.getElementById('error-message');
+    var errorText = document.getElementById('error-text');
+    if (errorEl && errorText) {
+      errorText.textContent = 'Erro ao autenticar: ' + error.message;
+      errorEl.hidden = false;
     }
+  });
+} else if (window.location.search && window.location.search.includes('error=')) {
+  var errorMatch = window.location.search.match(/error=([^&]+)/);
+  var errorMsg = errorMatch ? decodeURIComponent(errorMatch[1].replace(/\+/g, ' ')) : 'Erro desconhecido';
+  var errorEl = document.getElementById('error-message');
+  var errorText = document.getElementById('error-text');
+  if (errorEl && errorText) {
+    errorText.textContent = 'Erro do SUAP: ' + errorMsg;
+    errorEl.hidden = false;
+  }
+  window.history.replaceState({}, document.title, '/');
+} else if (isAlreadyAuthenticated()) {
+  redirectByPerfil();
+}
 
-    document.getElementById('suap-login').addEventListener('click', function(e) {
-      e.preventDefault();
-      Cookies.remove('suapToken');
-      Cookies.remove('suapTokenExpirationTime');
-      Cookies.remove('suapScope');
-      suap.login();
-    });
-  })();
-  </script>
+document.getElementById('suap-login').addEventListener('click', function(e) {
+  e.preventDefault();
+  Cookies.remove('suapToken');
+  Cookies.remove('suapTokenExpirationTime');
+  Cookies.remove('suapScope');
+  suap.login();
+});
+
+document.querySelectorAll('.login-tab').forEach(function(tab) {
+  tab.addEventListener('click', function() {
+    var target = tab.dataset.tab;
+    document.querySelectorAll('.login-tab').forEach(function(t) { t.classList.remove('active'); });
+    tab.classList.add('active');
+    document.querySelectorAll('.login-panel').forEach(function(p) { p.hidden = true; });
+    var panel = document.getElementById('panel-' + target);
+    if (panel) panel.hidden = false;
+  });
+});
+
+document.getElementById('local-login-form').addEventListener('submit', function(e) {
+  e.preventDefault();
+  var email = document.getElementById('local-email').value.trim();
+  var senha = document.getElementById('local-senha').value;
+  var btn = document.getElementById('local-login-btn');
+  var errorEl = document.getElementById('error-message');
+  var errorText = document.getElementById('error-text');
+
+  if (!email || !senha) {
+    if (errorEl && errorText) { errorText.textContent = 'Preencha email e senha.'; errorEl.hidden = false; }
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Entrando...';
+  if (errorEl) errorEl.hidden = true;
+
+  fetch('/auth/local-login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: email, senha: senha })
+  })
+ .then(function(response) {
+  if (!response.ok) {
+   return response.json().then(function(d) { throw new Error(d.detail || 'HTTP ' + response.status); })
+    .catch(function() { throw new Error('Email ou senha incorretos. Tente novamente.'); });
+  }
+  return response.json();
+ })
+ .then(function(data) {
+  localStorage.setItem('acolhe_user', JSON.stringify(data.usuario));
+  localStorage.setItem('acolhe_user_id', data.usuario.id);
+  localStorage.setItem('acolhe_access_token', data.token);
+  localStorage.setItem('acolhe_tipo_perfil', data.tipo_perfil || data.usuario.tipo_perfil || 'aluno');
+  localStorage.setItem('acolhe_senha_temporaria', data.usuario.senha_temporaria ? 'true' : 'false');
+  redirectByPerfil();
+ })
+ .catch(function(error) {
+  var msg = error.message;
+  if (msg.indexOf('Failed to fetch') !== -1 || msg.indexOf('NetworkError') !== -1 || msg.indexOf('404') !== -1) {
+   msg = 'Email ou senha incorretos. Tente novamente.';
+  }
+  if (errorEl && errorText) { errorText.textContent = msg; errorEl.hidden = false; }
+  btn.disabled = false;
+  btn.textContent = 'Entrar';
+ });
+});
+})();
+</script>
 </body>
 </html>

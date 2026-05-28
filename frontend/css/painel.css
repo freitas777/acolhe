@@ -293,9 +293,9 @@ body {
 }
 
 .painel-columns {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 24px;
+ display: grid;
+ grid-template-columns: 1fr 1fr 1fr;
+ gap: 24px;
 }
 
 .painel-column {
@@ -689,7 +689,176 @@ body {
 }
 
 .btn-modal-save:active {
-  transform: scale(0.97);
+ transform: scale(0.97);
+}
+
+.column-equipe {
+ background: #0A7F70;
+}
+
+.btn-invite {
+ display: inline-flex;
+ align-items: center;
+ gap: 4px;
+ padding: 4px 12px;
+ background: rgba(255,255,255,0.25);
+ color: #fff;
+ border: 1px solid rgba(255,255,255,0.3);
+ border-radius: 8px;
+ font-size: 12px;
+ font-weight: 600;
+ cursor: pointer;
+ font-family: 'Open Sans', sans-serif;
+ transition: background 0.2s;
+ white-space: nowrap;
+}
+
+.btn-invite:hover {
+ background: rgba(255,255,255,0.4);
+}
+
+.btn-invite svg {
+ width: 14px;
+ height: 14px;
+}
+
+.equipe-item {
+ display: flex;
+ align-items: center;
+ gap: 12px;
+ padding: 12px 20px;
+ border-bottom: 1px solid #f0f0f0;
+}
+
+.equipe-item:last-child {
+ border-bottom: none;
+}
+
+.membro-badge {
+ display: inline-block;
+ font-size: 11px;
+ font-weight: 600;
+ padding: 2px 8px;
+ border-radius: 6px;
+ margin-top: 4px;
+}
+
+.membro-badge.badge-pendente {
+ background: #FFF3E0;
+ color: #E65100;
+}
+
+.membro-badge.badge-inativo {
+ background: #FFEBEE;
+ color: #C62828;
+}
+
+.invite-result {
+ background: #E0F2F1;
+ border: 1px solid #B2DFDB;
+ border-radius: 12px;
+ padding: 16px;
+ margin-top: 4px;
+}
+
+.invite-result-header {
+ font-size: 15px;
+ font-weight: 700;
+ color: #0A7F70;
+ margin-bottom: 12px;
+}
+
+.invite-result-info p {
+ font-size: 13px;
+ color: #555;
+ margin-bottom: 10px;
+}
+
+.invite-cred {
+ display: flex;
+ align-items: center;
+ gap: 8px;
+ margin-bottom: 6px;
+}
+
+.invite-cred label {
+ font-size: 12px;
+ font-weight: 700;
+ color: #555;
+ min-width: 110px;
+}
+
+.invite-cred span {
+ font-size: 14px;
+ color: #1a1a2e;
+ font-family: monospace;
+ background: #fff;
+ padding: 4px 8px;
+ border-radius: 6px;
+ border: 1px solid #e0e0e0;
+}
+
+.invite-cred .senha-temp {
+ color: #C62828;
+ font-weight: 700;
+ letter-spacing: 1px;
+}
+
+.invite-warning {
+ font-size: 12px;
+ color: #E65100;
+ font-weight: 600;
+ margin-top: 8px;
+}
+
+.invite-result[hidden] {
+ display: none;
+}
+
+#invite-actions[hidden] {
+ display: none;
+}
+
+#btn-senha {
+ background: #F8F9FA;
+ border: 1px solid #E0E0E0;
+ color: #0A7F70;
+ width: 36px;
+ height: 36px;
+ border-radius: 8px;
+ cursor: pointer;
+ display: flex;
+ align-items: center;
+ justify-content: center;
+ transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+
+#btn-senha:hover {
+ background: #0A7F70;
+ color: #fff;
+ border-color: #0A7F70;
+}
+
+#btn-senha svg {
+ width: 18px;
+ height: 18px;
+}
+
+.senha-temp-notice {
+ display: flex;
+ align-items: center;
+ gap: 10px;
+ background: #FFF3E0;
+ border: 1px solid #FFE0B2;
+ border-radius: 10px;
+ padding: 12px 16px;
+ color: #E65100;
+ font-size: 13px;
+ font-weight: 600;
+}
+
+.senha-temp-notice[hidden] {
+ display: none;
 }
 
 @media (max-width: 768px) {

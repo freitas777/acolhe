@@ -1,19 +1,8 @@
 (function() {
-  'use strict';
+'use strict';
 
-  var suap = new SuapClient(SUAP_URL, CLIENT_ID, REDIRECT_URI, SCOPE);
-  suap.init();
+if (!acolheRequireRole(['psicopedagogo', 'servidor', 'admin'])) return;
 
-  if (!suap.isAuthenticated()) {
-    window.location.href = '/';
-    return;
-  }
-
-  var accessToken = localStorage.getItem('acolhe_access_token') || suap.getToken().getValue() || '';
-  if (!accessToken) {
-    window.location.href = '/';
-    return;
-  }
   var currentUser = null;
   var searchTimeout = null;
   var currentQuery = '';
@@ -42,10 +31,6 @@
       avatarEl.textContent = name.split(' ').map(function(n){ return n[0]; }).slice(0,2).join('').toUpperCase();
     }
     if (nameEl) nameEl.textContent = name;
-  }
-
-  function authHeaders() {
-    return { 'Authorization': 'Bearer ' + accessToken };
   }
 
   function setupEventListeners() {
@@ -96,18 +81,13 @@
       });
     }
 
-    if (btnLogout) {
-      btnLogout.addEventListener('click', function() {
-        if (confirm('Deseja realmente sair?')) {
-          if (suap.isAuthenticated()) suap.getToken().revoke();
-          localStorage.removeItem('acolhe_access_token');
-          localStorage.removeItem('acolhe_user');
-          localStorage.removeItem('acolhe_user_id');
-          localStorage.removeItem('acolhe_tipo_perfil');
-          window.location.replace('/');
-        }
-      });
-	}
+  if (btnLogout) {
+    btnLogout.addEventListener('click', function() {
+      if (confirm('Deseja realmente sair?')) {
+        acolheLogout();
+      }
+    });
+  }
 }
 
   function performSearch(query) {
@@ -131,32 +111,26 @@
       params += '&matricula=' + encodeURIComponent(query);
     }
 
-    fetch('/importacao/buscar?' + params, { headers: authHeaders() })
-      .then(function(r) {
-        if (r.status === 401) {
-          localStorage.removeItem('acolhe_access_token');
-          localStorage.removeItem('acolhe_user');
-          window.location.href = '/';
-          throw new Error('Sessao expirada');
-        }
-        if (r.status === 403) {
-          throw new Error('Acesso negado. Apenas membros do NAPNE podem importar alunos.');
-        }
-        if (r.status === 502) {
-          return r.json().then(function(data) {
-            throw new Error(data.detail || 'Erro HTTP 502');
-          });
-        }
-        if (!r.ok) {
-          return r.json().then(function(data) {
-            throw new Error(data.detail || 'Erro HTTP ' + r.status);
-          }).catch(function(e) {
-            if (e.message === 'Sessao expirada') throw e;
-            throw new Error(e.message || 'Erro HTTP ' + r.status);
-          });
-        }
-        return r.json();
-      })
+  acolheFetch('/importacao/buscar?' + params)
+  .then(function(r) {
+    if (r.status === 403) {
+      throw new Error('Acesso negado. Apenas membros do NAPNE podem importar alunos.');
+    }
+    if (r.status === 502) {
+      return r.json().then(function(data) {
+        throw new Error(data.detail || 'Erro HTTP 502');
+      });
+    }
+    if (!r.ok) {
+      return r.json().then(function(data) {
+        throw new Error(data.detail || 'Erro HTTP ' + r.status);
+      }).catch(function(e) {
+        if (e.message === 'Sessao expirada') throw e;
+        throw new Error(e.message || 'Erro HTTP ' + r.status);
+      });
+    }
+    return r.json();
+  })
       .then(function(results) {
         isSearching = false;
         hideLoading();
@@ -167,13 +141,13 @@
         showCount(results.length);
         renderResults(results);
       })
-      .catch(function(err) {
-        isSearching = false;
-        hideLoading();
-        if (err.message === 'Sessao expirada') return;
+  .catch(function(err) {
+    isSearching = false;
+    hideLoading();
 
-        var msg = err.message || '';
-        if (msg.indexOf('[SUAP_MODULE_ERROR]') !== -1) {
+    var msg = err.message || '';
+    if (msg === 'Sessao expirada. Faca login novamente.') return;
+    if (msg.indexOf('[SUAP_MODULE_ERROR]') !== -1) {
           showSuapAlert();
           showEmptyState();
         } else if (msg.indexOf('Acesso negado') !== -1 || msg.indexOf('indispon') !== -1) {
@@ -259,35 +233,30 @@
     btnEl.textContent = 'Importando...';
     btnEl.className = 'btn-import btn-import-loading';
 
-    fetch('/importacao/importar', {
-      method: 'POST',
-      headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
-      body: JSON.stringify({ matricula: matricula })
-    })
-      .then(function(r) {
-        if (r.status === 401) {
-          localStorage.removeItem('acolhe_access_token');
-          window.location.href = '/';
-          throw new Error('Sessao expirada');
-        }
-        if (r.status === 403) {
-          throw new Error('Acesso negado. Apenas membros do NAPNE podem importar alunos.');
-        }
-        if (r.status === 409) {
-          return r.json().then(function(data) {
-            throw new Error(data.detail || 'Aluno ja importado');
-          });
-        }
-        if (!r.ok) {
-          return r.json().then(function(data) {
-            throw new Error(data.detail || 'Erro ao importar aluno');
-          }).catch(function(e) {
-            if (e.message === 'Sessao expirada') throw e;
-            throw new Error(e.message || 'Erro ao importar aluno');
-          });
-        }
-        return r.json();
-      })
+  acolheFetch('/importacao/importar', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ matricula: matricula })
+  })
+  .then(function(r) {
+    if (r.status === 403) {
+      throw new Error('Acesso negado. Apenas membros do NAPNE podem importar alunos.');
+    }
+    if (r.status === 409) {
+      return r.json().then(function(data) {
+        throw new Error(data.detail || 'Aluno ja importado');
+      });
+    }
+    if (!r.ok) {
+      return r.json().then(function(data) {
+        throw new Error(data.detail || 'Erro ao importar aluno');
+      }).catch(function(e) {
+        if (e.message === 'Sessao expirada') throw e;
+        throw new Error(e.message || 'Erro ao importar aluno');
+      });
+    }
+    return r.json();
+  })
       .then(function(aluno) {
         btnEl.textContent = 'Importado';
         btnEl.className = 'btn-import btn-import-done';
@@ -307,9 +276,9 @@
 
         showToast('Aluno ' + escapeHtml(aluno.nome || matricula) + ' importado com sucesso!', 'success');
       })
-      .catch(function(err) {
-        if (err.message === 'Sessao expirada') return;
-        btnEl.disabled = false;
+  .catch(function(err) {
+    if (err.message === 'Sessao expirada. Faca login novamente.') return;
+    btnEl.disabled = false;
         btnEl.textContent = 'Importar';
         btnEl.className = 'btn-import btn-import-active';
         showToast('Erro: ' + err.message, 'error');

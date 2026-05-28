@@ -1,16 +1,9 @@
 (function() {
-    'use strict';
+'use strict';
 
-    var suap = new SuapClient(SUAP_URL, CLIENT_ID, REDIRECT_URI, SCOPE);
-    suap.init();
+ if (!acolheRequireRole(['aluno'])) return;
 
-    if (!suap.isAuthenticated()) {
-        window.location.href = '/';
-        return;
-    }
-
-    var accessToken = localStorage.getItem('acolhe_access_token') || suap.getToken().getValue();
-    var currentUser = null;
+ var currentUser = null;
     var perfilData = null;
     var currentTab = 'perfil';
     var conteudosLoaded = false;
@@ -112,18 +105,14 @@
             textareaInteresses.addEventListener('input', checkPerfilChanged);
         }
 
-        var btnLogout = document.getElementById('btn-logout');
-        if (btnLogout) {
-            btnLogout.addEventListener('click', function() {
-                if (confirm('Deseja realmente sair?')) {
-                    suap.logout();
-                    localStorage.removeItem('acolhe_access_token');
-                    localStorage.removeItem('acolhe_user');
-                    localStorage.removeItem('acolhe_user_id');
-                    window.location.href = '/';
-                }
-            });
-        }
+  var btnLogout = document.getElementById('btn-logout');
+  if (btnLogout) {
+    btnLogout.addEventListener('click', function() {
+      if (confirm('Deseja realmente sair?')) {
+        acolheLogout();
+      }
+    });
+  }
     }
 
     function checkPerfilChanged() {
@@ -149,19 +138,13 @@
         notFoundEl.hidden = true;
         contentEl.hidden = true;
 
-        fetch('/portal/meu-perfil', {
-            headers: { 'Authorization': 'Bearer ' + accessToken }
-        })
-        .then(function(response) {
-            if (!response.ok) {
-                if (response.status === 401) {
-                    window.location.href = '/';
-                    return;
-                }
-                throw new Error('HTTP ' + response.status);
-            }
-            return response.json();
-        })
+  acolheFetch('/portal/meu-perfil')
+  .then(function(response) {
+    if (!response.ok) {
+      throw new Error('HTTP ' + response.status);
+    }
+    return response.json();
+  })
         .then(function(data) {
             loadingEl.hidden = true;
 
@@ -230,14 +213,13 @@
         if (preferencia) payload.preferencia = preferencia;
         if (interesses) payload.interesses = interesses;
 
-        fetch('/portal/meu-perfil', {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer ' + accessToken
-            },
-            body: JSON.stringify(payload)
-        })
+  acolheFetch('/portal/meu-perfil', {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(payload)
+  })
         .then(function(response) {
             if (!response.ok) {
                 return response.json().then(function(err) {
@@ -270,19 +252,13 @@
         emptyEl.hidden = true;
         listEl.innerHTML = '';
 
-        fetch('/portal/meus-conteudos', {
-            headers: { 'Authorization': 'Bearer ' + accessToken }
-        })
-        .then(function(response) {
-            if (!response.ok) {
-                if (response.status === 401) {
-                    window.location.href = '/';
-                    return;
-                }
-                throw new Error('HTTP ' + response.status);
-            }
-            return response.json();
-        })
+  acolheFetch('/portal/meus-conteudos')
+  .then(function(response) {
+    if (!response.ok) {
+      throw new Error('HTTP ' + response.status);
+    }
+    return response.json();
+  })
         .then(function(conteudos) {
             loadingEl.hidden = true;
 

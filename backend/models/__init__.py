@@ -7,6 +7,7 @@ from backend.models.mensagem import Mensagem
 from backend.models.disciplina import Disciplina
 from backend.models.diario_aluno import DiarioAluno
 from backend.models.pendencia_validacao import PendenciaValidacao
+from backend.models.conta_local import ContaLocal
 
 __all__ = [
     "Usuario",
@@ -18,4 +19,5 @@ __all__ = [
     "Disciplina",
     "DiarioAluno",
     "PendenciaValidacao",
+    "ContaLocal",
 ]
