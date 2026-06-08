@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import logging
+import threading
 import time
+from collections import OrderedDict
 
 import httpx
 from fastapi import Depends, Header, HTTPException, Request, status
@@ -17,8 +19,31 @@ from backend.services.suap_service import SUAPService
 
 logger = logging.getLogger(__name__)
 
-_AUTH_CACHE: dict[str, tuple[float, str]] = {}
+_AUTH_CACHE_MAX = 500
 _AUTH_CACHE_TTL = 300
+_auth_cache_lock = threading.Lock()
+_AUTH_CACHE: OrderedDict[str, tuple[float, str]] = OrderedDict()
+
+
+def _cache_get(key: str):
+    with _auth_cache_lock:
+        entry = _AUTH_CACHE.get(key)
+        if entry:
+            _AUTH_CACHE.move_to_end(key)
+        return entry
+
+
+def _cache_set(key: str, value: tuple):
+    with _auth_cache_lock:
+        _AUTH_CACHE[key] = value
+        _AUTH_CACHE.move_to_end(key)
+        while len(_AUTH_CACHE) > _AUTH_CACHE_MAX:
+            _AUTH_CACHE.popitem(last=False)
+
+
+def _cache_pop(key: str):
+    with _auth_cache_lock:
+        _AUTH_CACHE.pop(key, None)
 
 
 class AuthData(BaseModel):
@@ -28,7 +53,7 @@ class AuthData(BaseModel):
     suap_token: str = ""
 
 
-async def _authenticate_local(token: str, db: Session) -> AuthData | None:
+async def _authenticate_local(token: str, db: Session) -> "AuthData | None":
     if not is_jwt_local(token):
         return None
     payload = validar_jwt(token)
@@ -61,7 +86,7 @@ async def _authenticate_local(token: str, db: Session) -> AuthData | None:
 
 async def _authenticate_suap(suap_token: str, db: Session) -> AuthData:
     now = time.time()
-    cached_entry = _AUTH_CACHE.get(suap_token)
+    cached_entry = _cache_get(suap_token)
     if cached_entry and (now - cached_entry[0]) < _AUTH_CACHE_TTL:
         usuario_repo_cache = UsuarioRepository(db)
         usuario = usuario_repo_cache.get_by_suap_id(cached_entry[1])
@@ -73,12 +98,12 @@ async def _authenticate_suap(suap_token: str, db: Session) -> AuthData:
         meus_dados = await suap_service.get_meus_dados(suap_token)
     except httpx.HTTPStatusError as e:
         if e.response.status_code in (401, 403):
-            _AUTH_CACHE.pop(suap_token, None)
+            _cache_pop(suap_token)
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Token invalido ou expirado. Faca login novamente.",
             )
-        logger.warning(f"Erro HTTP SUAP ao validar token: {e}")
+            logger.warning("Erro HTTP SUAP ao validar token: %s", e)
         if cached_entry:
             usuario_repo_fallback = UsuarioRepository(db)
             usuario = usuario_repo_fallback.get_by_suap_id(cached_entry[1])
@@ -89,7 +114,7 @@ async def _authenticate_suap(suap_token: str, db: Session) -> AuthData:
             detail="SUAP indisponivel. Tente novamente em alguns segundos.",
         )
     except Exception as e:
-        logger.warning(f"Erro de conexao ao validar token SUAP: {e}")
+        logger.warning("Erro de conexao ao validar token SUAP: %s", e)
         if cached_entry:
             usuario_repo_fallback = UsuarioRepository(db)
             usuario = usuario_repo_fallback.get_by_suap_id(cached_entry[1])
@@ -122,11 +147,11 @@ async def _authenticate_suap(suap_token: str, db: Session) -> AuthData:
             usuario.campus = novo_campus
             db.commit()
             db.refresh(usuario)
-            logger.info(f"Campus atualizado para usuario {usuario.id}: {novo_campus}")
+            logger.info("Campus atualizado para usuario %s: %s", usuario.id, novo_campus)
     except Exception as e:
-        logger.warning(f"Nao foi possivel atualizar campus do usuario {usuario.id}: {e}")
+        logger.warning("Nao foi possivel atualizar campus do usuario %s: %s", usuario.id, e)
 
-    _AUTH_CACHE[suap_token] = (now, suap_id)
+    _cache_set(suap_token, (now, suap_id))
     return AuthData(usuario=usuario, suap_token=suap_token)
 
 

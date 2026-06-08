@@ -13,10 +13,13 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     gemini_model: str = "gemini-2.5-flash"
 
+    debug: bool = False
+    allowed_origins: str = "http://localhost:8000,http://127.0.0.1:8000"
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
-        extra = "allow"
+        extra = "ignore"
 
 
 settings = Settings() #type:ignore

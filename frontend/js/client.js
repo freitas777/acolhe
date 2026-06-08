@@ -199,10 +199,9 @@ var SuapClient = function(authHost, clientID, redirectURI, scope) {
         .then(function(data) {
             callback(data);
         })
-        .catch(function(error) {
-            console.error('[SuapClient] Erro SUAP:', error);
-            alert('Falha na comunicação com o SUAP: ' + error.message);
-        });
+    .catch(function(error) {
+      alert('Falha na comunicacao com o SUAP: ' + error.message);
+    });
     };
 
     this.login = function() {

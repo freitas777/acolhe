@@ -18,7 +18,11 @@ class ConversaRepository(BaseRepository[Conversa]):
         skip: int = 0,
         limit: int = 100,
     ) -> list[Conversa]:
-        stmt = select(Conversa).options(selectinload(Conversa.mensagens))
+        stmt = (
+            select(Conversa)
+            .options(selectinload(Conversa.mensagens))
+            .options(selectinload(Conversa.aluno))
+        )
         if usuario_id is not None:
             stmt = stmt.where(Conversa.usuario_id == usuario_id)
         stmt = stmt.order_by(Conversa.criada_em.desc()).offset(skip).limit(limit)
@@ -29,6 +33,7 @@ class ConversaRepository(BaseRepository[Conversa]):
         stmt = (
             select(Conversa)
             .options(selectinload(Conversa.mensagens))
+            .options(selectinload(Conversa.aluno))
             .where(Conversa.id == conversa_id)
         )
         resultado = self.db.execute(stmt)

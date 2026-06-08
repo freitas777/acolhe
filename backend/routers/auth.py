@@ -72,7 +72,7 @@ async def callback(request: LoginRequest, auth_service: AuthService = Depends())
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro inesperado: {str(e)}",
+            detail="Erro interno. Tente novamente.",
         )
 
 
@@ -95,6 +95,10 @@ async def local_login(request: LocalLoginRequest, db: Session = Depends(get_db))
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Email ou senha invalidos.",
         )
+
+    if "$" not in conta.senha_hash:
+        conta.senha_hash = hash_senha(request.senha)
+        db.commit()
 
     usuario_repo = UsuarioRepository(db)
     usuario = usuario_repo.get_by_id(conta.usuario_id)
@@ -223,7 +227,7 @@ async def disciplinas(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Nao foi possivel buscar as disciplinas: {str(e)}",
+            detail="Não foi possível buscar as disciplinas. Tente novamente.",
         )
 
 
@@ -238,5 +242,5 @@ async def alunos_assistidos(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro ao buscar alunos assistidos: {str(e)}",
+            detail="Erro ao buscar alunos assistidos. Tente novamente.",
         )

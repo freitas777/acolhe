@@ -99,7 +99,7 @@ class SUAPService:
             return response.json()
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
-                logger.info(f"[SUAP] aluno-matriculado 404 para matricula={matricula}")
+                logger.info("[SUAP] aluno-matriculado 404 para matricula=%s", matricula)
                 return None
             raise
 
@@ -120,7 +120,7 @@ class SUAPService:
             return data if isinstance(data, list) else data.get("results", [])
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
-                logger.info(f"[SUAP] aluno-resumido 404 para matricula={matricula}")
+                logger.info("[SUAP] aluno-resumido 404 para matricula=%s", matricula)
                 return []
             raise
 

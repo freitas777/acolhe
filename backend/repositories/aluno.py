@@ -45,7 +45,8 @@ class AlunoRepository(BaseRepository[Aluno]):
         )
 
     def buscar_por_nome_ou_matricula(self, query: str) -> list[Aluno]:
-        termo = f"%{query}%"
+        escaped = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        termo = f"%{escaped}%"
         return (
             self.db.query(Aluno)
             .filter(

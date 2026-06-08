@@ -5,6 +5,10 @@
 const ChatUI = {
   elements: {},
 
+  isAluno() {
+    return (localStorage.getItem('acolhe_tipo_perfil') || 'aluno') === 'aluno';
+  },
+
   /**
    * Inicializa referências do DOM
    */
@@ -18,15 +22,21 @@ const ChatUI = {
       btnSend: document.getElementById('btn-send'),
       btnNewChat: document.getElementById('btn-new-chat'),
       btnMenuMobile: document.getElementById('btn-menu-mobile'),
-      btnDeleteConversation: document.getElementById('btn-delete-conversation'),
       btnLogout: document.getElementById('btn-logout'),
       chatTitle: document.getElementById('chat-title'),
       userAvatarSmall: document.getElementById('user-avatar-small'),
       userNameSmall: document.getElementById('user-name-small'),
-      userRoleSmall: document.getElementById('user-role-small')
-    };
+      userRoleSmall: document.getElementById('user-role-small'),
+      alunoContextBar: document.getElementById('aluno-context-bar'),
+      alunoBadge: document.getElementById('aluno-badge'),
+      alunoBadgeName: document.getElementById('aluno-badge-name'),
+      btnRemoveAluno: document.getElementById('btn-remove-aluno'),
+      btnAlunoContext: document.getElementById('btn-aluno-context'),
+      alunoSearchWrapper: document.getElementById('aluno-search-wrapper'),
+      alunoSearchInput: document.getElementById('aluno-search-input'),
+      alunoSearchResults: document.getElementById('aluno-search-results')
+  };
 
-    console.log('🎨 ChatUI inicializado');
   },
 
   /**
@@ -57,6 +67,7 @@ const ChatUI = {
           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
         </svg>
         <span>${this.escapeHtml(conv.title)}</span>
+        ${(!this.isAluno() && conv.aluno_id) ? '<svg class="aluno-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>' : ''}
         <button class="delete-btn" title="Excluir conversa">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="3 6 5 6 21 6"/>
@@ -67,16 +78,11 @@ const ChatUI = {
 
       // Clique para selecionar
       item.addEventListener('click', (e) => {
-        if (!e.target.closest('.delete-btn')) {
-          this.onConversationSelect(conv.id);
+        if (e.target.closest('.delete-btn')) {
+          this.onConversationDelete(conv.id);
+          return;
         }
-      });
-
-      // Clique para deletar
-      const deleteBtn = item.querySelector('.delete-btn');
-      deleteBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        this.onConversationDelete(conv.id);
+        this.onConversationSelect(conv.id);
       });
 
       list.appendChild(item);
@@ -233,13 +239,101 @@ const ChatUI = {
    * Handlers de eventos
    */
   onConversationSelect(id) {
-    // Implementado no dashboard.js
-    console.log('📍 Selecionar conversa:', id);
   },
 
   onConversationDelete(id) {
-    // Implementado no dashboard.js
-    console.log('🗑️ Deletar conversa:', id);
+  },
+
+    updateAlunoBadge(alunoNome) {
+        if (this.isAluno()) return;
+
+        const bar = this.elements.alunoContextBar;
+    const badge = this.elements.alunoBadge;
+    const badgeName = this.elements.alunoBadgeName;
+    const searchWrapper = this.elements.alunoSearchWrapper;
+
+    if (!bar) return;
+
+    bar.hidden = false;
+
+    if (alunoNome) {
+      if (badge) badge.hidden = false;
+      if (badgeName) badgeName.textContent = alunoNome;
+      if (searchWrapper) searchWrapper.hidden = true;
+    } else {
+      if (badge) badge.hidden = true;
+      if (searchWrapper) searchWrapper.hidden = true;
+    }
+  },
+
+  hideAlunoContext() {
+    const bar = this.elements.alunoContextBar;
+    if (bar) bar.hidden = true;
+  },
+
+    showAlunoSearch() {
+        if (this.isAluno()) return;
+
+        const bar = this.elements.alunoContextBar;
+    const badge = this.elements.alunoBadge;
+    const searchWrapper = this.elements.alunoSearchWrapper;
+    const input = this.elements.alunoSearchInput;
+
+    if (bar) bar.hidden = false;
+    if (badge) badge.hidden = true;
+    if (searchWrapper) searchWrapper.hidden = false;
+    if (input) {
+      input.value = '';
+      input.focus();
+    }
+  },
+
+  renderAlunoSearchResults(alunos) {
+    const container = this.elements.alunoSearchResults;
+    if (!container) return;
+
+    container.innerHTML = '';
+
+    if (!alunos || alunos.length === 0) {
+      container.hidden = false;
+      container.innerHTML = '<div class="aluno-search-empty">Nenhum aluno encontrado</div>';
+      return;
+    }
+
+    container.hidden = false;
+
+    alunos.forEach(aluno => {
+      const item = document.createElement('div');
+      item.className = 'aluno-search-item';
+      item.dataset.alunoId = aluno.id;
+      item.dataset.alunoNome = aluno.nome;
+
+      let detail = '';
+      if (aluno.matricula) detail += aluno.matricula;
+      if (aluno.diagnostico) detail += (detail ? ' · ' : '') + aluno.diagnostico;
+
+      item.innerHTML = `
+        <span class="aluno-search-item-nome">${this.escapeHtml(aluno.nome)}</span>
+        ${detail ? '<span class="aluno-search-item-detail">' + this.escapeHtml(detail) + '</span>' : ''}
+      `;
+
+      item.addEventListener('click', () => {
+        this.onAlunoSelected(aluno.id, aluno.nome);
+      });
+
+      container.appendChild(item);
+    });
+  },
+
+  hideAlunoSearchResults() {
+    const container = this.elements.alunoSearchResults;
+    if (container) {
+      container.innerHTML = '';
+      container.hidden = true;
+    }
+  },
+
+  onAlunoSelected(alunoId, alunoNome) {
   },
 
   /**

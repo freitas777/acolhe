@@ -47,18 +47,18 @@ if (!acolheRequireAuth()) return;
       if (callback) callback();
     })
     .catch(function(error) {
-      console.error('Erro ao sincronizar no init:', error);
       if (callback) callback();
     });
   }
 
   function loadUserInfo() {
   var savedUser = localStorage.getItem('acolhe_user');
-  if (savedUser) {
-    try {
-      currentUser = JSON.parse(savedUser);
-      tipoPerfil = currentUser.tipo_perfil || localStorage.getItem('acolhe_tipo_perfil') || 'aluno';
-    } catch (e) {}
+    if (savedUser) {
+        try {
+            var parsed = JSON.parse(savedUser);
+            currentUser = parsed;
+            tipoPerfil = parsed.tipo_perfil || localStorage.getItem('acolhe_tipo_perfil') || 'aluno';
+        } catch (e) {}
   }
   updateUserInfoUI();
 }
@@ -113,7 +113,6 @@ if (!acolheRequireAuth()) return;
       }
     })
     .catch(function(error) {
-      console.error('Erro ao carregar disciplinas:', error);
       renderEmpty('Erro ao carregar disciplinas', 'Tente sincronizar com o SUAP novamente');
     });
   }
@@ -161,7 +160,6 @@ if (!acolheRequireAuth()) return;
       }
     })
     .catch(function(error) {
-      console.error('Erro ao sincronizar:', error);
       var msg = error.message || 'Erro desconhecido';
       if (msg.indexOf('SUAP') !== -1 || msg.indexOf('Connection') !== -1 || msg.indexOf('timeout') !== -1) {
         renderEmpty('SUAP indisponivel', 'Nao foi possivel conectar ao SUAP no momento. Tente novamente mais tarde.');

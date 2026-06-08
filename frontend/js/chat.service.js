@@ -8,62 +8,52 @@ const ChatService = {
   /**
    * Envia mensagem e recebe resposta da IA
    */
-  async sendMessage(content) {
+  async sendMessage(content, alunoId) {
     if (!content || !content.trim()) {
       throw new Error('Mensagem não pode estar vazia');
     }
 
     const trimmedContent = content.trim();
 
-    // ✅ MODO COM BACKEND + IA
     try {
+      const body = {
+        message: trimmedContent,
+        conversation_id: ChatStore.state.activeConversationId
+      };
+      if (alunoId) body.aluno_id = alunoId;
+
       const response = await acolheFetch(`${this.API_BASE_URL}/api/chat/send`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          message: trimmedContent,
-          conversation_id: ChatStore.state.activeConversationId
-        })
+        body: JSON.stringify(body)
       });
 
-      if (!response.ok) {
+    if (!response.ok) {
+      let detail = 'Erro na API';
+      try {
         const error = await response.json();
-        throw new Error(error.detail || 'Erro na API');
-      }
-
-      const data = await response.json();
-      
-      // Salva no localStorage também (backup)
-      ChatStore.addMessage('user', trimmedContent);
-      if (data.assistant_message) {
-        ChatStore.addMessage('assistant', data.assistant_message.content);
-      }
-
-      console.log('🤖 Resposta da IA recebida');
-
-      return {
-        success: true,
-        message: data.user_message,
-        assistantMessage: data.assistant_message,
-        conversationId: data.conversation_id
-      };
-
-    } catch (error) {
-      console.error('Erro ao chamar API:', error);
-      
-      // Fallback para localStorage apenas
-      const userMessage = ChatStore.addMessage('user', trimmedContent);
-      
-      return {
-        success: true,
-        message: userMessage,
-        assistantMessage: null,
-        needsAIResponse: true
-      };
+        detail = error.detail || detail;
+      } catch (_) {}
+      throw new Error(detail);
     }
-  },
+
+    const data = await response.json();
+
+        return {
+            success: true,
+            message: data.user_message,
+            assistantMessage: data.assistant_message,
+            conversationId: data.conversation_id,
+            alunoId: data.aluno_id || null,
+            alunoNome: data.aluno_nome || null
+        };
+
+  } catch (error) {
+    throw error;
+  }
+},
 
   /**
    * Gera conteúdo educacional adaptado
@@ -88,11 +78,10 @@ const ChatService = {
       const data = await response.json();
       return data.conteudo;
 
-    } catch (error) {
-      console.error('Erro ao gerar conteúdo:', error);
-      throw error;
-    }
-  },
+} catch (error) {
+throw error;
+}
+},
 
   /**
    * Carrega conversas do backend
@@ -103,26 +92,39 @@ const ChatService = {
 
       if (response.ok) {
         const conversations = await response.json();
-        return conversations;
+        ChatStore.state.conversations = conversations.map(function(c) {
+          return {
+            id: c.id,
+            title: c.title,
+            messages: c.messages || [],
+            created_at: c.created_at,
+            aluno_id: c.aluno_id || null,
+            aluno_nome: c.aluno_nome || null
+          };
+        });
+        ChatStore.save();
+        return ChatStore.getAllConversations();
       }
     } catch (error) {
-      console.error('Erro ao carregar conversas:', error);
+      ChatUI.showError('Erro ao carregar conversas');
     }
-
     return ChatStore.getAllConversations();
   },
 
   /**
    * Cria nova conversa
    */
-  async createNewConversation() {
+  async createNewConversation(alunoId) {
     try {
+      const body = { title: 'Nova conversa' };
+      if (alunoId) body.aluno_id = alunoId;
+
       const response = await acolheFetch(`${this.API_BASE_URL}/api/chat/conversations`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ title: 'Nova conversa' })
+        body: JSON.stringify(body)
       });
 
       if (response.ok) {
@@ -130,9 +132,8 @@ const ChatService = {
         return conversation;
       }
     } catch (error) {
-      console.error('Erro ao criar conversa:', error);
+      ChatUI.showError('Erro ao criar conversa');
     }
-
     return ChatStore.createConversation();
   },
 
@@ -145,9 +146,8 @@ const ChatService = {
         method: 'DELETE'
       });
     } catch (error) {
-      console.error('Erro ao deletar no backend:', error);
+      ChatUI.showError('Erro ao excluir conversa');
     }
-
     return ChatStore.deleteConversation(id);
   },
 
@@ -157,6 +157,18 @@ const ChatService = {
 
   getConversationsHistory() {
     return ChatStore.getAllConversations();
+  },
+
+  async searchAlunos(query) {
+    if (!query || query.trim().length < 2) return [];
+    try {
+      const response = await acolheFetch(`${this.API_BASE_URL}/alunos/busca?q=${encodeURIComponent(query.trim())}`);
+      if (response.ok) {
+        return await response.json();
+      }
+  } catch (error) {
+  }
+  return [];
   }
 };
 

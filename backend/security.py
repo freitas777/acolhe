@@ -2,6 +2,7 @@ import hashlib
 import hmac
 import base64
 import json
+import os
 import time
 from typing import Optional
 
@@ -9,15 +10,27 @@ from backend.config import settings
 
 
 def hash_senha(senha: str) -> str:
-    salt = settings.secret_key
-    return hashlib.pbkdf2_hmac("sha256", senha.encode("utf-8"), salt.encode("utf-8"), 100000).hex()
+    salt = os.urandom(16).hex()
+    hash_val = hashlib.pbkdf2_hmac(
+        "sha256", senha.encode("utf-8"), salt.encode("utf-8"), 100000
+    ).hex()
+    return f"{salt}${hash_val}"
 
 
 def verificar_senha(senha: str, senha_hash: str) -> bool:
-    return hmac.compare_digest(hash_senha(senha), senha_hash)
+    if "$" in senha_hash:
+        salt, stored_hash = senha_hash.split("$", 1)
+        computed = hashlib.pbkdf2_hmac(
+            "sha256", senha.encode("utf-8"), salt.encode("utf-8"), 100000
+        ).hex()
+        return hmac.compare_digest(computed, stored_hash)
+    legacy_hash = hashlib.pbkdf2_hmac(
+        "sha256", senha.encode("utf-8"), settings.secret_key.encode("utf-8"), 100000
+    ).hex()
+    return hmac.compare_digest(legacy_hash, senha_hash)
 
 
-_JWT_HEADER = base64.urlsafe_b64encode(json.dumps({"alg": "HS256", "typ": "JWT"}).encode()).rstrip(b"=")
+_JWT_HEADER = base64.urlsafe_b64encode(json.dumps({"alg": "HS256", "typ": "acolhe-local"}).encode()).rstrip(b"=")
 
 
 def criar_jwt(payload: dict, expira_em_horas: int = 24) -> str:
@@ -43,6 +56,8 @@ def validar_jwt(token: str) -> Optional[dict]:
         header = json.loads(base64.urlsafe_b64decode(header_b64))
         if header.get("alg") != "HS256":
             return None
+        if header.get("typ") != "acolhe-local":
+            return None
 
         signing_input = (parts[0] + "." + parts[1]).encode()
         expected_sig = hmac.new(settings.secret_key.encode(), signing_input, hashlib.sha256).digest()
@@ -60,4 +75,16 @@ def validar_jwt(token: str) -> Optional[dict]:
 
 
 def is_jwt_local(token: str) -> bool:
-    return token.count(".") == 2 and len(token) < 500
+    if token.count(".") != 2:
+        return False
+    if len(token) >= 500:
+        return False
+    try:
+        header_b64 = token.split(".")[0]
+        padding = 4 - len(header_b64) % 4
+        if padding != 4:
+            header_b64 += "=" * padding
+        header = json.loads(base64.urlsafe_b64decode(header_b64))
+        return header.get("typ") == "acolhe-local"
+    except Exception:
+        return False

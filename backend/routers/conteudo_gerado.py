@@ -78,7 +78,7 @@ def update_conteudo(
     auth_data: AuthData = Depends(require_napne),
     db: Session = Depends(get_db),
 ):
-    payload = data.model_dump(exclude_none=True)
+    payload = data.model_dump(exclude_unset=True)
     updated = _conteudo_repo(db).update(conteudo_id, payload)
     if not updated:
         raise HTTPException(

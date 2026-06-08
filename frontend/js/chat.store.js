@@ -11,7 +11,9 @@ const ChatStore = {
    */
   state: {
     conversations: [],
-    activeConversationId: null
+    activeConversationId: null,
+    activeAlunoId: null,
+    activeAlunoNome: null
   },
 
   /**
@@ -22,12 +24,19 @@ const ChatStore = {
     if (saved) {
       try {
         this.state = JSON.parse(saved);
-      } catch (e) {
-        console.error('Erro ao carregar dados do chat:', e);
-        this.state = { conversations: [], activeConversationId: null };
+        this.state.conversations = this.state.conversations.filter(
+          c => c.id && !c.id.startsWith('conv_')
+        );
+        if (this.state.activeConversationId && this.state.activeConversationId.startsWith('conv_')) {
+          this.state.activeConversationId = null;
+          this.state.activeAlunoId = null;
+          this.state.activeAlunoNome = null;
+        }
+        this.save();
+    } catch (e) {
+      this.state = { conversations: [], activeConversationId: null, activeAlunoId: null, activeAlunoNome: null };
       }
-    }
-    console.log('📦 ChatStore inicializado');
+  }
   },
 
   /**
@@ -41,25 +50,29 @@ const ChatStore = {
    * Gera UUID único
    */
   generateId() {
-    return 'conv_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      const r = Math.random() * 16 | 0;
+      const v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
   },
 
   /**
    * Cria nova conversa
    */
-  createConversation(title = 'Nova conversa') {
+  createConversation(title = 'Nova conversa', alunoId = null, alunoNome = null) {
     const conversation = {
       id: this.generateId(),
       title: title,
       messages: [],
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
+      aluno_id: alunoId,
+      aluno_nome: alunoNome
     };
     
     this.state.conversations.unshift(conversation);
     this.state.activeConversationId = conversation.id;
     this.save();
-    
-    console.log('✅ Conversa criada:', conversation.id);
     return conversation;
   },
 
@@ -87,8 +100,9 @@ const ChatStore = {
     const conversation = this.getConversation(id);
     if (conversation) {
       this.state.activeConversationId = id;
+      this.state.activeAlunoId = conversation.aluno_id || null;
+      this.state.activeAlunoNome = conversation.aluno_nome || null;
       this.save();
-      console.log('📍 Conversa ativa:', id);
       return conversation;
     }
     return null;
@@ -99,10 +113,7 @@ const ChatStore = {
    */
   addMessage(role, content) {
     const conversation = this.getActiveConversation();
-    if (!conversation) {
-      console.error('❌ Nenhuma conversa ativa');
-      return null;
-    }
+    if (!conversation) return null;
 
     const message = {
       id: this.generateId(),
@@ -119,7 +130,6 @@ const ChatStore = {
     }
     
     this.save();
-    console.log('💬 Mensagem adicionada:', message.id);
     return message;
   },
 
@@ -138,7 +148,6 @@ const ChatStore = {
     }
     
     this.save();
-    console.log('🗑️ Conversa deletada:', id);
     return true;
   },
 
@@ -153,10 +162,31 @@ const ChatStore = {
    * Limpa todos os dados
    */
   clear() {
-    this.state = { conversations: [], activeConversationId: null };
+    this.state = { conversations: [], activeConversationId: null, activeAlunoId: null, activeAlunoNome: null };
     this.save();
     localStorage.removeItem(this.STORAGE_KEY);
-    console.log('🧹 ChatStore limpo');
+  },
+
+  setAlunoContext(alunoId, alunoNome) {
+    this.state.activeAlunoId = alunoId;
+    this.state.activeAlunoNome = alunoNome;
+    const conversation = this.getActiveConversation();
+    if (conversation) {
+      conversation.aluno_id = alunoId;
+      conversation.aluno_nome = alunoNome;
+    }
+    this.save();
+  },
+
+  clearAlunoContext() {
+    this.state.activeAlunoId = null;
+    this.state.activeAlunoNome = null;
+    const conversation = this.getActiveConversation();
+    if (conversation) {
+      conversation.aluno_id = null;
+      conversation.aluno_nome = null;
+    }
+    this.save();
   }
 };
 

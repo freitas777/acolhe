@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session, joinedload
 from backend.models.aluno import Aluno
 from backend.models.perfil_aluno import PerfilAluno
+from backend.repositories.aluno import AlunoRepository
 from backend.schemas.aluno import AlunoCreate, AlunoUpdate
 from backend.schemas.perfil_aluno import PerfilAlunoCreate, PerfilAlunoUpdate
 
@@ -8,6 +9,7 @@ from backend.schemas.perfil_aluno import PerfilAlunoCreate, PerfilAlunoUpdate
 class AlunoService:
     def __init__(self, db: Session):
         self.db = db
+        self.repo = AlunoRepository(db)
 
     def criar_aluno(self, data: AlunoCreate) -> Aluno:
         aluno = Aluno(**data.model_dump())
@@ -89,7 +91,21 @@ class AlunoService:
         aluno = self.db.query(Aluno).filter(Aluno.id == aluno_id).first()
         if not aluno:
             return False
-        
+
         self.db.delete(aluno)
         self.db.commit()
         return True
+
+    def buscar_alunos(self, query: str) -> list[dict]:
+        if not query or len(query.strip()) < 2:
+            return []
+        resultados = self.repo.buscar_por_nome_ou_matricula(query.strip())
+        return [
+            {
+                "id": a.id,
+                "nome": a.nome,
+                "matricula": getattr(a, "matricula", None),
+                "diagnostico": a.perfil.diagnostico if a.perfil else None,
+            }
+            for a in resultados
+        ]

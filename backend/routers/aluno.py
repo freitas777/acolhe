@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
 from backend.dependencies import AuthData, get_current_usuario, require_napne, require_admin
 from backend.services.aluno_service import AlunoService
-from backend.schemas.aluno import AlunoCreate, AlunoResponse, AlunoUpdate
+from backend.schemas.aluno import AlunoBuscaResultado, AlunoCreate, AlunoResponse, AlunoUpdate
 from backend.schemas.perfil_aluno import PerfilAlunoCreate, PerfilAlunoResponse, PerfilAlunoUpdate
 
 router = APIRouter(prefix="/alunos", tags=["Alunos"])
@@ -32,13 +32,25 @@ def create_aluno(
 
 @router.get("/", response_model=list[AlunoResponse])
 def list_alunos(
- skip: int = 0,
- limit: int = 100,
- auth_data: AuthData = Depends(require_napne),
- db: Session = Depends(get_db),
+    skip: int = 0,
+    limit: int = 100,
+    auth_data: AuthData = Depends(require_napne),
+    db: Session = Depends(get_db),
 ):
     service = _service(db)
     return service.listar_alunos(skip=skip, limit=limit)
+
+
+@router.get("/busca", response_model=list[AlunoBuscaResultado])
+def buscar_alunos(
+    q: str = Query(..., min_length=2, max_length=100),
+    auth_data: AuthData = Depends(get_current_usuario),
+    db: Session = Depends(get_db),
+):
+    if auth_data.usuario.tipo_perfil == "aluno":
+        raise HTTPException(status_code=403, detail="Acesso restrito a servidores e professores.")
+    service = _service(db)
+    return service.buscar_alunos(q)
 
 
 @router.get("/{aluno_id}", response_model=AlunoResponse)

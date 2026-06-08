@@ -156,9 +156,8 @@
             contentEl.hidden = false;
             renderPerfil(data.aluno);
         })
-        .catch(function(error) {
-            console.error('Erro ao carregar perfil:', error);
-            loadingEl.hidden = true;
+    .catch(function(error) {
+      loadingEl.hidden = true;
             notFoundEl.hidden = false;
             notFoundEl.querySelector('h3').textContent = 'Erro ao carregar perfil';
             notFoundEl.querySelector('p').textContent = 'Tente novamente mais tarde.';
@@ -232,9 +231,8 @@
             perfilData = data;
             showToast('Perfil atualizado com sucesso!', 'success');
         })
-        .catch(function(error) {
-            console.error('Erro ao salvar perfil:', error);
-            showToast('Erro ao salvar: ' + error.message, 'error');
+    .catch(function(error) {
+      showToast('Erro ao salvar: ' + error.message, 'error');
             btnSave.disabled = false;
         })
         .finally(function() {
@@ -271,9 +269,8 @@
                 listEl.appendChild(createConteudoCard(conteudo));
             });
         })
-        .catch(function(error) {
-            console.error('Erro ao carregar conteudos:', error);
-            loadingEl.hidden = true;
+    .catch(function(error) {
+      loadingEl.hidden = true;
             emptyEl.hidden = false;
             emptyEl.querySelector('h3').textContent = 'Erro ao carregar conteudos';
             emptyEl.querySelector('p').textContent = 'Tente novamente mais tarde.';

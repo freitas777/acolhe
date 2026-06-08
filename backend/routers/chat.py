@@ -32,7 +32,7 @@ async def criar_conversa(
  auth_data: AuthData = Depends(get_current_usuario),
  service: ChatService = Depends(_service),
 ):
- return service.criar_conversa(dados, usuario_id=auth_data.usuario.id)
+    return await service.criar_conversa(dados, usuario_id=auth_data.usuario.id)
 
 
 @router.get(
@@ -43,7 +43,10 @@ async def listar_conversas(
  auth_data: AuthData = Depends(get_current_usuario),
  service: ChatService = Depends(_service),
 ):
- return service.listar_conversas(usuario_id=auth_data.usuario.id)
+    return service.listar_conversas(
+        usuario_id=auth_data.usuario.id,
+        tipo_perfil=auth_data.usuario.tipo_perfil,
+    )
 
 
 @router.post("/send", response_model=ChatResposta)
@@ -52,7 +55,11 @@ async def enviar_mensagem(
  auth_data: AuthData = Depends(get_current_usuario),
  service: ChatService = Depends(_service),
 ):
- return await service.enviar_mensagem(dados, usuario_id=auth_data.usuario.id)
+    return await service.enviar_mensagem(
+        dados,
+        usuario_id=auth_data.usuario.id,
+        tipo_perfil=auth_data.usuario.tipo_perfil,
+    )
 
 
 @router.post(
@@ -72,14 +79,13 @@ async def gerar_conteudo_educacional(
     status_code=status.HTTP_204_NO_CONTENT,
 )
 async def deletar_conversa(
- conversa_id: str,
- auth_data: AuthData = Depends(get_current_usuario),
- service: ChatService = Depends(_service),
+    conversa_id: str,
+    auth_data: AuthData = Depends(get_current_usuario),
+    service: ChatService = Depends(_service),
 ):
- conversa = service.conversa_repo.get_by_id(conversa_id)
- if not conversa:
-  raise HTTPException(status_code=404, detail="Conversa nao encontrada")
- if conversa.usuario_id and conversa.usuario_id != auth_data.usuario.id:
-  if auth_data.usuario.tipo_perfil not in ("psicopedagogo", "admin"):
-   raise HTTPException(status_code=403, detail="Voce nao pode deletar esta conversa.")
- service.deletar_conversa(conversa_id)
+    await service.deletar_conversa(
+        conversa_id,
+        usuario_id=auth_data.usuario.id,
+        tipo_perfil=auth_data.usuario.tipo_perfil,
+    )
+    return None

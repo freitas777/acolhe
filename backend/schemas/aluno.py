@@ -41,6 +41,15 @@ class AlunoResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class AlunoBuscaResultado(BaseModel):
+    id: int
+    nome: str
+    matricula: Optional[str] = None
+    diagnostico: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
 class AlunoSUAPSearchResult(BaseModel):
     matricula: str
     nome: str

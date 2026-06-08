@@ -1,23 +1,35 @@
 ﻿(function() {
 'use strict';
 
-if (!acolheRequireAuth()) return;
+    if (!acolheRequireAuth()) return;
 
-var currentUser = null;
+    var currentUser = null;
+    var alunoSearchTimer = null;
+    var isAluno = (localStorage.getItem('acolhe_tipo_perfil') || 'aluno') === 'aluno';
 
-  async function init() {
-    ChatStore.init();
-    ChatUI.init();
-    await loadUserData();
-    setupEventListeners();
-    renderInitialState();
-  }
+    if (isAluno) document.body.classList.add('role-aluno');
 
-  async function loadUserData() {
-  var savedUser = localStorage.getItem('acolhe_user');
-  if (savedUser) {
-    currentUser = JSON.parse(savedUser);
-  }
+    async function init() {
+        ChatStore.init();
+        ChatUI.init();
+        applyRoleVisibility();
+        await loadUserData();
+        setupEventListeners();
+        await renderInitialState();
+    }
+
+    function applyRoleVisibility() {
+        if (isAluno) {
+            if (ChatUI.elements.btnAlunoContext) ChatUI.elements.btnAlunoContext.hidden = true;
+            if (ChatUI.elements.alunoContextBar) ChatUI.elements.alunoContextBar.hidden = true;
+        }
+    }
+
+async function loadUserData() {
+    var savedUser = localStorage.getItem('acolhe_user');
+    if (savedUser) {
+        try { currentUser = JSON.parse(savedUser); } catch(e) {}
+    }
   ChatUI.updateUserInfo(currentUser);
 }
 
@@ -46,67 +58,127 @@ var currentUser = null;
         }
       }
     });
-    if (ChatUI.elements.btnDeleteConversation) {
-      ChatUI.elements.btnDeleteConversation.addEventListener('click', handleDeleteConversation);
-    }
-    if (ChatUI.elements.btnLogout) {
+if (ChatUI.elements.btnLogout) {
       ChatUI.elements.btnLogout.addEventListener('click', handleLogout);
     }
     ChatUI.onConversationSelect = handleConversationSelect;
     ChatUI.onConversationDelete = handleConversationDelete;
-  }
 
-  function handleNewConversation() {
-    var conversation = ChatService.createNewConversation();
-    ChatUI.updateTitle(conversation.title);
-    ChatUI.renderMessages([]);
-    ChatUI.renderConversations(ChatService.getConversationsHistory(), conversation.id);
-    ChatUI.closeSidebar();
-    if (ChatUI.elements.messageInput) ChatUI.elements.messageInput.focus();
-  }
+    if (!isAluno) {
+        ChatUI.onAlunoSelected = handleAlunoSelected;
 
-  async function handleSendMessage() {
-    var input = ChatUI.elements.messageInput;
-    if (!input) return;
-    var content = input.value.trim();
-    if (!content) return;
-
-    try {
-      input.disabled = true;
-      ChatUI.elements.btnSend.disabled = true;
-      ChatUI.showTypingIndicator();
-
-      var result = await ChatService.sendMessage(content);
-      if (result.success) {
-        ChatUI.removeTypingIndicator();
-        ChatUI.appendMessage(result.message);
-        if (result.assistantMessage) {
-          await new Promise(function(resolve) { setTimeout(resolve, 500); });
-          ChatUI.appendMessage(result.assistantMessage);
+        if (ChatUI.elements.btnAlunoContext) {
+            ChatUI.elements.btnAlunoContext.addEventListener('click', function() {
+                ChatUI.showAlunoSearch();
+            });
         }
-        ChatUI.clearInput();
-        var activeConv = ChatService.getActiveConversation();
-        if (activeConv) {
-          ChatUI.updateTitle(activeConv.title);
-          ChatUI.renderConversations(ChatService.getConversationsHistory(), activeConv.id);
+        if (ChatUI.elements.btnRemoveAluno) {
+            ChatUI.elements.btnRemoveAluno.addEventListener('click', handleRemoveAluno);
         }
-      }
-    } catch (error) {
-      console.error('Erro ao enviar mensagem:', error);
-      ChatUI.removeTypingIndicator();
-      ChatUI.showError('Erro ao enviar: ' + error.message);
-    } finally {
-      input.disabled = false;
-      input.focus();
-      ChatUI.updateSendButton();
+        if (ChatUI.elements.alunoSearchInput) {
+            ChatUI.elements.alunoSearchInput.addEventListener('input', handleAlunoSearchInput);
+            ChatUI.elements.alunoSearchInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    ChatUI.hideAlunoSearchResults();
+                    if (ChatStore.state.activeAlunoNome) {
+                        ChatUI.updateAlunoBadge(ChatStore.state.activeAlunoNome);
+                    } else {
+                        ChatUI.hideAlunoContext();
+                    }
+                }
+            });
+        }
+        document.addEventListener('click', function(e) {
+            var searchResults = ChatUI.elements.alunoSearchResults;
+            var searchInput = ChatUI.elements.alunoSearchInput;
+            if (searchResults && !searchResults.contains(e.target) && e.target !== searchInput) {
+                ChatUI.hideAlunoSearchResults();
+            }
+        });
     }
-  }
+}
 
-  function handleInput(e) {
-    ChatUI.updateSendButton();
-    e.target.style.height = 'auto';
-    e.target.style.height = Math.min(e.target.scrollHeight, 200) + 'px';
-  }
+async function handleNewConversation() {
+var alunoId = ChatStore.state.activeAlunoId || null;
+var alunoNome = ChatStore.state.activeAlunoNome || null;
+var conversation = await ChatService.createNewConversation(alunoId);
+if (conversation && conversation.id) {
+var localConv = {
+id: conversation.id,
+title: conversation.title || 'Nova conversa',
+messages: [],
+created_at: conversation.created_at || new Date().toISOString(),
+aluno_id: conversation.aluno_id || alunoId,
+aluno_nome: conversation.aluno_nome || alunoNome
+};
+ChatStore.state.conversations.unshift(localConv);
+ChatStore.state.activeConversationId = localConv.id;
+ChatStore.state.activeAlunoId = localConv.aluno_id || null;
+ChatStore.state.activeAlunoNome = localConv.aluno_nome || null;
+ChatStore.save();
+ChatUI.updateTitle(localConv.title);
+ChatUI.renderMessages([]);
+ChatUI.renderConversations(ChatStore.getAllConversations(), localConv.id);
+} else {
+var localConv = ChatStore.createConversation('Nova conversa', alunoId, alunoNome);
+ChatUI.updateTitle(localConv.title);
+ChatUI.renderMessages([]);
+ChatUI.renderConversations(ChatStore.getAllConversations(), localConv.id);
+}
+ChatUI.closeSidebar();
+syncAlunoBadge();
+if (ChatUI.elements.messageInput) ChatUI.elements.messageInput.focus();
+}
+
+    async function handleSendMessage() {
+        var input = ChatUI.elements.messageInput;
+        if (!input) return;
+        var content = input.value.trim();
+        if (!content) return;
+
+        try {
+            input.disabled = true;
+            ChatUI.elements.btnSend.disabled = true;
+            ChatUI.showTypingIndicator();
+
+            var result = await ChatService.sendMessage(content, ChatStore.state.activeAlunoId);
+            if (result.success && result.assistantMessage) {
+                ChatUI.removeTypingIndicator();
+                if (result.conversationId && !ChatStore.state.activeConversationId) {
+                    ChatStore.state.activeConversationId = result.conversationId;
+                }
+                ChatStore.addMessage('user', result.message.content);
+                ChatStore.addMessage('assistant', result.assistantMessage.content);
+                ChatUI.appendMessage(result.message);
+                await new Promise(function(resolve) { setTimeout(resolve, 300); });
+                ChatUI.appendMessage(result.assistantMessage);
+                ChatUI.clearInput();
+                if (result.alunoId && !ChatStore.state.activeAlunoId) {
+                    ChatStore.state.activeAlunoId = result.alunoId;
+                    ChatStore.state.activeAlunoNome = result.alunoNome;
+                }
+                var activeConv = ChatService.getActiveConversation();
+                if (activeConv) {
+                    ChatUI.updateTitle(activeConv.title);
+                    ChatUI.renderConversations(ChatService.getConversationsHistory(), activeConv.id);
+                }
+            } else if (result.success && !result.assistantMessage) {
+                ChatUI.removeTypingIndicator();
+                ChatUI.showError('Não foi possível obter resposta da IA. Tente novamente.');
+            }
+        } catch (error) {
+            ChatUI.removeTypingIndicator();
+            ChatUI.showError('Erro ao enviar: ' + error.message);
+        } finally {
+            input.disabled = false;
+            input.focus();
+            ChatUI.updateSendButton();
+        }
+    }
+
+function handleInput(e) {
+ChatUI.updateSendButton();
+}
 
   function handleKeydown(e) {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -115,60 +187,88 @@ var currentUser = null;
     }
   }
 
-  function handleConversationSelect(id) {
-    var conversation = ChatService.selectConversation(id);
-    if (conversation) {
-      ChatUI.updateTitle(conversation.title);
-      ChatUI.renderMessages(conversation.messages);
-      ChatUI.renderConversations(ChatService.getConversationsHistory(), conversation.id);
-      ChatUI.closeSidebar();
-    }
-  }
-
-  function handleConversationDelete(id) {
-    if (confirm('Tem certeza que deseja excluir esta conversa?')) {
-      ChatService.deleteConversation(id);
-      var activeConv = ChatService.getActiveConversation();
-      if (activeConv) {
-        ChatUI.updateTitle(activeConv.title);
-        ChatUI.renderMessages(activeConv.messages);
-      } else {
-        ChatUI.updateTitle('Nova Conversa');
-        ChatUI.renderMessages([]);
-      }
-      ChatUI.renderConversations(ChatService.getConversationsHistory(), activeConv ? activeConv.id : null);
-    }
-  }
-
-  function handleDeleteConversation() {
-    var activeConv = ChatService.getActiveConversation();
-    if (!activeConv) {
-      alert('Nenhuma conversa selecionada');
-      return;
-    }
-    handleConversationDelete(activeConv.id);
-  }
-
-  function handleLogout() {
-  if (confirm('Deseja realmente sair?')) {
-    acolheLogout();
-  }
+function handleConversationSelect(id) {
+var conversation = ChatStore.setActiveConversation(id);
+if (conversation) {
+ChatUI.updateTitle(conversation.title);
+ChatUI.renderMessages(conversation.messages);
+ChatUI.renderConversations(ChatService.getConversationsHistory(), conversation.id);
+ChatUI.closeSidebar();
+syncAlunoBadge();
+}
 }
 
-  function renderInitialState() {
-    var conversations = ChatService.getConversationsHistory();
-    var activeConv = ChatService.getActiveConversation();
-    if (activeConv) {
-      ChatUI.updateTitle(activeConv.title);
-      ChatUI.renderMessages(activeConv.messages);
-    } else if (conversations.length > 0) {
-      handleConversationSelect(conversations[0].id);
-    } else {
-      ChatUI.updateTitle('Nova Conversa');
-      ChatUI.renderMessages([]);
+    async function handleConversationDelete(id) {
+        if (confirm('Tem certeza que deseja excluir esta conversa?')) {
+            await ChatService.deleteConversation(id);
+            var activeConv = ChatService.getActiveConversation();
+            if (activeConv) {
+                ChatUI.updateTitle(activeConv.title);
+                ChatUI.renderMessages(activeConv.messages);
+            } else {
+                ChatUI.updateTitle('Nova Conversa');
+                ChatUI.renderMessages([]);
+            }
+            ChatUI.renderConversations(ChatService.getConversationsHistory(), activeConv ? activeConv.id : null);
+        }
     }
-    ChatUI.renderConversations(conversations, activeConv ? activeConv.id : null);
-  }
 
-  document.addEventListener('DOMContentLoaded', init);
+function handleLogout() {
+if (confirm('Deseja realmente sair?')) {
+acolheLogout();
+}
+}
+
+function handleAlunoSelected(alunoId, alunoNome) {
+ChatStore.setAlunoContext(alunoId, alunoNome);
+ChatUI.updateAlunoBadge(alunoNome);
+ChatUI.hideAlunoSearchResults();
+}
+
+function handleRemoveAluno() {
+ChatStore.clearAlunoContext();
+ChatUI.hideAlunoContext();
+}
+
+function handleAlunoSearchInput(e) {
+var query = e.target.value;
+clearTimeout(alunoSearchTimer);
+if (!query || query.trim().length < 2) {
+ChatUI.hideAlunoSearchResults();
+return;
+}
+alunoSearchTimer = setTimeout(async function() {
+var results = await ChatService.searchAlunos(query);
+ChatUI.renderAlunoSearchResults(results);
+}, 300);
+}
+
+    function syncAlunoBadge() {
+        if (isAluno) return;
+        var nome = ChatStore.state.activeAlunoNome;
+if (nome) {
+ChatUI.updateAlunoBadge(nome);
+} else {
+ChatUI.hideAlunoContext();
+}
+}
+
+async function renderInitialState() {
+var conversations = await ChatService.loadConversations();
+var activeConv = ChatService.getActiveConversation();
+if (activeConv) {
+ChatUI.updateTitle(activeConv.title);
+ChatUI.renderMessages(activeConv.messages);
+} else if (conversations && conversations.length > 0) {
+handleConversationSelect(conversations[0].id);
+return;
+} else {
+ChatUI.updateTitle('Nova Conversa');
+ChatUI.renderMessages([]);
+}
+ChatUI.renderConversations(conversations || [], activeConv ? activeConv.id : null);
+syncAlunoBadge();
+}
+
+document.addEventListener('DOMContentLoaded', init);
 })();

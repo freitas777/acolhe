@@ -7,14 +7,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse
 from pathlib import Path
 
+from backend.config import settings
+
 app = FastAPI(title="Acolhe+", version="1.0.0")
 
 # =====================
 # CORS
 # =====================
+ALLOWED_ORIGINS = [o.strip() for o in settings.allowed_origins.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -59,7 +63,7 @@ async def portal():
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "frontend_dir": str(FRONTEND_DIR)}
+    return {"status": "ok"}
 
 # =====================
 # API ROUTERS

@@ -1,5 +1,5 @@
 import enum
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy import Enum, String, DateTime, Boolean
@@ -31,7 +31,7 @@ class Usuario(Base):
     setor: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
     aprovado_napne: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     criado_em: Mapped[datetime] = mapped_column(
-        nullable=False, default=datetime.utcnow
+        nullable=False, default=lambda: datetime.now(timezone.utc)
     )
 
     conta_local = relationship("ContaLocal", back_populates="usuario", uselist=False, cascade="all, delete-orphan")

@@ -55,7 +55,7 @@ class AuthService:
                 detalhe = primeiro.get("detalhamento") or {}
                 setor = detalhe.get("cargo", "") or detalhe.get("modalidade", "") or ""
         except Exception as e:
-            logger.warning(f"Falha ao obter vinculos do SUAP: {e}")
+            logger.warning("Falha ao obter vinculos do SUAP: %s", e)
 
         tipo_perfil = "aluno"
         if tipo_vinculo and tipo_vinculo.lower() not in ("aluno", "estudante"):
@@ -103,7 +103,7 @@ class AuthService:
                 disciplinas_raw = await self.suap_service.get_disciplinas(token, semestre)
                 self._sincronizar_disciplinas(usuario.id, disciplinas_raw, semestre)
         except Exception as e:
-            logger.warning(f"Falha ao sincronizar para usuario {usuario.id}: {e}")
+            logger.warning("Falha ao sincronizar para usuario %s: %s", usuario.id, e)
 
         self.db.refresh(usuario)
 
@@ -131,7 +131,7 @@ class AuthService:
         periodo_letivo = int(parts[1]) if len(parts) > 1 else 1
 
         diarios_raw = await self.suap_service.get_meus_diarios(token, ano_letivo, periodo_letivo)
-        logger.info(f"Professor {usuario.id}: {len(diarios_raw)} diarios encontrados no SUAP")
+        logger.info("Professor %s: %d diarios encontrados no SUAP", usuario.id, len(diarios_raw))
 
         self.disciplina_repo.deletar_por_usuario_e_semestre(usuario.id, semestre)
 
@@ -179,7 +179,7 @@ class AuthService:
 
             try:
                 alunos_diario = await self.suap_service.get_alunos_diario(token, diario_id)
-                logger.info(f"Diario {diario_id}: {len(alunos_diario)} alunos")
+                logger.info("Diario %d: %d alunos", diario_id, len(alunos_diario))
 
                 for aluno_suap in alunos_diario:
                     matricula_aluno = aluno_suap.get("matricula", "")
@@ -194,7 +194,7 @@ class AuthService:
                                 "aluno_matricula": matricula_aluno,
                             })
             except Exception as e:
-                logger.warning(f"Falha ao buscar alunos do diario {diario_id}: {e}")
+                logger.warning("Falha ao buscar alunos do diario %d: %s", diario_id, e)
 
     def _sincronizar_disciplinas(self, usuario_id: int, disciplinas_raw: list[dict], semestre: str):
         self.disciplina_repo.deletar_por_usuario_e_semestre(usuario_id, semestre)
@@ -243,11 +243,11 @@ class AuthService:
             raise HTTPException(status_code=404, detail="Pendência não encontrada")
         if pendencia.status != "pendente":
             raise HTTPException(status_code=400, detail="Pendência já foi processada")
-        from datetime import datetime
+        from datetime import datetime, timezone
         update_data = {
             "status": acao,
             "validado_por_id": validado_por_id,
-            "validado_em": datetime.utcnow(),
+            "validado_em": datetime.now(timezone.utc),
         }
         pendencia = self.pendencia_repo.update(pendencia_id, update_data)
         if acao in ("validado", "rejeitado") and pendencia.aluno_id:
