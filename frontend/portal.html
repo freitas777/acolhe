@@ -5,12 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Acolhe+ | Portal do Aluno</title>
     <link rel="stylesheet" href="/css/portal.css">
+    <link rel="stylesheet" href="/css/notificacoes.css">
     <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
     <header class="topbar">
         <div class="topbar-left">
-            <a href="/dashboard" class="topbar-logo" title="Ir para o Chat">
+            <a href="#" class="topbar-logo" id="topbar-logo" title="Pagina inicial">
                 <div class="logo-icon">A+</div>
                 <span class="logo-text">Acolhe+</span>
             </a>
@@ -18,8 +19,9 @@
         <div class="topbar-center">
             <h1 class="page-title">Portal do Aluno</h1>
         </div>
-        <div class="topbar-right">
-            <div class="user-pill" id="user-pill">
+<div class="topbar-right">
+        <div class="notificacao-bell-container"></div>
+        <div class="user-pill" id="user-pill">
                 <div class="user-avatar" id="user-avatar">??</div>
                 <span class="user-name" id="user-name">Carregando...</span>
             </div>
@@ -199,5 +201,9 @@
     <script src="/js/settings.js"></script>
     <script src="/js/client.js"></script>
     <script src="/js/portal.js"></script>
+<script src="/js/notificacao.js"></script>
+<script>
+(function() { if (typeof NotificacaoService !== 'undefined') NotificacaoService.init(); })();
+</script>
 </body>
 </html>

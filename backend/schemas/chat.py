@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field, Field
+from pydantic import BaseModel, Field
 
 
 class ConversaCriar(BaseModel):
@@ -18,7 +18,7 @@ class ConversaResposta(BaseModel):
     aluno_id: Optional[int] = None
     aluno_nome: Optional[str] = None
 
-    model_config = {"from_attributes": True, "populate_by_name": True}
+    model_config = {"from_attributes": True, "populate_by_name": True, "by_alias": False}
 
 
 class MensagemResposta(BaseModel):
@@ -27,7 +27,7 @@ class MensagemResposta(BaseModel):
     content: str = Field(alias="conteudo")
     created_at: datetime = Field(alias="criada_em")
 
-    model_config = {"from_attributes": True, "populate_by_name": True}
+    model_config = {"from_attributes": True, "populate_by_name": True, "by_alias": False}
 
 
 class ChatRequisicao(BaseModel):

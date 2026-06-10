@@ -25,6 +25,7 @@ def _service(db: Session = Depends(get_db)) -> ChatService:
 @router.post(
     "/conversations",
     response_model=ConversaResposta,
+    response_model_by_alias=False,
     status_code=status.HTTP_201_CREATED,
 )
 async def criar_conversa(
@@ -38,6 +39,7 @@ async def criar_conversa(
 @router.get(
     "/conversations",
     response_model=list[ConversaResposta],
+    response_model_by_alias=False,
 )
 async def listar_conversas(
  auth_data: AuthData = Depends(get_current_usuario),
@@ -49,7 +51,7 @@ async def listar_conversas(
     )
 
 
-@router.post("/send", response_model=ChatResposta)
+@router.post("/send", response_model=ChatResposta, response_model_by_alias=False)
 async def enviar_mensagem(
  dados: ChatRequisicao,
  auth_data: AuthData = Depends(get_current_usuario),
@@ -65,6 +67,7 @@ async def enviar_mensagem(
 @router.post(
     "/educational-content",
     response_model=ConteudoEducacionalResposta,
+    response_model_by_alias=False,
 )
 async def gerar_conteudo_educacional(
  dados: ConteudoEducacionalRequisicao,

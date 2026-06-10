@@ -8,6 +8,18 @@ from typing import Optional
 
 from backend.config import settings
 
+_LEGACY_SECRET_KEYS: list = []
+
+
+def _load_legacy_keys() -> list:
+    global _LEGACY_SECRET_KEYS
+    if _LEGACY_SECRET_KEYS:
+        return _LEGACY_SECRET_KEYS
+    legacy = os.getenv("LEGACY_SECRET_KEYS", "")
+    if legacy:
+        _LEGACY_SECRET_KEYS = [k.strip() for k in legacy.split(",") if k.strip()]
+    return _LEGACY_SECRET_KEYS
+
 
 def hash_senha(senha: str) -> str:
     salt = os.urandom(16).hex()
@@ -24,10 +36,13 @@ def verificar_senha(senha: str, senha_hash: str) -> bool:
             "sha256", senha.encode("utf-8"), salt.encode("utf-8"), 100000
         ).hex()
         return hmac.compare_digest(computed, stored_hash)
-    legacy_hash = hashlib.pbkdf2_hmac(
-        "sha256", senha.encode("utf-8"), settings.secret_key.encode("utf-8"), 100000
-    ).hex()
-    return hmac.compare_digest(legacy_hash, senha_hash)
+    for key in [settings.secret_key] + _load_legacy_keys():
+        legacy_hash = hashlib.pbkdf2_hmac(
+            "sha256", senha.encode("utf-8"), key.encode("utf-8"), 100000
+        ).hex()
+        if hmac.compare_digest(legacy_hash, senha_hash):
+            return True
+    return False
 
 
 _JWT_HEADER = base64.urlsafe_b64encode(json.dumps({"alg": "HS256", "typ": "acolhe-local"}).encode()).rstrip(b"=")

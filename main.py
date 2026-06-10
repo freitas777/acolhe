@@ -1,6 +1,8 @@
 from dotenv import load_dotenv
 load_dotenv()
 
+import logging
+import re
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,6 +10,25 @@ from fastapi.responses import FileResponse, RedirectResponse
 from pathlib import Path
 
 from backend.config import settings
+
+logger = logging.getLogger("acolhe")
+
+_WEAK_SECRET_PATTERNS = [
+    "change-me", "secret", "password", "changeme", "default",
+    "acolhe-mais", "chave-secreta",
+]
+
+def _check_secret_key():
+    key = settings.secret_key
+    if len(key) < 32:
+        logger.warning("SECRET_KEY tem menos de 32 caracteres — use uma chave forte em produção!")
+    lower = key.lower()
+    for pattern in _WEAK_SECRET_PATTERNS:
+        if pattern in lower:
+            logger.warning(f"SECRET_KEY contem padrao fraco '{pattern}' — troque em producao!")
+            break
+
+_check_secret_key()
 
 app = FastAPI(title="Acolhe+", version="1.0.0")
 
@@ -41,9 +62,13 @@ async def root():
 async def login_page():
     return RedirectResponse(url="/", status_code=302)
 
+@app.get("/chat")
+async def chat_page():
+    return FileResponse(str(FRONTEND_DIR / "chat.html"))
+
 @app.get("/dashboard")
-async def dashboard():
-    return FileResponse(str(FRONTEND_DIR / "dashboard.html"))
+async def dashboard_redirect():
+    return RedirectResponse(url="/chat", status_code=302)
 
 @app.get("/disciplinas")
 async def disciplinas():
@@ -61,6 +86,10 @@ async def importacao():
 async def portal():
     return FileResponse(str(FRONTEND_DIR / "portal.html"))
 
+@app.get("/notificacoes")
+async def notificacoes():
+    return FileResponse(str(FRONTEND_DIR / "notificacoes.html"))
+
 @app.get("/health")
 async def health():
     return {"status": "ok"}
@@ -76,6 +105,7 @@ from backend.routers.auth import router as auth_router
 from backend.routers.equipe import router as equipe_router
 from backend.routers.importacao import router as importacao_router
 from backend.routers.portal import router as portal_router
+from backend.routers.notificacao import router as notificacao_router
 
 app.include_router(chat_router)
 app.include_router(aluno_router)
@@ -85,6 +115,7 @@ app.include_router(auth_router)
 app.include_router(equipe_router)
 app.include_router(importacao_router)
 app.include_router(portal_router)
+app.include_router(notificacao_router)
 
 # =====================
 # ARQUIVOS ESTÁTICOS

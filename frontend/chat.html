@@ -3,9 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Acolhe+ | Dashboard</title>
-  <link rel="stylesheet" href="/css/dashboard.css">
+<title>Acolhe+ | Chat</title>
+  <link rel="stylesheet" href="/css/chat.css">
   <link rel="stylesheet" href="/css/disciplinas.css">
+    <link rel="stylesheet" href="/css/notificacoes.css">
     <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -79,6 +80,7 @@
                 </button>
       <h2 class="chat-title" id="chat-title">Nova Conversa</h2>
       <div class="header-actions">
+        <div class="notificacao-bell-container"></div>
         <button class="btn-icon" id="btn-aluno-context" title="Vincular aluno a conversa" aria-label="Vincular aluno a conversa">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
@@ -145,6 +147,10 @@
 <script src="/js/chat.store.js"></script>
 <script src="/js/chat.service.js"></script>
   <script src="/js/chat.ui.js"></script>
-<script src="/js/dashboard.js"></script>
+<script src="/js/chat.js"></script>
+<script src="/js/notificacao.js"></script>
+<script>
+(function() { if (typeof NotificacaoService !== 'undefined') NotificacaoService.init(); })();
+</script>
 </body>
 </html>

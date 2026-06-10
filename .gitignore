@@ -31,7 +31,3 @@ Thumbs.db
 # Logs
 *.log
 
-pytest.ini
-
-test_*.py
-

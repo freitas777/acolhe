@@ -41,14 +41,14 @@ const ChatService = {
 
     const data = await response.json();
 
-        return {
-            success: true,
-            message: data.user_message,
-            assistantMessage: data.assistant_message,
-            conversationId: data.conversation_id,
-            alunoId: data.aluno_id || null,
-            alunoNome: data.aluno_nome || null
-        };
+    return {
+      success: true,
+      userMessage: data.user_message,
+      assistantMessage: data.assistant_message,
+      conversationId: data.conversation_id,
+      alunoId: data.aluno_id || null,
+      alunoNome: data.aluno_nome || null
+    };
 
   } catch (error) {
     throw error;

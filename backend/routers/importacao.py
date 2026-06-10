@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 import logging
-import os
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 import httpx
@@ -15,14 +14,17 @@ from backend.dependencies import AuthData, get_current_usuario, require_napne
 from backend.models.aluno import Aluno
 from backend.repositories.aluno import AlunoRepository
 from backend.repositories.pendencia_validacao import PendenciaValidacaoRepository
+from backend.models.pendencia_validacao import StatusPendencia
 from backend.schemas.aluno import AlunoSUAPSearchResult, ImportarAlunoRequest, AlunoResponse
 from backend.services.suap_service import SUAPService
+from backend.config import settings
+from backend.services.notificacao_service import NotificacaoService
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/importacao", tags=["Importação SUAP"])
 
-DEV_MODE = os.getenv("DEV_MODE", "false").lower() == "true"
+DEV_MODE = settings.dev_mode
 
 _MOCK_ALUNOS = [
     {
@@ -366,16 +368,29 @@ async def importar_aluno(
         "email": dados.get("email_pessoal", "") or dados.get("email_academico", ""),
         "cpf": dados.get("cpf", ""),
         "status_acompanhamento": "aguardando_indicacao",
-        "data_importacao": datetime.utcnow(),
+        "data_importacao": datetime.now(timezone.utc),
     })
     logger.info(f"[IMPORTAR] Aluno {novo.nome} ({novo.matricula}) importado com sucesso (id={novo.id})")
 
     pendencia_repo = PendenciaValidacaoRepository(db)
     pendencia_repo.create({
         "aluno_id": novo.id,
-        "status": "pendente",
+        "status": StatusPendencia.pendente,
         "motivo": "Aguardando indicacao",
         "criado_em": novo.data_importacao or novo.criado_em,
     })
+
+    try:
+        notif_service = NotificacaoService(db)
+        notif_service.criar_notificacao(
+            tipo="aluno_importado",
+            titulo=f"Aluno importado: {novo.nome}",
+            mensagem=f"O aluno {novo.nome} (matricula {novo.matricula}) foi importado no sistema e aguarda indicacao.",
+            remetente_id=auth_data.usuario.id,
+            aluno_id=novo.id,
+            destino_tipo="napne",
+        )
+    except Exception as e:
+        logger.warning("Falha ao criar notificacao de importacao: %s", e)
 
     return novo

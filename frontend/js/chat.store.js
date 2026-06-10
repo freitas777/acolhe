@@ -115,6 +115,7 @@ const ChatStore = {
     const conversation = this.getActiveConversation();
     if (!conversation) return null;
 
+    if (!content) content = '';
     const message = {
       id: this.generateId(),
       role: role, // 'user' ou 'assistant'
@@ -123,7 +124,7 @@ const ChatStore = {
     };
 
     conversation.messages.push(message);
-    
+
     // Atualiza título se for primeira mensagem do usuário
     if (conversation.messages.length === 1 && role === 'user') {
       conversation.title = content.substring(0, 50) + (content.length > 50 ? '...' : '');

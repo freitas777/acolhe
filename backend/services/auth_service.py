@@ -12,9 +12,10 @@ from backend.repositories.usuario import UsuarioRepository
 from backend.repositories.disciplina import DisciplinaRepository
 from backend.repositories.diario_aluno import DiarioAlunoRepository
 from backend.repositories.aluno import AlunoRepository
-from backend.models.pendencia_validacao import PendenciaValidacao
+from backend.models.pendencia_validacao import PendenciaValidacao, StatusPendencia
 from backend.repositories.pendencia_validacao import PendenciaValidacaoRepository
 from backend.services.suap_service import SUAPService
+from backend.services.notificacao_service import NotificacaoService
 from backend.schemas.auth import UsuarioSUAPResponse, DisciplinaResponse, AlunoAssistidoResponse, PendenciaResponse
 from backend.database import get_db
 from fastapi import Depends, HTTPException, status
@@ -133,9 +134,16 @@ class AuthService:
         diarios_raw = await self.suap_service.get_meus_diarios(token, ano_letivo, periodo_letivo)
         logger.info("Professor %s: %d diarios encontrados no SUAP", usuario.id, len(diarios_raw))
 
+        existing_disciplinas = self.disciplina_repo.listar_por_usuario(usuario.id, semestre)
+        existing_aluno_pairs: set[tuple[int, int]] = set()
+        for disc in existing_disciplinas:
+            for da in disc.alunos_assistidos:
+                existing_aluno_pairs.add((disc.suap_id or disc.diario_id or 0, da.aluno_id))
+
         self.disciplina_repo.deletar_por_usuario_e_semestre(usuario.id, semestre)
 
         assistidos_by_matricula = self.aluno_repo.get_matricula_lookup()
+        new_assistidos: list[tuple[int, str, str]] = []
 
         for diario in diarios_raw:
             diario_id = diario.get("id", 0)
@@ -193,8 +201,26 @@ class AuthService:
                                 "aluno_nome": aluno_suap.get("nome", aluno_db.nome),
                                 "aluno_matricula": matricula_aluno,
                             })
+                            pair_key = (diario_id, aluno_db.id)
+                            if pair_key not in existing_aluno_pairs:
+                                new_assistidos.append((aluno_db.id, aluno_db.nome, descricao))
             except Exception as e:
                 logger.warning("Falha ao buscar alunos do diario %d: %s", diario_id, e)
+
+        if new_assistidos:
+            try:
+                notif_service = NotificacaoService(self.db)
+                for aluno_id, aluno_nome, disc_desc in new_assistidos:
+                    notif_service.criar_notificacao(
+                        tipo="assistido_na_turma",
+                        titulo=f"Aluno assistido na sua turma: {aluno_nome}",
+                        mensagem=f"O aluno assistido {aluno_nome} esta matriculado na disciplina {disc_desc}.",
+                        aluno_id=aluno_id,
+                        destino_tipo="professor",
+                        destino_id=usuario.id,
+                    )
+            except Exception as e:
+                logger.warning("Falha ao criar notificacoes de assistido na turma: %s", e)
 
     def _sincronizar_disciplinas(self, usuario_id: int, disciplinas_raw: list[dict], semestre: str):
         self.disciplina_repo.deletar_por_usuario_e_semestre(usuario_id, semestre)
@@ -241,7 +267,7 @@ class AuthService:
         pendencia = self.pendencia_repo.get_by_id(pendencia_id)
         if not pendencia:
             raise HTTPException(status_code=404, detail="Pendência não encontrada")
-        if pendencia.status != "pendente":
+        if pendencia.status != StatusPendencia.pendente:
             raise HTTPException(status_code=400, detail="Pendência já foi processada")
         from datetime import datetime, timezone
         update_data = {
@@ -250,12 +276,12 @@ class AuthService:
             "validado_em": datetime.now(timezone.utc),
         }
         pendencia = self.pendencia_repo.update(pendencia_id, update_data)
-        if acao in ("validado", "rejeitado") and pendencia.aluno_id:
+        if acao in (StatusPendencia.validado.value, StatusPendencia.rejeitado.value) and pendencia.aluno_id:
             aluno = self.aluno_repo.get_by_id(pendencia.aluno_id)
             if aluno:
-                if acao == "validado" and aluno.status_acompanhamento == "aguardando_indicacao":
+                if acao == StatusPendencia.validado.value and aluno.status_acompanhamento == "aguardando_indicacao":
                     aluno.status_acompanhamento = "ativo"
-                elif acao == "rejeitado":
+                elif acao == StatusPendencia.rejeitado.value:
                     aluno.status_acompanhamento = "rejeitado"
                 self.db.commit()
                 self.db.refresh(aluno)
@@ -272,7 +298,7 @@ class AuthService:
             "aluno_id": aluno_id,
             "indicado_por_id": indicado_por_id,
             "motivo": motivo,
-            "status": "pendente",
+            "status": StatusPendencia.pendente,
         })
 
     def atualizar_perfil_usuario(self, usuario_id: int, novo_perfil: str) -> Usuario:

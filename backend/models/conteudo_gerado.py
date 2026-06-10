@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -21,7 +21,7 @@ class ConteudoGerado(Base):
     conteudo: Mapped[str] = mapped_column(Text, nullable=False)
     modelo_ia: Mapped[str] = mapped_column(String(100), nullable=False)
     gerado_em: Mapped[datetime] = mapped_column(
-        nullable=False, default=datetime.utcnow
+        nullable=False, default=lambda: datetime.now(timezone.utc)
     )
 
     aluno = relationship("Aluno", back_populates="conteudos")

@@ -61,6 +61,18 @@ function acolheGetToken() {
   return localStorage.getItem('acolhe_access_token') || '';
 }
 
+function acolheGetHomepage() {
+    var perfil = localStorage.getItem('acolhe_tipo_perfil') || 'aluno';
+    if (perfil === 'aluno' || perfil === 'professor') return '/disciplinas';
+    if (perfil === 'psicopedagogo' || perfil === 'admin' || perfil === 'servidor') return '/painel';
+    return '/disciplinas';
+}
+
+(function() {
+    var logo = document.getElementById('topbar-logo');
+    if (logo) logo.href = acolheGetHomepage();
+})();
+
 function acolheRequireRole(allowedRoles) {
  if (!acolheRequireAuth()) return false;
  var perfil = localStorage.getItem('acolhe_tipo_perfil') || 'aluno';

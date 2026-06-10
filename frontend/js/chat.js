@@ -141,17 +141,17 @@ if (ChatUI.elements.messageInput) ChatUI.elements.messageInput.focus();
             ChatUI.elements.btnSend.disabled = true;
             ChatUI.showTypingIndicator();
 
-            var result = await ChatService.sendMessage(content, ChatStore.state.activeAlunoId);
-            if (result.success && result.assistantMessage) {
-                ChatUI.removeTypingIndicator();
-                if (result.conversationId && !ChatStore.state.activeConversationId) {
-                    ChatStore.state.activeConversationId = result.conversationId;
-                }
-                ChatStore.addMessage('user', result.message.content);
-                ChatStore.addMessage('assistant', result.assistantMessage.content);
-                ChatUI.appendMessage(result.message);
-                await new Promise(function(resolve) { setTimeout(resolve, 300); });
-                ChatUI.appendMessage(result.assistantMessage);
+      var result = await ChatService.sendMessage(content, ChatStore.state.activeAlunoId);
+      if (result.success && result.assistantMessage) {
+        ChatUI.removeTypingIndicator();
+        if (result.conversationId && !ChatStore.state.activeConversationId) {
+          ChatStore.state.activeConversationId = result.conversationId;
+        }
+        ChatStore.addMessage('user', result.userMessage.content);
+        ChatStore.addMessage('assistant', result.assistantMessage.content);
+        ChatUI.appendMessage(result.userMessage);
+        await new Promise(function(resolve) { setTimeout(resolve, 300); });
+        ChatUI.appendMessage(result.assistantMessage);
                 ChatUI.clearInput();
                 if (result.alunoId && !ChatStore.state.activeAlunoId) {
                     ChatStore.state.activeAlunoId = result.alunoId;

@@ -170,9 +170,9 @@ function validarPendencia(pendenciaId, acao) {
     }
     listEl.innerHTML = '';
     alunos.forEach(function(a) {
-      var initials = a.nome.split(' ').map(function(n){ return n[0]; }).slice(0,2).join('').toUpperCase();
-      var item = document.createElement('div');
-      item.className = 'aluno-ativo-item';
+var initials = (a.nome || '?').split(' ').map(function(n){ return n[0]; }).slice(0,2).join('').toUpperCase();
+    var item = document.createElement('div');
+    item.className = 'aluno-ativo-item';
       item.setAttribute('data-aluno-id', a.id);
       item.setAttribute('data-aluno-nome', a.nome);
       item.innerHTML =
@@ -222,9 +222,9 @@ function validarPendencia(pendenciaId, acao) {
             }
             resultsEl.innerHTML = '';
             alunos.forEach(function(a) {
-                var initials = a.nome.split(' ').map(function(n){ return n[0]; }).slice(0,2).join('').toUpperCase();
-                var item = document.createElement('div');
-                item.className = 'search-result-item';
+var initials = (a.nome || '?').split(' ').map(function(n){ return n[0]; }).slice(0,2).join('').toUpperCase();
+    var item = document.createElement('div');
+    item.className = 'search-result-item';
                 item.innerHTML =
                     '<div class="result-avatar">' + escapeHtml(initials) + '</div>' +
                     '<div class="result-info">' +

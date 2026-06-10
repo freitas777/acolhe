@@ -184,7 +184,7 @@ if (!acolheRequireAuth()) return;
 
     disciplinas.forEach(function(disc, index) {
       var color = colors[index % colors.length];
-      var sigla = disc.sigla || disc.descricao.substring(0, 6).toUpperCase();
+      var sigla = disc.sigla || (disc.descricao || '').substring(0, 6).toUpperCase();
       var situacaoClass = 'situacao-' + (disc.situacao || '').toLowerCase().replace(/\s+/g, '-');
 
       var card = document.createElement('div');
@@ -280,7 +280,7 @@ if (!acolheRequireAuth()) return;
 
       listEl.innerHTML = '';
       alunos.forEach(function(aluno) {
-        var initials = aluno.aluno_nome.split(' ').map(function(n) { return n[0]; }).slice(0, 2).join('').toUpperCase();
+        var initials = (aluno.aluno_nome || '?').split(' ').map(function(n) { return n[0]; }).slice(0, 2).join('').toUpperCase();
         var item = document.createElement('div');
         item.className = 'aluno-item';
         item.innerHTML =

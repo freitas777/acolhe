@@ -349,10 +349,12 @@ const ChatUI = {
       .toUpperCase();
   },
 
-  formatTime(isoString) {
-    const date = new Date(isoString);
-    return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-  },
+    formatTime(isoString) {
+        if (!isoString) return '';
+        const date = new Date(isoString);
+        if (isNaN(date.getTime())) return '';
+        return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    },
 
   escapeHtml(text) {
     if (!text) return '';

@@ -1,0 +1,334 @@
+.notificacoes-page {
+    flex: 1;
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 32px 24px;
+    width: 100%;
+}
+
+.notificacoes-page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    gap: 16px;
+}
+
+.notificacoes-header-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.notificacoes-header-left h2 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #1A1A1A;
+}
+
+.notificacoes-count-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 26px;
+    height: 26px;
+    border-radius: 13px;
+    background: #DC3545;
+    color: #FFF;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 0 8px;
+}
+
+.notificacoes-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.btn-notificacao-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border: 1px solid #0A7F70;
+    background: #FFF;
+    color: #0A7F70;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: 'Open Sans', sans-serif;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+    white-space: nowrap;
+}
+
+.btn-notificacao-action:hover {
+    background: #0A7F70;
+    color: #FFF;
+}
+
+.btn-notificacao-action svg {
+    width: 16px;
+    height: 16px;
+}
+
+.notificacoes-filters {
+    display: flex;
+    gap: 4px;
+    background: #F0F0F0;
+    border-radius: 10px;
+    padding: 4px;
+    margin-bottom: 20px;
+}
+
+.filter-btn {
+    flex: 1;
+    padding: 8px 16px;
+    border: none;
+    background: transparent;
+    color: #666;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: 'Open Sans', sans-serif;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+}
+
+.filter-btn:hover {
+    color: #1A1A1A;
+    background: rgba(255,255,255,0.5);
+}
+
+.filter-btn.active {
+    background: #FFF;
+    color: #0A7F70;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.notificacao-page-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 16px;
+    background: #FFF;
+    border: 1px solid #F0F0F0;
+    border-radius: 12px;
+    margin-bottom: 10px;
+    transition: box-shadow 0.2s, border-color 0.2s;
+}
+
+.notificacao-page-item:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    border-color: #E0E0E0;
+}
+
+.notificacao-page-item-nao-lida {
+    border-left: 3px solid #0A7F70;
+}
+
+.notificacao-page-item-lida {
+    opacity: 0.6;
+}
+
+.notificacao-page-item-icon {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.type-icon {
+    width: 22px;
+    height: 22px;
+}
+
+.type-icon-importado {
+    color: #1565C0;
+}
+
+.notificacao-page-item-nao-lida .notificacao-page-item-icon {
+    background: #E3F2FD;
+}
+
+.notificacao-page-item-lida .notificacao-page-item-icon {
+    background: #F5F5F5;
+}
+
+.type-icon-assistido {
+    color: #0A7F70;
+}
+
+.notificacao-page-item-nao-lida .notificacao-page-item-icon:has(.type-icon-assistido) {
+    background: #E0F2F1;
+}
+
+.notificacao-page-item-lida .notificacao-page-item-icon:has(.type-icon-assistido) {
+    background: #F5F5F5;
+}
+
+.type-icon-default {
+    color: #666;
+}
+
+.notificacao-page-item-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.notificacao-page-item-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 4px;
+}
+
+.notificacao-page-item-titulo {
+    font-size: 14px;
+    font-weight: 600;
+    color: #1A1A1A;
+    line-height: 1.3;
+}
+
+.notificacao-page-item-mensagem {
+    font-size: 13px;
+    color: #666;
+    line-height: 1.5;
+    margin-bottom: 6px;
+}
+
+.notificacao-page-item-data {
+    font-size: 12px;
+    color: #999;
+}
+
+.notificacao-page-item-actions {
+ flex-shrink: 0;
+ display: flex;
+ align-items: flex-start;
+ gap: 4px;
+}
+
+.btn-notificacao-marcar {
+    width: 32px;
+    height: 32px;
+    border: 1px solid #E0E0E0;
+    background: #FFF;
+    color: #0A7F70;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.btn-notificacao-marcar:hover {
+    background: #0A7F70;
+    color: #FFF;
+    border-color: #0A7F70;
+}
+
+.btn-notificacao-marcar svg {
+ width: 16px;
+ height: 16px;
+}
+
+.btn-notificacao-excluir {
+ width: 32px;
+ height: 32px;
+ border: 1px solid #E0E0E0;
+ background: #FFF;
+ color: #DC3545;
+ border-radius: 8px;
+ cursor: pointer;
+ display: flex;
+ align-items: center;
+ justify-content: center;
+ transition: background 0.2s, color 0.2s, border-color 0.2s;
+ margin-left: 4px;
+}
+
+.btn-notificacao-excluir:hover {
+ background: #DC3545;
+ color: #FFF;
+ border-color: #DC3545;
+}
+
+.btn-notificacao-excluir svg {
+ width: 16px;
+ height: 16px;
+}
+
+.notificacao-page-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 48px 24px;
+    color: #999;
+    font-size: 15px;
+    text-align: center;
+}
+
+.notificacao-page-empty .empty-icon {
+    width: 48px;
+    height: 48px;
+    color: #CCC;
+}
+
+.notificacoes-load-more {
+    display: flex;
+    justify-content: center;
+    padding: 20px 0;
+}
+
+.btn-load-more {
+    padding: 10px 28px;
+    background: #FFF;
+    border: 1px solid #E0E0E0;
+    color: #555;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    font-family: 'Open Sans', sans-serif;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.btn-load-more:hover {
+    background: #F8F9FA;
+    border-color: #CCC;
+    color: #1A1A1A;
+}
+
+@media (max-width: 600px) {
+    .notificacoes-page {
+        padding: 20px 16px;
+    }
+
+    .notificacoes-page-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .notificacao-page-item {
+        padding: 12px;
+        gap: 10px;
+    }
+
+    .notificacao-page-item-icon {
+        width: 36px;
+        height: 36px;
+    }
+
+    .type-icon {
+        width: 18px;
+        height: 18px;
+    }
+}

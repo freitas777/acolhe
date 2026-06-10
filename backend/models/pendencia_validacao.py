@@ -1,8 +1,8 @@
 import enum
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, Text
+from sqlalchemy import DateTime, Enum, ForeignKey, Integer, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.database import Base
@@ -28,11 +28,11 @@ class PendenciaValidacao(Base):
         Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True
     )
     motivo: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    status: Mapped[str] = mapped_column(
-        String(20), nullable=False, default="pendente"
+    status: Mapped[StatusPendencia] = mapped_column(
+        Enum(StatusPendencia), nullable=False, default=StatusPendencia.pendente
     )
     criado_em: Mapped[datetime] = mapped_column(
-        nullable=False, default=datetime.utcnow
+        nullable=False, default=lambda: datetime.now(timezone.utc)
     )
     validado_em: Mapped[Optional[datetime]] = mapped_column(
         DateTime, nullable=True

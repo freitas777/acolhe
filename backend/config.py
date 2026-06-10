@@ -1,5 +1,4 @@
 from pydantic_settings import BaseSettings
-import os
 from pydantic import ValidationError
 class Settings(BaseSettings):
     database_url: str
@@ -14,6 +13,7 @@ class Settings(BaseSettings):
     gemini_model: str = "gemini-2.5-flash"
 
     debug: bool = False
+    dev_mode: bool = False
     allowed_origins: str = "http://localhost:8000,http://127.0.0.1:8000"
 
     class Config:

@@ -24,7 +24,7 @@
 
         disciplinas.forEach(function(disc, index) {
             var color = colors[index % colors.length];
-            var sigla = disc.sigla || disc.descricao.substring(0, 3).toUpperCase();
+            var sigla = disc.sigla || (disc.descricao || '').substring(0, 3).toUpperCase();
             var situacaoClass = 'situacao-' + (disc.situacao || '').toLowerCase().replace(/\s/g, '-');
 
             var card = document.createElement('div');
