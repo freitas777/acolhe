@@ -8,52 +8,99 @@ const ChatService = {
   /**
    * Envia mensagem e recebe resposta da IA
    */
-  async sendMessage(content, alunoId) {
+  async sendMessageStream(content, alunoId, callbacks) {
     if (!content || !content.trim()) {
       throw new Error('Mensagem não pode estar vazia');
     }
 
-    const trimmedContent = content.trim();
+    var trimmedContent = content.trim();
+    var onChunk = callbacks.onChunk || function() {};
+    var onDone = callbacks.onDone || function() {};
+    var onError = callbacks.onError || function() {};
 
     try {
-      const body = {
+      var body = {
         message: trimmedContent,
         conversation_id: ChatStore.state.activeConversationId
       };
       if (alunoId) body.aluno_id = alunoId;
 
-      const response = await acolheFetch(`${this.API_BASE_URL}/api/chat/send`, {
+      var response = await acolheFetch(this.API_BASE_URL + '/api/chat/stream', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Accept': 'text/event-stream'
         },
         body: JSON.stringify(body)
       });
 
-    if (!response.ok) {
-      let detail = 'Erro na API';
-      try {
-        const error = await response.json();
-        detail = error.detail || detail;
-      } catch (_) {}
-      throw new Error(detail);
+      if (!response.ok) {
+        var detail = 'Erro na API';
+        try {
+          var errorData = await response.json();
+          detail = errorData.detail || detail;
+        } catch (_) {}
+        throw new Error(detail);
+      }
+
+      var reader = response.body.getReader();
+      var decoder = new TextDecoder();
+      var buffer = '';
+      var userMessage = null;
+      var conversationId = null;
+      var alunoIdResult = null;
+      var alunoNomeResult = null;
+      var fullContent = '';
+
+      while (true) {
+        var result = await reader.read();
+        if (result.done) break;
+
+        buffer += decoder.decode(result.value, { stream: true });
+        var lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (var i = 0; i < lines.length; i++) {
+          var line = lines[i].trim();
+          if (line.indexOf('data: ') !== 0) continue;
+          var jsonStr = line.substring(6);
+          if (!jsonStr) continue;
+
+          try {
+            var event = JSON.parse(jsonStr);
+          } catch (_) {
+            continue;
+          }
+
+          if (event.type === 'user_message') {
+            userMessage = event.message;
+          } else if (event.type === 'conversation_id') {
+            conversationId = event.conversation_id;
+          } else if (event.type === 'meta') {
+            alunoIdResult = event.aluno_id || null;
+            alunoNomeResult = event.aluno_nome || null;
+          } else if (event.type === 'chunk') {
+            fullContent += event.content;
+            onChunk(event.content, fullContent);
+          } else if (event.type === 'error') {
+            fullContent += event.content;
+            onError(event.content, fullContent);
+          } else if (event.type === 'done') {
+            onDone({
+              userMessage: userMessage,
+              assistantMessage: event.message || { role: 'assistant', content: fullContent },
+              conversationId: conversationId,
+              alunoId: alunoIdResult,
+              alunoNome: alunoNomeResult
+            });
+          }
+        }
+      }
+    } catch (error) {
+      throw error;
     }
+  },
 
-    const data = await response.json();
-
-    return {
-      success: true,
-      userMessage: data.user_message,
-      assistantMessage: data.assistant_message,
-      conversationId: data.conversation_id,
-      alunoId: data.aluno_id || null,
-      alunoNome: data.aluno_nome || null
-    };
-
-  } catch (error) {
-    throw error;
-  }
-},
 
   /**
    * Gera conteúdo educacional adaptado

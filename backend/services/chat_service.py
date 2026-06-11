@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import uuid
 from datetime import datetime, timezone
@@ -8,6 +9,7 @@ from typing import Optional
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
+from backend.database import SessionLocal
 from backend.models.conversa import Conversa
 from backend.models.mensagem import Mensagem
 from backend.repositories.aluno import AlunoRepository
@@ -142,12 +144,12 @@ class ChatService:
         self._verificar_propriedade(conversa, usuario_id, tipo_perfil)
         return _para_conversa_resposta(conversa)
 
-    async def enviar_mensagem(
+    async def _preparar_envio(
         self,
         dados: ChatRequisicao,
         usuario_id: int | None = None,
         tipo_perfil: str = "aluno",
-    ) -> ChatResposta:
+    ) -> tuple[str, Mensagem]:
         conversa_id = dados.conversation_id
         aluno_id = dados.aluno_id
 
@@ -175,7 +177,10 @@ class ChatService:
             if not aluno_id and conversa.aluno_id:
                 contexto_aluno = self._obter_contexto_aluno(conversa.aluno_id)
                 if contexto_aluno:
-                    await ai_service.garantir_sessao_com_contexto(conversa_id, contexto_aluno=contexto_aluno)
+                    mensagens_existentes = self.mensagem_repo.listar_por_conversa(conversa_id)
+                    await ai_service.garantir_sessao_com_contexto(
+                        conversa_id, contexto_aluno=contexto_aluno, mensagens=mensagens_existentes,
+                    )
         else:
             titulo = dados.message[:50] + ("..." if len(dados.message) > 50 else "")
             conversa = await self._criar_conversa_com_contexto(
@@ -199,11 +204,22 @@ class ChatService:
             })
 
         logger.info("Mensagem recebida: conversa=%s", conversa_id)
+        return conversa_id, msg_usuario
+
+    async def enviar_mensagem(
+        self,
+        dados: ChatRequisicao,
+        usuario_id: int | None = None,
+        tipo_perfil: str = "aluno",
+    ) -> ChatResposta:
+        conversa_id, msg_usuario = await self._preparar_envio(dados, usuario_id, tipo_perfil)
 
         try:
+            mensagens_db = self.mensagem_repo.listar_por_conversa(conversa_id)
             conteudo_ia = await ai_service.gerar_resposta(
                 conversa_id=conversa_id,
                 mensagem_usuario=dados.message,
+                mensagens=mensagens_db,
             )
             msg_assistente = self.mensagem_repo.create({
                 "id": str(uuid.uuid4()),
@@ -234,6 +250,67 @@ class ChatService:
             aluno_id=conversa_atualizada.aluno_id if conversa_atualizada else None,
             aluno_nome=aluno_nome,
         )
+
+    async def enviar_mensagem_stream(
+        self,
+        dados: ChatRequisicao,
+        usuario_id: int | None = None,
+        tipo_perfil: str = "aluno",
+    ):
+        conversa_id, msg_usuario = await self._preparar_envio(dados, usuario_id, tipo_perfil)
+
+        user_msg_data = _para_mensagem_resposta(msg_usuario)
+        yield f"data: {json.dumps({'type': 'user_message', 'message': user_msg_data.model_dump(mode='json')})}\n\n"
+        yield f"data: {json.dumps({'type': 'conversation_id', 'conversation_id': conversa_id})}\n\n"
+
+        conversa = self.conversa_repo.obter_com_mensagens(conversa_id)
+        aluno_id = conversa.aluno_id if conversa else None
+        aluno_nome = conversa.aluno.nome if conversa and conversa.aluno else None
+        yield f"data: {json.dumps({'type': 'meta', 'aluno_id': aluno_id, 'aluno_nome': aluno_nome})}\n\n"
+
+        conteudo_completo = []
+        try:
+            mensagens_db = self.mensagem_repo.listar_por_conversa(conversa_id)
+            async for chunk in ai_service.gerar_resposta_stream(
+                conversa_id=conversa_id,
+                mensagem_usuario=dados.message,
+                mensagens=mensagens_db,
+            ):
+                conteudo_completo.append(chunk)
+                yield f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n"
+        except Exception as exc:
+            logger.error("Erro no streaming da IA: %s", exc)
+            if not conteudo_completo:
+                fallback = "Desculpe, estou com dificuldades para responder no momento. Tente novamente."
+                yield f"data: {json.dumps({'type': 'error', 'content': fallback})}\n\n"
+                conteudo_completo.append(fallback)
+            else:
+                yield f"data: {json.dumps({'type': 'error', 'content': ' [resposta interrompida]'})}\n\n"
+
+        texto_completo = "".join(conteudo_completo)
+        db = SessionLocal()
+        try:
+            msg_assistente = Mensagem(
+                id=str(uuid.uuid4()),
+                conversa_id=conversa_id,
+                papel="assistente",
+                conteudo=texto_completo,
+            )
+            db.add(msg_assistente)
+            db.commit()
+            db.refresh(msg_assistente)
+            assistant_msg_data = MensagemResposta(
+                id=msg_assistente.id,
+                role="assistant",
+                content=msg_assistente.conteudo,
+                created_at=msg_assistente.criada_em,
+            )
+            yield f"data: {json.dumps({'type': 'done', 'message': assistant_msg_data.model_dump(mode='json')})}\n\n"
+        except Exception as exc:
+            logger.error("Erro ao salvar mensagem assistente: %s", exc)
+            yield f"data: {json.dumps({'type': 'done', 'message': None})}\n\n"
+        finally:
+            db.close()
 
     async def deletar_conversa(
         self,

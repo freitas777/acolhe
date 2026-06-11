@@ -124,11 +124,18 @@ const ChatUI = {
   createMessageElement(message) {
     const div = document.createElement('div');
     div.className = 'message';
-    
+
     const isUser = message.role === 'user';
     const avatar = isUser ? this.getUserInitials() : 'AI';
     const author = isUser ? 'Você' : 'Acolhe+';
     const time = this.formatTime(message.created_at);
+
+    var contentHtml;
+    if (isUser) {
+      contentHtml = this.escapeHtml(message.content);
+    } else {
+      contentHtml = this.renderMarkdown(message.content);
+    }
 
     div.innerHTML = `
       <div class="message-avatar ${message.role}">${avatar}</div>
@@ -137,7 +144,7 @@ const ChatUI = {
           <span class="message-author">${author}</span>
           <span class="message-time">${time}</span>
         </div>
-        <div class="message-text">${this.escapeHtml(message.content)}</div>
+        <div class="message-text">${contentHtml}</div>
       </div>
     `;
 
@@ -363,6 +370,14 @@ const ChatUI = {
     return div.innerHTML;
   },
 
+  renderMarkdown(text) {
+    if (!text) return '';
+    if (typeof window.marked !== 'undefined' && typeof window.DOMPurify !== 'undefined') {
+      return DOMPurify.sanitize(marked.parse(text));
+    }
+    return this.escapeHtml(text);
+  },
+
     /**
    * Mostra indicador de "digitando..."
    */
@@ -408,16 +423,83 @@ const ChatUI = {
 
     const errorDiv = document.createElement('div');
     errorDiv.className = 'message error-message';
-        errorDiv.innerHTML = `
-            <div class="message-content" style="width: 100%;">
-                <div class="message-text" style="color: var(--color-error);">
-                    ⚠️ ${this.escapeHtml(message)}
-                </div>
-            </div>
-        `;
+    errorDiv.innerHTML = `
+      <div class="message-content" style="width: 100%;">
+        <div class="message-text" style="color: var(--color-error);">
+          ⚠️ ${this.escapeHtml(message)}
+        </div>
+      </div>
+    `;
 
     wrapper.appendChild(errorDiv);
     this.scrollToBottom();
+  },
+
+  createStreamingMessage() {
+    const wrapper = this.elements.messagesWrapper;
+    const emptyState = this.elements.emptyState;
+
+    if (!wrapper) return null;
+
+    if (emptyState) emptyState.style.display = 'none';
+
+    const div = document.createElement('div');
+    div.className = 'message streaming';
+    div.id = 'streaming-message';
+
+    const avatar = 'AI';
+    const author = 'Acolhe+';
+
+    div.innerHTML = `
+      <div class="message-avatar assistant">${avatar}</div>
+      <div class="message-content">
+        <div class="message-header">
+          <span class="message-author">${author}</span>
+          <span class="message-time"></span>
+        </div>
+        <div class="message-text"></div>
+      </div>
+    `;
+
+    wrapper.appendChild(div);
+    this.scrollToBottom();
+
+    return div.querySelector('.message-text');
+  },
+
+  appendChunk(textEl, chunk) {
+    if (!textEl) return;
+    textEl.textContent += chunk;
+    this.scrollToBottom();
+  },
+
+  finalizeStreamMessage(textEl, fullContent) {
+    if (!textEl) return;
+
+    var streamingMsg = document.getElementById('streaming-message');
+    if (streamingMsg) {
+      streamingMsg.removeAttribute('id');
+      streamingMsg.classList.remove('streaming');
+      var timeEl = streamingMsg.querySelector('.message-time');
+      if (timeEl) {
+        timeEl.textContent = this.formatTime(new Date().toISOString());
+      }
+    }
+
+    if (typeof window.marked !== 'undefined' && typeof window.DOMPurify !== 'undefined') {
+      textEl.innerHTML = DOMPurify.sanitize(marked.parse(fullContent));
+    } else {
+      textEl.textContent = fullContent;
+    }
+
+    this.scrollToBottom();
+  },
+
+  removeStreamingMessage() {
+    var streamingMsg = document.getElementById('streaming-message');
+    if (streamingMsg) {
+      streamingMsg.remove();
+    }
   }
 
   

@@ -4,6 +4,8 @@ import asyncio
 import hashlib
 import logging
 import os
+import threading
+import typing
 from collections import OrderedDict
 from typing import Optional
 
@@ -112,20 +114,26 @@ class AIService:
 
         return contexto
 
+    def _construir_historico_base(self, contexto_aluno: Optional[str] = None) -> list[dict]:
+        if contexto_aluno:
+            instrucao = INSTRUCAO_SISTEMA + "\n\n" + contexto_aluno
+        else:
+            instrucao = INSTRUCAO_SISTEMA
+        return [
+            {"role": "user", "parts": [instrucao]},
+            {"role": "model", "parts": ["Entendido. Sou o Acolhe+, pronto para ajudar."]},
+        ]
+
     def _criar_sessao(self, conversa_id: str, contexto_aluno: Optional[str] = None) -> None:
         if contexto_aluno:
             modelo = self._obter_modelo_com_contexto(contexto_aluno)
             self._sessao_contexto[conversa_id] = contexto_aluno
-            instrucao = INSTRUCAO_SISTEMA + "\n\n" + contexto_aluno
         else:
             modelo = self._obter_modelo()
             self._sessao_contexto.pop(conversa_id, None)
-            instrucao = INSTRUCAO_SISTEMA
 
-        sessao = modelo.start_chat(history=[
-            {"role": "user", "parts": [instrucao]},
-            {"role": "model", "parts": ["Entendido. Sou o Acolhe+, pronto para ajudar."]},
-        ])
+        historico = self._construir_historico_base(contexto_aluno)
+        sessao = modelo.start_chat(history=historico)
         self._sessoes[conversa_id] = sessao
 
         if len(self._sessoes) > MAX_SESSOES:
@@ -136,23 +144,76 @@ class AIService:
 
         logger.info("Sessão de chat iniciada: %s (contexto_aluno=%s)", conversa_id, bool(contexto_aluno))
 
+    def _reconstruir_sessao(
+        self,
+        conversa_id: str,
+        contexto_aluno: Optional[str] = None,
+        mensagens: Optional[list] = None,
+    ) -> None:
+        if contexto_aluno:
+            modelo = self._obter_modelo_com_contexto(contexto_aluno)
+            self._sessao_contexto[conversa_id] = contexto_aluno
+        else:
+            modelo = self._obter_modelo()
+            self._sessao_contexto.pop(conversa_id, None)
+
+        historico = self._construir_historico_base(contexto_aluno)
+
+        if mensagens:
+            for msg in mensagens:
+                papel = getattr(msg, "papel", None) or ""
+                conteudo = getattr(msg, "conteudo", None) or ""
+                role = "user" if papel == "usuario" else "model"
+                historico.append({"role": role, "parts": [conteudo]})
+
+        sessao = modelo.start_chat(history=historico)
+        self._sessoes[conversa_id] = sessao
+
+        if len(self._sessoes) > MAX_SESSOES:
+            chave_mais_antiga = next(iter(self._sessoes))
+            del self._sessoes[chave_mais_antiga]
+            self._sessao_contexto.pop(chave_mais_antiga, None)
+            logger.info("Sessão removida por LRU: %s", chave_mais_antiga)
+
+        logger.info(
+            "Sessão reconstruída: %s (contexto_aluno=%s, mensagens=%d)",
+            conversa_id,
+            bool(contexto_aluno),
+            len(mensagens) if mensagens else 0,
+        )
+
     async def iniciar_sessao(self, conversa_id: str, contexto_aluno: Optional[str] = None) -> None:
         async with self._lock:
             self._criar_sessao(conversa_id, contexto_aluno)
 
-    async def obter_sessao(self, conversa_id: str) -> genai.ChatSession:
+    async def obter_sessao(
+        self,
+        conversa_id: str,
+        mensagens: Optional[list] = None,
+    ) -> genai.ChatSession:
         async with self._lock:
             if conversa_id not in self._sessoes:
                 contexto = self._sessao_contexto.get(conversa_id)
-                self._criar_sessao(conversa_id, contexto_aluno=contexto)
+                if mensagens:
+                    self._reconstruir_sessao(conversa_id, contexto_aluno=contexto, mensagens=mensagens)
+                else:
+                    self._criar_sessao(conversa_id, contexto_aluno=contexto)
             sessao = self._sessoes.pop(conversa_id)
             self._sessoes[conversa_id] = sessao
             return sessao
 
-    async def garantir_sessao_com_contexto(self, conversa_id: str, contexto_aluno: Optional[str] = None) -> None:
+    async def garantir_sessao_com_contexto(
+        self,
+        conversa_id: str,
+        contexto_aluno: Optional[str] = None,
+        mensagens: Optional[list] = None,
+    ) -> None:
         async with self._lock:
             if conversa_id not in self._sessoes:
-                self._criar_sessao(conversa_id, contexto_aluno=contexto_aluno)
+                if mensagens:
+                    self._reconstruir_sessao(conversa_id, contexto_aluno=contexto_aluno, mensagens=mensagens)
+                else:
+                    self._criar_sessao(conversa_id, contexto_aluno=contexto_aluno)
 
     async def encerrar_sessao(self, conversa_id: str) -> None:
         async with self._lock:
@@ -166,10 +227,11 @@ class AIService:
         conversa_id: str,
         mensagem_usuario: str,
         max_retries: int = 3,
+        mensagens: Optional[list] = None,
     ) -> str:
         for tentativa in range(1, max_retries + 1):
             try:
-                sessao = await self.obter_sessao(conversa_id)
+                sessao = await self.obter_sessao(conversa_id, mensagens=mensagens)
                 loop = asyncio.get_running_loop()
                 resposta = await loop.run_in_executor(
                     None,
@@ -186,11 +248,49 @@ class AIService:
                     "Tentativa %d/%d falhou para conversa=%s: %s",
                     tentativa, max_retries, conversa_id, exc,
                 )
-                if tentativa < max_retries:
-                    await asyncio.sleep(tentativa * 2)
-                else:
-                    logger.error("Todas as tentativas falharam para conversa=%s", conversa_id)
-                    raise
+            if tentativa < max_retries:
+                await asyncio.sleep(tentativa * 2)
+            else:
+                logger.error("Todas as tentativas falharam para conversa=%s", conversa_id)
+                raise
+
+    async def gerar_resposta_stream(
+        self,
+        conversa_id: str,
+        mensagem_usuario: str,
+        mensagens: Optional[list] = None,
+    ) -> typing.AsyncIterator[str]:
+        sessao = await self.obter_sessao(conversa_id, mensagens=mensagens)
+        queue: asyncio.Queue = asyncio.Queue()
+        _STREAM_SENTINEL = object()
+        _STREAM_ERROR = object()
+
+        def _consume_stream(s, m, q, loop):
+            try:
+                resposta = s.send_message(m, stream=True)
+                for chunk in resposta:
+                    texto = getattr(chunk, "text", None)
+                    if texto:
+                        loop.call_soon_threadsafe(q.put_nowait, texto)
+                loop.call_soon_threadsafe(q.put_nowait, _STREAM_SENTINEL)
+            except Exception as exc:
+                loop.call_soon_threadsafe(q.put_nowait, (_STREAM_ERROR, exc))
+
+        loop = asyncio.get_running_loop()
+        thread = threading.Thread(
+            target=_consume_stream,
+            args=(sessao, mensagem_usuario, queue, loop),
+            daemon=True,
+        )
+        thread.start()
+
+        while True:
+            item = await queue.get()
+            if item is _STREAM_SENTINEL:
+                break
+            if isinstance(item, tuple) and len(item) == 2 and item[0] is _STREAM_ERROR:
+                raise item[1]
+            yield item
 
     async def gerar_conteudo_educacional(
         self,

@@ -130,51 +130,64 @@ syncAlunoBadge();
 if (ChatUI.elements.messageInput) ChatUI.elements.messageInput.focus();
 }
 
-    async function handleSendMessage() {
-        var input = ChatUI.elements.messageInput;
-        if (!input) return;
-        var content = input.value.trim();
-        if (!content) return;
+  async function handleSendMessage() {
+    var input = ChatUI.elements.messageInput;
+    if (!input) return;
+    var content = input.value.trim();
+    if (!content) return;
 
-        try {
-            input.disabled = true;
-            ChatUI.elements.btnSend.disabled = true;
-            ChatUI.showTypingIndicator();
+    try {
+      input.disabled = true;
+      ChatUI.elements.btnSend.disabled = true;
 
-      var result = await ChatService.sendMessage(content, ChatStore.state.activeAlunoId);
-      if (result.success && result.assistantMessage) {
-        ChatUI.removeTypingIndicator();
-        if (result.conversationId && !ChatStore.state.activeConversationId) {
-          ChatStore.state.activeConversationId = result.conversationId;
+      ChatUI.appendMessage({ role: 'user', content: content, created_at: new Date().toISOString() });
+      ChatUI.clearInput();
+
+      var textEl = ChatUI.createStreamingMessage();
+
+      await ChatService.sendMessageStream(content, ChatStore.state.activeAlunoId, {
+        onChunk: function(chunk, fullContent) {
+          ChatUI.appendChunk(textEl, chunk);
+        },
+        onDone: function(result) {
+          ChatUI.removeTypingIndicator();
+
+          if (result.conversationId && !ChatStore.state.activeConversationId) {
+            ChatStore.state.activeConversationId = result.conversationId;
+          }
+
+          ChatStore.addMessage('user', content);
+
+          var assistantContent = result.assistantMessage ? result.assistantMessage.content : '';
+          ChatStore.addMessage('assistant', assistantContent);
+
+          ChatUI.finalizeStreamMessage(textEl, assistantContent);
+
+          if (result.alunoId && !ChatStore.state.activeAlunoId) {
+            ChatStore.state.activeAlunoId = result.alunoId;
+            ChatStore.state.activeAlunoNome = result.alunoNome;
+          }
+
+          var activeConv = ChatService.getActiveConversation();
+          if (activeConv) {
+            ChatUI.updateTitle(activeConv.title);
+            ChatUI.renderConversations(ChatService.getConversationsHistory(), activeConv.id);
+          }
+        },
+        onError: function(errorContent, fullContent) {
+          ChatUI.appendChunk(textEl, errorContent);
         }
-        ChatStore.addMessage('user', result.userMessage.content);
-        ChatStore.addMessage('assistant', result.assistantMessage.content);
-        ChatUI.appendMessage(result.userMessage);
-        await new Promise(function(resolve) { setTimeout(resolve, 300); });
-        ChatUI.appendMessage(result.assistantMessage);
-                ChatUI.clearInput();
-                if (result.alunoId && !ChatStore.state.activeAlunoId) {
-                    ChatStore.state.activeAlunoId = result.alunoId;
-                    ChatStore.state.activeAlunoNome = result.alunoNome;
-                }
-                var activeConv = ChatService.getActiveConversation();
-                if (activeConv) {
-                    ChatUI.updateTitle(activeConv.title);
-                    ChatUI.renderConversations(ChatService.getConversationsHistory(), activeConv.id);
-                }
-            } else if (result.success && !result.assistantMessage) {
-                ChatUI.removeTypingIndicator();
-                ChatUI.showError('Não foi possível obter resposta da IA. Tente novamente.');
-            }
-        } catch (error) {
-            ChatUI.removeTypingIndicator();
-            ChatUI.showError('Erro ao enviar: ' + error.message);
-        } finally {
-            input.disabled = false;
-            input.focus();
-            ChatUI.updateSendButton();
-        }
+      });
+    } catch (error) {
+      ChatUI.removeTypingIndicator();
+      ChatUI.removeStreamingMessage();
+      ChatUI.showError('Erro ao enviar: ' + error.message);
+    } finally {
+      input.disabled = false;
+      input.focus();
+      ChatUI.updateSendButton();
     }
+  }
 
 function handleInput(e) {
 ChatUI.updateSendButton();

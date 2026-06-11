@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from starlette.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
@@ -53,14 +54,36 @@ async def listar_conversas(
 
 @router.post("/send", response_model=ChatResposta, response_model_by_alias=False)
 async def enviar_mensagem(
- dados: ChatRequisicao,
- auth_data: AuthData = Depends(get_current_usuario),
- service: ChatService = Depends(_service),
+    dados: ChatRequisicao,
+    auth_data: AuthData = Depends(get_current_usuario),
+    service: ChatService = Depends(_service),
 ):
     return await service.enviar_mensagem(
         dados,
         usuario_id=auth_data.usuario.id,
         tipo_perfil=auth_data.usuario.tipo_perfil,
+    )
+
+
+@router.post("/stream")
+async def enviar_mensagem_stream(
+    dados: ChatRequisicao,
+    auth_data: AuthData = Depends(get_current_usuario),
+    service: ChatService = Depends(_service),
+):
+    generator = service.enviar_mensagem_stream(
+        dados,
+        usuario_id=auth_data.usuario.id,
+        tipo_perfil=auth_data.usuario.tipo_perfil,
+    )
+    return StreamingResponse(
+        generator,
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
     )
 
 
