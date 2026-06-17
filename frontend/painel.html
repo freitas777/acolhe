@@ -4,12 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Acolhe+ | Painel NAPNE</title>
-    <link rel="stylesheet" href="/css/painel.css">
+    <link rel="stylesheet" href="/css/base.css">
+<link rel="stylesheet" href="/css/painel.css">
     <link rel="stylesheet" href="/css/notificacoes.css">
     <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <header class="topbar">
+<a href="#main-content" class="skip-link">Pular para o conteudo principal</a>
+<header class="topbar">
 <div class="topbar-left">
         <a href="#" class="topbar-logo" id="topbar-logo" title="Pagina inicial">
 				<div class="logo-icon">A+</div>
@@ -20,19 +22,24 @@
 			<h1 class="page-title">Painel NAPNE</h1>
 		</div>
 <div class="topbar-right">
-        <div class="notificacao-bell-container"></div>
-        <div class="user-pill" id="user-pill">
+<div class="notificacao-bell-container"></div>
+<a href="/chat" class="btn-nav" title="Chat">
+<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+</svg>
+</a>
+<div class="user-pill" id="user-pill">
                 <div class="user-avatar" id="user-avatar">??</div>
                 <span class="user-name" id="user-name">Carregando...</span>
             </div>
             <button class="btn-logout" id="btn-senha" title="Alterar Senha">
-       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+       <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
         <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
        </svg>
       </button>
       <button class="btn-logout" id="btn-logout" title="Sair">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
                     <polyline points="16 17 21 12 16 7"/>
                     <line x1="21" y1="12" x2="9" y2="12"/>
@@ -41,10 +48,10 @@
         </div>
     </header>
 
-    <main class="painel-page">
+    <main class="painel-page" id="main-content">
         <div class="painel-nav">
             <a href="/importacao" class="nav-link nav-importacao" title="Importar alunos do SUAP">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                     <polyline points="7 10 12 15 17 10"/>
                     <line x1="12" y1="15" x2="12" y2="3"/>
@@ -55,7 +62,7 @@
 
         <div class="painel-section">
             <div class="search-bar">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="search-icon">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="search-icon">
                     <circle cx="11" cy="11" r="8"/>
                     <line x1="21" y1="21" x2="16.65" y2="16.65"/>
                 </svg>
@@ -66,17 +73,17 @@
 
   <div class="painel-columns">
   <div class="painel-column">
-   <div class="column-header column-equipe">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px">
-     <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-     <circle cx="9" cy="7" r="4"/>
-     <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-     <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+<div class="column-header column-equipe">
+<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px">
+<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+<circle cx="9" cy="7" r="4"/>
+<path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+<path d="M16 3.13a4 4 0 0 1 0 7.75"/>
     </svg>
     <h2>Equipe NAPNE</h2>
     <span class="badge badge-green" id="equipe-count">0</span>
     <button class="btn-invite" id="btn-invite" title="Convidar membro">
-     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px">
+     <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px">
       <line x1="12" y1="5" x2="12" y2="19"/>
       <line x1="5" y1="12" x2="19" y2="12"/>
      </svg>
@@ -90,8 +97,8 @@
 
   <div class="painel-column">
    <div class="column-header column-pendencias">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px">
-     <circle cx="12" cy="12" r="10"/>
+<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px">
+<circle cx="12" cy="12" r="10"/>
      <line x1="12" y1="8" x2="12" y2="12"/>
      <line x1="12" y1="16" x2="12.01" y2="16"/>
     </svg>
@@ -104,12 +111,12 @@
   </div>
 
   <div class="painel-column">
-   <div class="column-header column-ativos">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px">
-     <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-     <circle cx="9" cy="7" r="4"/>
-     <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-     <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+<div class="column-header column-ativos">
+<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px">
+<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+<circle cx="9" cy="7" r="4"/>
+<path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+<path d="M16 3.13a4 4 0 0 1 0 7.75"/>
     </svg>
     <h2>Alunos Ativos</h2>
     <span class="badge badge-green" id="ativos-count">0</span>
@@ -121,7 +128,7 @@
  </div>
     </main>
 
- <div class="modal-overlay" id="profile-modal" hidden>
+ <div class="modal-overlay" id="profile-modal" role="dialog" aria-modal="true" aria-labelledby="modal-aluno-name" hidden>
   <div class="modal">
    <div class="modal-header">
     <h2 id="modal-aluno-name">Perfil do Aluno</h2>
@@ -178,10 +185,10 @@
   </div>
  </div>
 
- <div class="modal-overlay" id="invite-modal" hidden>
+ <div class="modal-overlay" id="invite-modal" role="dialog" aria-modal="true" aria-labelledby="invite-modal-title" hidden>
   <div class="modal">
    <div class="modal-header">
-    <h2>Convidar Membro</h2>
+    <h2 id="invite-modal-title">Convidar Membro</h2>
     <button class="modal-close" id="invite-modal-close" title="Fechar">&times;</button>
    </div>
    <form id="invite-form" class="modal-body">
@@ -224,10 +231,10 @@
   </div>
  </div>
 
-<div class="modal-overlay" id="senha-modal" hidden>
+<div class="modal-overlay" id="senha-modal" role="dialog" aria-modal="true" aria-labelledby="senha-modal-title" hidden>
  <div class="modal">
   <div class="modal-header">
-   <h2>Alterar Senha</h2>
+   <h2 id="senha-modal-title">Alterar Senha</h2>
    <button class="modal-close" id="senha-modal-close" title="Fechar">&times;</button>
   </div>
   <form id="senha-form" class="modal-body">
@@ -244,7 +251,7 @@
     <input type="password" id="senha-nova-conf" placeholder="Confirme a nova senha" required autocomplete="new-password" minlength="6">
    </div>
    <div class="senha-temp-notice" id="senha-temp-notice" hidden>
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;flex-shrink:0">
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;flex-shrink:0">
      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
      <line x1="12" y1="9" x2="12" y2="13"/>
      <line x1="12" y1="17" x2="12.01" y2="17"/>

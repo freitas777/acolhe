@@ -33,7 +33,7 @@ class AuthService:
         self.pendencia_repo = PendenciaValidacaoRepository(db)
         self.suap_service = SUAPService()
 
-    async def login_com_suap(self, token: str, semestre: str = "2026.1") -> dict:
+    async def login_com_suap(self, token: str, semestre: str = "") -> dict:
         meus_dados = await self.suap_service.get_meus_dados(token)
         eu_dados = await self.suap_service.get_eu(token)
 

@@ -49,7 +49,7 @@ class TestVerificarSenha:
     def test_senha_correta_formato_legado(self):
         import hashlib
         with patch("backend.security.settings") as mock_settings, \
-             patch("backend.security._load_legacy_keys", return_value=["chave_legada"]):
+             patch("backend.security._get_legacy_keys", return_value=["chave_legada"]):
             mock_settings.secret_key = "new-rotated-key"
             legacy_hash = hashlib.pbkdf2_hmac(
                 "sha256", "minhasenha".encode(), "chave_legada".encode(), 100000
@@ -58,14 +58,14 @@ class TestVerificarSenha:
 
     def test_senha_incorreta_formato_legado(self):
         with patch("backend.security.settings") as mock_settings, \
-             patch("backend.security._load_legacy_keys", return_value=["chave_legada"]):
+             patch("backend.security._get_legacy_keys", return_value=["chave_legada"]):
             mock_settings.secret_key = "new-rotated-key"
             assert verificar_senha("errada", "hash_qualquer_sem_cifrao") is False
 
     def test_legacy_key_nao_encontrada_retorna_false(self):
         import hashlib
         with patch("backend.security.settings") as mock_settings, \
-             patch("backend.security._load_legacy_keys", return_value=["other_key"]):
+             patch("backend.security._get_legacy_keys", return_value=["other_key"]):
             mock_settings.secret_key = "new-rotated-key"
             legacy_hash = hashlib.pbkdf2_hmac(
                 "sha256", "minhasenha".encode(), "old_key".encode(), 100000

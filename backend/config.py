@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     gemini_model: str = "gemini-2.5-flash"
 
+    legacy_secret_keys: str = ""
+    semestre_vigente: str = "2026.1"
+
     debug: bool = False
     dev_mode: bool = False
     allowed_origins: str = "http://localhost:8000,http://127.0.0.1:8000"

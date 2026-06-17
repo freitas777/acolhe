@@ -5,27 +5,30 @@
 }
 
 .notificacao-bell {
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 6px;
-    color: var(--color-text-secondary, #666);
-    border-radius: var(--radius-md, 0.5rem);
-    transition: background var(--transition-fast, 150ms ease), color var(--transition-fast, 150ms ease);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: relative;
+ background: #F8F9FA;
+ border: 1px solid #E0E0E0;
+ cursor: pointer;
+ padding: 6px;
+ color: #666;
+ width: 36px;
+ height: 36px;
+ border-radius: 8px;
+ transition: background 0.2s, color 0.2s;
+ display: flex;
+ align-items: center;
+ justify-content: center;
+ position: relative;
 }
 
 .notificacao-bell:hover {
-    background: var(--color-surface-secondary, #F8F9FA);
-    color: var(--suap-green, #0A7F70);
+ background: #0A7F70;
+ border-color: #0A7F70;
+ color: white;
 }
 
 .notificacao-bell svg {
-    width: 22px;
-    height: 22px;
+ width: 18px;
+ height: 18px;
 }
 
 .notificacao-badge {

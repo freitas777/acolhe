@@ -302,7 +302,7 @@
                 '</button>' +
             '</div>' +
             '<div class="conteudo-card-body" id="conteudo-body-' + conteudo.id + '" hidden>' +
-                '<div class="conteudo-texto">' + escapeHtml(conteudo.conteudo) + '</div>' +
+                '<div class="conteudo-texto">' + renderMarkdown(conteudo.conteudo) + '</div>' +
             '</div>';
 
         var toggleBtn = card.querySelector('.btn-toggle-conteudo');
@@ -335,17 +335,25 @@
         }, 3500);
     }
 
-    function escapeHtml(text) {
-        if (!text) return '';
-        var div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
+function escapeHtml(text) {
+ if (!text) return '';
+ var div = document.createElement('div');
+ div.textContent = text;
+ return div.innerHTML;
+ }
 
-    function capitalizeFirst(str) {
-        if (!str) return '';
-        return str.charAt(0).toUpperCase() + str.slice(1);
-    }
+ function renderMarkdown(text) {
+ if (!text) return '';
+ if (typeof window.marked !== 'undefined' && typeof window.DOMPurify !== 'undefined') {
+ return DOMPurify.sanitize(marked.parse(text));
+ }
+ return escapeHtml(text);
+ }
+
+ function capitalizeFirst(str) {
+ if (!str) return '';
+ return str.charAt(0).toUpperCase() + str.slice(1);
+ }
 
     function formatDate(isoString) {
         if (!isoString) return '-';

@@ -18,8 +18,9 @@ if (!acolheRequireAuth()) return;
       loadUserInfo();
       loadDisciplinas();
     }
-    setupEventListeners();
-    var semestreEl = document.getElementById('semestre-text');
+setupEventListeners();
+applyNavVisibility();
+var semestreEl = document.getElementById('semestre-text');
     if (semestreEl) semestreEl.textContent = SEMESTRE_VIGENTE;
   }
 
@@ -359,13 +360,19 @@ if (!acolheRequireAuth()) return;
     return div.innerHTML;
   }
 
-  function setupEventListeners() {
-    var btnSync = document.getElementById('btn-sync');
-    if (btnSync) btnSync.addEventListener('click', handleSync);
+function setupEventListeners() {
+var btnSync = document.getElementById('btn-sync');
+if (btnSync) btnSync.addEventListener('click', handleSync);
 
-    var btnLogout = document.getElementById('btn-logout');
-    if (btnLogout) btnLogout.addEventListener('click', handleLogout);
-  }
+var btnLogout = document.getElementById('btn-logout');
+if (btnLogout) btnLogout.addEventListener('click', handleLogout);
+}
+
+function applyNavVisibility() {
+var isAluno = tipoPerfil === 'aluno';
+var navPortal = document.getElementById('nav-portal');
+if (navPortal) navPortal.style.display = isAluno ? '' : 'none';
+}
 
   function handleLogout() {
   if (confirm('Deseja realmente sair?')) {

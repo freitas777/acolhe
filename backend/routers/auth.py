@@ -46,7 +46,8 @@ async def login():
 @router.post("/callback", response_model=LoginResponse)
 async def callback(request: LoginRequest, auth_service: AuthService = Depends()):
     try:
-        result = await auth_service.login_com_suap(request.access_token, request.semestre)
+        semestre = request.semestre or settings.semestre_vigente
+        result = await auth_service.login_com_suap(request.access_token, semestre)
         result["token"] = request.access_token
         return result
     except httpx.ConnectError:

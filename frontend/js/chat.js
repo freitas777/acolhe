@@ -18,12 +18,22 @@
         await renderInitialState();
     }
 
-    function applyRoleVisibility() {
-        if (isAluno) {
-            if (ChatUI.elements.btnAlunoContext) ChatUI.elements.btnAlunoContext.hidden = true;
-            if (ChatUI.elements.alunoContextBar) ChatUI.elements.alunoContextBar.hidden = true;
-        }
-    }
+function applyRoleVisibility() {
+if (isAluno) {
+if (ChatUI.elements.btnAlunoContext) ChatUI.elements.btnAlunoContext.hidden = true;
+if (ChatUI.elements.alunoContextBar) ChatUI.elements.alunoContextBar.hidden = true;
+}
+
+var perfil = localStorage.getItem('acolhe_tipo_perfil') || 'aluno';
+var isNapne = perfil === 'psicopedagogo' || perfil === 'admin' || perfil === 'servidor';
+var navPainel = document.getElementById('nav-painel');
+var navPortal = document.getElementById('nav-portal');
+var navDisciplinas = document.getElementById('nav-disciplinas');
+
+if (navPainel) navPainel.style.display = isNapne ? '' : 'none';
+if (navPortal) navPortal.style.display = isAluno ? '' : 'none';
+if (navDisciplinas) navDisciplinas.style.display = isAluno || perfil === 'professor' ? '' : 'none';
+}
 
 async function loadUserData() {
     var savedUser = localStorage.getItem('acolhe_user');
@@ -189,9 +199,14 @@ if (ChatUI.elements.messageInput) ChatUI.elements.messageInput.focus();
     }
   }
 
-function handleInput(e) {
-ChatUI.updateSendButton();
-}
+  function handleInput(e) {
+    var input = ChatUI.elements.messageInput;
+    if (input) {
+      input.style.height = 'auto';
+      input.style.height = Math.min(input.scrollHeight, 200) + 'px';
+    }
+    ChatUI.updateSendButton();
+  }
 
   function handleKeydown(e) {
     if (e.key === 'Enter' && !e.shiftKey) {

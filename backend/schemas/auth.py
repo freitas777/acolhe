@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 class LoginRequest(BaseModel):
     access_token: str
-    semestre: str = "2026.1"
+    semestre: str = ""
 
 
 class UsuarioSUAPResponse(BaseModel):

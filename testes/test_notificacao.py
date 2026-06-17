@@ -6,9 +6,11 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from backend.models.notificacao import Notificacao
+from backend.models.notificacao import NotificacaoLeitura
 from backend.models.aluno import Aluno
 from backend.models.usuario import Usuario
 from backend.services.notificacao_service import NotificacaoService
+from backend.repositories.notificacao import NotificacaoRepository
 from backend.schemas.notificacao import NotificacaoResponse, NotificacaoCountResponse
 
 
@@ -234,3 +236,129 @@ class TestNotificacaoCountResponse:
     def test_count_zero(self):
         resp = NotificacaoCountResponse(nao_lidas=0)
         assert resp.nao_lidas == 0
+
+
+# ---------------------------------------------------------------------------
+# Repository tests (mock-based)
+# ---------------------------------------------------------------------------
+
+@pytest.fixture
+def notificacao_repo():
+    db = MagicMock()
+    repo = NotificacaoRepository.__new__(NotificacaoRepository)
+    repo.model = Notificacao
+    repo.db = db
+    return repo
+
+
+class TestNotificacaoRepositoryMarcarComoLida:
+    def test_notificacao_nao_encontrada(self, notificacao_repo):
+        notificacao_repo.get_by_id = MagicMock(return_value=None)
+        result = notificacao_repo.marcar_como_lida(999, usuario_id=1)
+        assert result is False
+        notificacao_repo.db.add.assert_not_called()
+
+    def test_cria_leitura_quando_nao_existe(self, notificacao_repo):
+        notificacao_repo.get_by_id = MagicMock(return_value=make_notificacao())
+        notificacao_repo.db.get = MagicMock(return_value=None)
+        result = notificacao_repo.marcar_como_lida(1, usuario_id=5)
+        assert result is True
+        notificacao_repo.db.add.assert_called_once()
+        notificacao_repo.db.commit.assert_called_once()
+        leitura = notificacao_repo.db.add.call_args[0][0]
+        assert isinstance(leitura, NotificacaoLeitura)
+        assert leitura.notificacao_id == 1
+        assert leitura.usuario_id == 5
+
+    def test_nao_cria_leitura_quando_ja_existe(self, notificacao_repo):
+        notificacao_repo.get_by_id = MagicMock(return_value=make_notificacao())
+        existing = MagicMock()
+        notificacao_repo.db.get = MagicMock(return_value=existing)
+        result = notificacao_repo.marcar_como_lida(1, usuario_id=5)
+        assert result is True
+        notificacao_repo.db.add.assert_not_called()
+
+
+class TestNotificacaoRepositoryEstaLida:
+    def test_lida(self, notificacao_repo):
+        leitura = MagicMock()
+        leitura.excluida = False
+        notificacao_repo.db.get = MagicMock(return_value=leitura)
+        assert notificacao_repo.esta_lida(1, usuario_id=1) is True
+
+    def test_nao_lida(self, notificacao_repo):
+        notificacao_repo.db.get = MagicMock(return_value=None)
+        assert notificacao_repo.esta_lida(1, usuario_id=1) is False
+
+    def test_excluida_conta_como_nao_lida(self, notificacao_repo):
+        leitura = MagicMock()
+        leitura.excluida = True
+        notificacao_repo.db.get = MagicMock(return_value=leitura)
+        assert notificacao_repo.esta_lida(1, usuario_id=1) is False
+
+
+class TestNotificacaoRepositoryExcluir:
+    def test_notificacao_nao_encontrada(self, notificacao_repo):
+        notificacao_repo.get_by_id = MagicMock(return_value=None)
+        result = notificacao_repo.excluir(999, usuario_id=1)
+        assert result is False
+
+    def test_cria_leitura_excluida(self, notificacao_repo):
+        notificacao_repo.get_by_id = MagicMock(return_value=make_notificacao())
+        notificacao_repo.db.get = MagicMock(return_value=None)
+        result = notificacao_repo.excluir(1, usuario_id=5)
+        assert result is True
+        notificacao_repo.db.add.assert_called_once()
+        leitura = notificacao_repo.db.add.call_args[0][0]
+        assert isinstance(leitura, NotificacaoLeitura)
+        assert leitura.excluida is True
+        assert leitura.notificacao_id == 1
+        assert leitura.usuario_id == 5
+
+    def test_atualiza_leitura_existente_para_excluida(self, notificacao_repo):
+        notificacao_repo.get_by_id = MagicMock(return_value=make_notificacao())
+        existing = MagicMock()
+        existing.excluida = False
+        notificacao_repo.db.get = MagicMock(return_value=existing)
+        result = notificacao_repo.excluir(1, usuario_id=5)
+        assert result is True
+        assert existing.excluida is True
+        notificacao_repo.db.add.assert_not_called()
+
+
+class TestNotificacaoRepositoryMarcarTodas:
+    def test_nenhuma_nao_lida(self, notificacao_repo):
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = []
+        notificacao_repo.db.execute = MagicMock(return_value=mock_result)
+        result = notificacao_repo.marcar_todas_como_lidas(
+            destino_tipo="napne", destino_id=None, usuario_id=1,
+        )
+        assert result == 0
+        notificacao_repo.db.add.assert_not_called()
+
+    def test_marca_duas_nao_lidas(self, notificacao_repo):
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = [10, 20]
+        notificacao_repo.db.execute = MagicMock(return_value=mock_result)
+        notificacao_repo.db.get = MagicMock(return_value=None)
+        result = notificacao_repo.marcar_todas_como_lidas(
+            destino_tipo="napne", destino_id=None, usuario_id=1,
+        )
+        assert result == 2
+        assert notificacao_repo.db.add.call_count == 2
+        notificacao_repo.db.commit.assert_called_once()
+
+    def test_pula_leitura_ja_existente(self, notificacao_repo):
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = [10, 20]
+        existing_leitura = MagicMock()
+        notificacao_repo.db.execute = MagicMock(return_value=mock_result)
+        notificacao_repo.db.get = MagicMock(
+            side_effect=lambda cls, pk: existing_leitura if pk == (10, 1) else None,
+        )
+        result = notificacao_repo.marcar_todas_como_lidas(
+            destino_tipo="napne", destino_id=None, usuario_id=1,
+        )
+        assert result == 2
+        notificacao_repo.db.add.assert_called_once()

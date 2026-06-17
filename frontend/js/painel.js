@@ -123,9 +123,13 @@ function loadPendencias() {
             listEl.querySelectorAll('.btn-approve').forEach(function(btn) {
                 btn.addEventListener('click', function() { validarPendencia(parseInt(btn.dataset.id), 'validado'); });
             });
-            listEl.querySelectorAll('.btn-reject').forEach(function(btn) {
-                btn.addEventListener('click', function() { validarPendencia(parseInt(btn.dataset.id), 'rejeitado'); });
-            });
+listEl.querySelectorAll('.btn-reject').forEach(function(btn) {
+btn.addEventListener('click', function() {
+if (confirm('Deseja realmente rejeitar esta pendencia? O aluno sera excluido do acompanhamento.')) {
+validarPendencia(parseInt(btn.dataset.id), 'rejeitado');
+}
+});
+});
         })
         .catch(function(err) {
             listEl.innerHTML = '<div class="empty-col"><p>Erro ao carregar pendencias</p></div>';
@@ -183,7 +187,7 @@ var initials = (a.nome || '?').split(' ').map(function(n){ return n[0]; }).slice
         (a.diagnostico ? '<div class="ativo-diagnostico">' + escapeHtml(a.diagnostico) + '</div>' : '') +
         '</div>' +
         '<button class="btn-profile" title="Editar perfil" data-aluno-id="' + a.id + '" data-aluno-nome="' + escapeHtml(a.nome) + '">' +
-        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>' +
+        '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>' +
         '</button>';
       listEl.appendChild(item);
     });
@@ -221,18 +225,25 @@ var initials = (a.nome || '?').split(' ').map(function(n){ return n[0]; }).slice
                 return;
             }
             resultsEl.innerHTML = '';
-            alunos.forEach(function(a) {
+alunos.forEach(function(a) {
 var initials = (a.nome || '?').split(' ').map(function(n){ return n[0]; }).slice(0,2).join('').toUpperCase();
-    var item = document.createElement('div');
-    item.className = 'search-result-item';
-                item.innerHTML =
-                    '<div class="result-avatar">' + escapeHtml(initials) + '</div>' +
-                    '<div class="result-info">' +
-                        '<div class="result-nome">' + escapeHtml(a.nome) + '</div>' +
-                        (a.matricula ? '<div class="result-matricula">' + escapeHtml(a.matricula) + '</div>' : '') +
-                        (a.diagnostico ? '<div class="result-diagnostico">' + escapeHtml(a.diagnostico) + '</div>' : '') +
-                    '</div>';
-                resultsEl.appendChild(item);
+var item = document.createElement('div');
+item.className = 'search-result-item';
+item.setAttribute('data-aluno-id', a.id);
+item.setAttribute('data-aluno-nome', a.nome);
+item.innerHTML =
+'<div class="result-avatar">' + escapeHtml(initials) + '</div>' +
+'<div class="result-info">' +
+'<div class="result-nome">' + escapeHtml(a.nome) + '</div>' +
+(a.matricula ? '<div class="result-matricula">' + escapeHtml(a.matricula) + '</div>' : '') +
+(a.diagnostico ? '<div class="result-diagnostico">' + escapeHtml(a.diagnostico) + '</div>' : '') +
+'</div>';
+item.addEventListener('click', function() {
+openProfileModal(a.id, a.nome);
+resultsEl.hidden = true;
+document.getElementById('search-input').value = '';
+});
+resultsEl.appendChild(item);
             });
             resultsEl.hidden = false;
         })
@@ -263,7 +274,41 @@ var initials = (a.nome || '?').split(' ').map(function(n){ return n[0]; }).slice
         return div.innerHTML;
     }
 
-    function openProfileModal(alunoId, alunoNome) {
+    var _trapHandler = null;
+var _trapLastFocus = null;
+
+function _trapFocus(modalEl) {
+    _untrapFocus();
+    _trapLastFocus = document.activeElement;
+    var focusable = modalEl.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])');
+    if (!focusable.length) return;
+    var first = focusable[0];
+    var last = focusable[focusable.length - 1];
+    _trapHandler = function(e) {
+        if (e.key === 'Escape') {
+            var id = modalEl.id;
+            if (id === 'profile-modal') closeProfileModal();
+            else if (id === 'invite-modal') closeInviteModal();
+            else if (id === 'senha-modal') closeSenhaModal();
+            return;
+        }
+        if (e.key !== 'Tab') return;
+        if (e.shiftKey) {
+            if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+        } else {
+            if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+        }
+    };
+    document.addEventListener('keydown', _trapHandler);
+    setTimeout(function() { first.focus(); }, 50);
+}
+
+function _untrapFocus() {
+    if (_trapHandler) { document.removeEventListener('keydown', _trapHandler); _trapHandler = null; }
+    if (_trapLastFocus) { try { _trapLastFocus.focus(); } catch(e) {} _trapLastFocus = null; }
+}
+
+function openProfileModal(alunoId, alunoNome) {
   var modal = document.getElementById('profile-modal');
   var nameEl = document.getElementById('modal-aluno-name');
   var idEl = document.getElementById('profile-aluno-id');
@@ -290,16 +335,18 @@ var initials = (a.nome || '?').split(' ').map(function(n){ return n[0]; }).slice
     document.getElementById('profile-dificuldade-leitura').value = String(perfil.dificuldade_leitura || false);
     if (perfil.preferencia) document.getElementById('profile-preferencia').value = perfil.preferencia;
     if (perfil.interesses) document.getElementById('profile-interesses').value = perfil.interesses;
-    if (perfil.diagnostico) document.getElementById('profile-diagnostico').value = perfil.diagnostico;
-  })
-  .catch(function() {
-    showToast('Erro ao carregar perfil', 'error');
-  });
+        if (perfil.diagnostico) document.getElementById('profile-diagnostico').value = perfil.diagnostico;
+    })
+    .catch(function() {
+        showToast('Erro ao carregar perfil', 'error');
+    });
+    _trapFocus(modal);
 }
 
 function closeProfileModal() {
-  var modal = document.getElementById('profile-modal');
-  if (modal) modal.hidden = true;
+    _untrapFocus();
+    var modal = document.getElementById('profile-modal');
+    if (modal) modal.hidden = true;
 }
 
 function saveProfile(e) {
@@ -345,13 +392,15 @@ function openInviteModal() {
   var actionsEl = document.getElementById('invite-actions');
   if (actionsEl) actionsEl.hidden = false;
   var submitBtn = document.getElementById('invite-submit');
-  if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Convidar'; }
-  modal.hidden = false;
+    if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Convidar'; }
+    modal.hidden = false;
+    _trapFocus(modal);
 }
 
 function closeInviteModal() {
-  var modal = document.getElementById('invite-modal');
-  if (modal) modal.hidden = true;
+    _untrapFocus();
+    var modal = document.getElementById('invite-modal');
+    if (modal) modal.hidden = true;
 }
 
 function handleInvite(e) {
@@ -407,16 +456,18 @@ function openSenhaModal(forceTemp) {
  var cancelBtn = document.getElementById('senha-cancel');
  if (cancelBtn) cancelBtn.style.display = isTemp ? 'none' : '';
  var submitBtn = document.getElementById('senha-submit');
- if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Alterar Senha'; }
- modal.hidden = false;
+    if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Alterar Senha'; }
+    modal.hidden = false;
+    _trapFocus(modal);
 }
 
 function closeSenhaModal() {
- var modal = document.getElementById('senha-modal');
- if (modal) modal.hidden = true;
- if (localStorage.getItem('acolhe_senha_temporaria') === 'true') {
-  acolheLogout();
- }
+    _untrapFocus();
+    var modal = document.getElementById('senha-modal');
+    if (modal) modal.hidden = true;
+    if (localStorage.getItem('acolhe_senha_temporaria') === 'true') {
+        acolheLogout();
+    }
 }
 
 function handleAlterarSenha(e) {

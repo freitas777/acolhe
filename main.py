@@ -3,10 +3,13 @@ load_dotenv()
 
 import logging
 import re
-from fastapi import FastAPI
+import time
+import threading
+from collections import defaultdict
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from pathlib import Path
 
 from backend.config import settings
@@ -33,6 +36,43 @@ _check_secret_key()
 app = FastAPI(title="Acolhe+", version="1.0.0")
 
 # =====================
+# RATE LIMITER
+# =====================
+class _RateLimiter:
+    def __init__(self, max_requests: int = 10, window_seconds: int = 60):
+        self.max_requests = max_requests
+        self.window_seconds = window_seconds
+        self._buckets: dict[str, list[float]] = defaultdict(list)
+        self._lock = threading.Lock()
+
+    def _cleanup(self, key: str, now: float):
+        self._buckets[key] = [t for t in self._buckets[key] if now - t < self.window_seconds]
+
+    def is_limited(self, key: str) -> bool:
+        now = time.time()
+        with self._lock:
+            self._cleanup(key, now)
+            if len(self._buckets[key]) >= self.max_requests:
+                return True
+            self._buckets[key].append(now)
+            return False
+
+_CHAT_LIMITER = _RateLimiter(max_requests=10, window_seconds=60)
+_RATE_LIMIT_PATHS = {"/api/chat/send", "/api/chat/stream"}
+
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    if request.url.path in _RATE_LIMIT_PATHS:
+        auth_header = request.headers.get("authorization", "")
+        client_key = auth_header or request.client.host if request.client else "unknown"
+        if _CHAT_LIMITER.is_limited(client_key):
+            return JSONResponse(
+                status_code=429,
+                content={"detail": "Muitas requisicoes. Aguarde um momento e tente novamente."},
+            )
+    return await call_next(request)
+
+# =====================
 # CORS
 # =====================
 ALLOWED_ORIGINS = [o.strip() for o in settings.allowed_origins.split(",") if o.strip()]
@@ -40,7 +80,7 @@ ALLOWED_ORIGINS = [o.strip() for o in settings.allowed_origins.split(",") if o.s
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -66,10 +106,6 @@ async def login_page():
 async def chat_page():
     return FileResponse(str(FRONTEND_DIR / "chat.html"))
 
-@app.get("/dashboard")
-async def dashboard_redirect():
-    return RedirectResponse(url="/chat", status_code=302)
-
 @app.get("/disciplinas")
 async def disciplinas():
     return FileResponse(str(FRONTEND_DIR / "disciplinas.html"))
@@ -93,6 +129,17 @@ async def notificacoes():
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+
+@app.get("/api/config")
+async def config():
+    return {
+        "suap_client_id": settings.suap_client_id,
+        "suap_redirect_uri": settings.suap_redirect_uri,
+        "suap_base_url": settings.suap_base_url,
+        "suap_scope": settings.suap_scope,
+        "semestre_vigente": settings.semestre_vigente,
+    }
 
 # =====================
 # API ROUTERS
