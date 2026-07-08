@@ -12,6 +12,7 @@ from backend.repositories.usuario import UsuarioRepository
 from backend.repositories.disciplina import DisciplinaRepository
 from backend.repositories.diario_aluno import DiarioAlunoRepository
 from backend.repositories.aluno import AlunoRepository
+from backend.repositories.perfil_aluno import PerfilAlunoRepository
 from backend.models.pendencia_validacao import PendenciaValidacao, StatusPendencia
 from backend.repositories.pendencia_validacao import PendenciaValidacaoRepository
 from backend.services.suap_service import SUAPService
@@ -29,6 +30,7 @@ class AuthService:
         self.usuario_repo = UsuarioRepository(db)
         self.disciplina_repo = DisciplinaRepository(db)
         self.diario_aluno_repo = DiarioAlunoRepository(db)
+        self.perfil_aluno_repo = PerfilAlunoRepository(db)
         self.aluno_repo = AlunoRepository(db)
         self.pendencia_repo = PendenciaValidacaoRepository(db)
         self.suap_service = SUAPService()
@@ -253,6 +255,80 @@ class AuthService:
 
     def obter_alunos_assistidos(self, disciplina_id: int) -> list[DiarioAluno]:
         return self.diario_aluno_repo.listar_por_disciplina(disciplina_id)
+
+    # --- New methods for Professor Dashboard ---
+    def obter_perfil_aluno(self, professor_id: int, aluno_id: int):
+        # Verify professor has this aluno in any of their disciplinas
+        if not self.diario_aluno_repo.verificar_professor_aluno(professor_id, aluno_id):
+            raise HTTPException(status_code=403, detail="Acesso negado ao perfil do aluno.")
+        perfil = self.perfil_aluno_repo.get_by_aluno_id(aluno_id)
+        if not perfil:
+            raise HTTPException(status_code=404, detail="Perfil do aluno não encontrado.")
+        return perfil
+
+    def obter_conteudos_aluno(self, professor_id: int, aluno_id: int):
+        # Verify professor association
+        if not self.diario_aluno_repo.verificar_professor_aluno(professor_id, aluno_id):
+            raise HTTPException(status_code=403, detail="Acesso negado ao conteúdo do aluno.")
+        # Use existing repository
+        from backend.repositories.conteudo_gerado import ConteudoGeradoRepository
+        repo = ConteudoGeradoRepository(self.db)
+        return repo.list_by_aluno(aluno_id)
+
+    def solicitar_apoio_napne(self, professor_id: int, aluno_id: int, motivo: str):
+        # Verify association
+        if not self.diario_aluno_repo.verificar_professor_aluno(professor_id, aluno_id):
+            raise HTTPException(status_code=403, detail="Acesso negado ao aluno.")
+        # Check for existing pending pendencia
+        existing = self.pendencia_repo.get_pendente_por_aluno(aluno_id)
+        if existing:
+            raise HTTPException(status_code=409, detail="Já existe pendência pendente para este aluno.")
+        # Create pendencia (reuse existing logic)
+        pend = self.pendencia_repo.create({
+            "aluno_id": aluno_id,
+            "indicado_por_id": professor_id,
+            "motivo": motivo,
+            "status": StatusPendencia.pendente,
+        })
+        # Notify NAPNE
+        notif_service = NotificacaoService(self.db)
+        notif_service.criar_notificacao(
+            tipo="solicitacao_apoio",
+            titulo="Solicitação de apoio do NAPNE",
+            mensagem=motivo,
+            aluno_id=aluno_id,
+            destino_tipo="napne",
+        )
+        return pend
+
+    def criar_ou_atualizar_observacao(self, professor_id: int, aluno_id: int, disciplina_id: int, texto: str):
+        # Verify association
+        if not self.diario_aluno_repo.verificar_professor_aluno(professor_id, aluno_id):
+            raise HTTPException(status_code=403, detail="Acesso negado ao aluno.")
+        from backend.repositories.acomodacao_observacao import AcomodacaoObservacaoRepository
+        repo = AcomodacaoObservacaoRepository(self.db)
+        observacao = repo.criar_ou_atualizar(aluno_id, disciplina_id, professor_id, texto)
+        # Notify NAPNE
+        notif_service = NotificacaoService(self.db)
+        notif_service.criar_notificacao(
+            tipo="observacao_acomodacao",
+            titulo="Nova observação de acomodação",
+            mensagem=f"Observação para o aluno {aluno_id} na disciplina {disciplina_id}",
+            aluno_id=aluno_id,
+            destino_tipo="napne",
+        )
+        return observacao
+
+    def obter_observacao(self, professor_id: int, aluno_id: int, disciplina_id: int):
+        # Verify association
+        if not self.diario_aluno_repo.verificar_professor_aluno(professor_id, aluno_id):
+            raise HTTPException(status_code=403, detail="Acesso negado ao aluno.")
+        from backend.repositories.acomodacao_observacao import AcomodacaoObservacaoRepository
+        repo = AcomodacaoObservacaoRepository(self.db)
+        obs = repo.get_by_aluno_disciplina_professor(aluno_id, disciplina_id, professor_id)
+        if not obs:
+            raise HTTPException(status_code=404, detail="Observação não encontrada")
+        return obs
 
     def obter_pendencias(self) -> list[PendenciaValidacao]:
         return self.pendencia_repo.listar_pendentes()

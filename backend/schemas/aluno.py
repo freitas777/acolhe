@@ -63,3 +63,11 @@ class AlunoSUAPSearchResult(BaseModel):
 
 class ImportarAlunoRequest(BaseModel):
     matricula: str
+
+
+class AlunoManualCreate(BaseModel):
+    nome: str
+    matricula: str
+    curso: Optional[str] = None
+    campus: Optional[str] = None
+    email: Optional[str] = None

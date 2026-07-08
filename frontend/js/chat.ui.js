@@ -34,9 +34,31 @@ const ChatUI = {
       btnAlunoContext: document.getElementById('btn-aluno-context'),
       alunoSearchWrapper: document.getElementById('aluno-search-wrapper'),
       alunoSearchInput: document.getElementById('aluno-search-input'),
-      alunoSearchResults: document.getElementById('aluno-search-results')
-  };
+      alunoSearchResults: document.getElementById('aluno-search-results'),
+      btnCloseAlunoSearch: document.getElementById('btn-close-aluno-search'),
+      disciplinaContextBar: document.getElementById('disciplina-context-bar'),
+      disciplinaBadgeName: document.getElementById('disciplina-badge-name'),
+      disciplinaBadgeSigla: document.getElementById('disciplina-badge-sigla')
+   };
 
+  },
+
+  showDisciplinaBadge(descricao, sigla) {
+    const bar = this.elements.disciplinaContextBar;
+    if (!bar) return;
+    bar.hidden = false;
+    const nameEl = this.elements.disciplinaBadgeName;
+    const siglaEl = this.elements.disciplinaBadgeSigla;
+    if (nameEl) nameEl.textContent = descricao || '';
+    if (siglaEl) {
+      siglaEl.textContent = sigla || '';
+      siglaEl.style.display = sigla ? '' : 'none';
+    }
+  },
+
+  hideDisciplinaBadge() {
+    const bar = this.elements.disciplinaContextBar;
+    if (bar) bar.hidden = true;
   },
 
   /**
@@ -126,14 +148,29 @@ const ChatUI = {
     div.className = 'message';
 
     const isUser = message.role === 'user';
-    const avatar = isUser ? this.getUserInitials() : 'AI';
-    const author = isUser ? 'Você' : 'Acolhe+';
-    const time = this.formatTime(message.created_at);
+    let avatar, authorHtml, time;
+    time = this.formatTime(message.created_at);
 
     var contentHtml;
     if (isUser) {
+      let user = null;
+      try { user = JSON.parse(localStorage.getItem('acolhe_user') || '{}'); } catch(e) {}
+      const userName = (user && (user.nome || user.nome_usual)) || 'Usuário';
+      avatar = this.getUserInitials(userName);
+      const roleLabels = {
+        aluno: 'Aluno',
+        professor: 'Professor',
+        psicopedagogo: 'Psicopedagogo',
+        admin: 'Administrador',
+        servidor: 'Servidor'
+      };
+      const role = user && user.tipo_perfil ? (roleLabels[user.tipo_perfil] || user.tipo_perfil) : '';
+      authorHtml = `<span class="message-author">${this.escapeHtml(userName)}</span>` +
+        (role ? `<span class="message-role">${this.escapeHtml(role)}</span>` : '');
       contentHtml = this.escapeHtml(message.content);
     } else {
+      avatar = 'AI';
+      authorHtml = `<span class="message-author">Acolhe+</span>`;
       contentHtml = this.renderMarkdown(message.content);
     }
 
@@ -141,7 +178,9 @@ const ChatUI = {
       <div class="message-avatar ${message.role}">${avatar}</div>
       <div class="message-content">
         <div class="message-header">
-          <span class="message-author">${author}</span>
+          <div class="message-author-info">
+            ${authorHtml}
+          </div>
           <span class="message-time">${time}</span>
         </div>
         <div class="message-text">${contentHtml}</div>
@@ -295,6 +334,18 @@ const ChatUI = {
     }
   },
 
+  hideAlunoSearch() {
+    const searchWrapper = this.elements.alunoSearchWrapper;
+    const badge = this.elements.alunoBadge;
+    const input = this.elements.alunoSearchInput;
+    if (input) input.value = '';
+    this.hideAlunoSearchResults();
+    if (searchWrapper) searchWrapper.hidden = true;
+    if (badge) badge.hidden = true;
+    const bar = this.elements.alunoContextBar;
+    if (bar) bar.hidden = true;
+  },
+
   renderAlunoSearchResults(alunos) {
     const container = this.elements.alunoSearchResults;
     if (!container) return;
@@ -388,10 +439,15 @@ const ChatUI = {
     const typingDiv = document.createElement('div');
     typingDiv.className = 'message typing-indicator';
     typingDiv.id = 'typing-indicator';
-    
+
     typingDiv.innerHTML = `
       <div class="message-avatar assistant">AI</div>
       <div class="message-content">
+        <div class="message-header">
+          <div class="message-author-info">
+            <span class="message-author">Acolhe+</span>
+          </div>
+        </div>
         <div class="typing-dots">
           <span></span>
           <span></span>
@@ -447,14 +503,13 @@ const ChatUI = {
     div.className = 'message streaming';
     div.id = 'streaming-message';
 
-    const avatar = 'AI';
-    const author = 'Acolhe+';
-
     div.innerHTML = `
-      <div class="message-avatar assistant">${avatar}</div>
+      <div class="message-avatar assistant">AI</div>
       <div class="message-content">
         <div class="message-header">
-          <span class="message-author">${author}</span>
+          <div class="message-author-info">
+            <span class="message-author">Acolhe+</span>
+          </div>
           <span class="message-time"></span>
         </div>
         <div class="message-text"></div>

@@ -146,7 +146,10 @@ throw error;
             messages: c.messages || [],
             created_at: c.created_at,
             aluno_id: c.aluno_id || null,
-            aluno_nome: c.aluno_nome || null
+            aluno_nome: c.aluno_nome || null,
+            disciplina_id: c.disciplina_id || null,
+            disciplina_descricao: c.disciplina_descricao || null,
+            disciplina_sigla: c.disciplina_sigla || null
           };
         });
         ChatStore.save();
@@ -156,6 +159,23 @@ throw error;
       ChatUI.showError('Erro ao carregar conversas');
     }
     return ChatStore.getAllConversations();
+  },
+
+  /**
+   * Obtém ou cria conversa vinculada a uma disciplina
+   */
+  async getOrCreateConversaByDisciplina(disciplinaId) {
+    try {
+      const response = await acolheFetch(`${this.API_BASE_URL}/api/chat/conversations/disciplina/${disciplinaId}`, {
+        method: 'POST'
+      });
+      if (response.ok) {
+        return await response.json();
+      }
+    } catch (error) {
+      ChatUI.showError('Erro ao abrir conversa da disciplina');
+    }
+    return null;
   },
 
   /**

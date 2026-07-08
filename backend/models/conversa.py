@@ -31,6 +31,11 @@ class Conversa(Base):
         ForeignKey("alunos.id", ondelete="SET NULL"),
         nullable=True,
     )
+    disciplina_id: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        ForeignKey("disciplinas.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     criada_em: Mapped[datetime] = mapped_column(
         nullable=False,
         default=lambda: datetime.now(timezone.utc),
@@ -44,6 +49,7 @@ class Conversa(Base):
         order_by="Mensagem.criada_em",
     )
     aluno = relationship("Aluno")
+    disciplina = relationship("Disciplina")
 
     def __repr__(self) -> str:
         return f"<Conversa(id={self.id}, titulo={self.titulo!r})>"

@@ -8,7 +8,7 @@ from backend.dependencies import AuthData, get_current_usuario
 from backend.schemas.notificacao import NotificacaoResponse, NotificacaoCountResponse
 from backend.services.notificacao_service import NotificacaoService
 
-router = APIRouter(prefix="/notificacoes", tags=["Notificações"])
+router = APIRouter(prefix="/notificacoes", tags=["Notificacoes"])
 
 
 def _destino_params(auth_data: AuthData):

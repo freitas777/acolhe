@@ -309,38 +309,40 @@ function _untrapFocus() {
 }
 
 function openProfileModal(alunoId, alunoNome) {
-  var modal = document.getElementById('profile-modal');
-  var nameEl = document.getElementById('modal-aluno-name');
-  var idEl = document.getElementById('profile-aluno-id');
-  if (!modal || !idEl) return;
+   var modal = document.getElementById('profile-modal');
+   var nameEl = document.getElementById('modal-aluno-name');
+   var idEl = document.getElementById('profile-aluno-id');
+   if (!modal || !idEl) return;
 
-  idEl.value = alunoId;
-  if (nameEl) nameEl.textContent = 'Perfil: ' + (alunoNome || 'Aluno');
+   idEl.value = alunoId;
+   if (nameEl) nameEl.textContent = 'Perfil: ' + (alunoNome || 'Aluno');
 
-  document.getElementById('profile-nivel-atencao').value = '';
-  document.getElementById('profile-dificuldade-leitura').value = 'false';
-  document.getElementById('profile-preferencia').value = '';
-  document.getElementById('profile-interesses').value = '';
-  document.getElementById('profile-diagnostico').value = '';
+   document.getElementById('profile-nivel-atencao').value = '';
+   document.getElementById('profile-dificuldade-leitura').value = 'false';
+   document.getElementById('profile-preferencia').value = '';
+   document.getElementById('profile-interesses').value = '';
+   document.getElementById('profile-diagnostico').value = '';
 
-  modal.hidden = false;
+   modal.hidden = false;
 
- acolheFetch('/equipe/alunos/' + alunoId + '/perfil')
-  .then(function(r) {
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    return r.json();
-  })
-  .then(function(perfil) {
-    if (perfil.nivel_atencao) document.getElementById('profile-nivel-atencao').value = perfil.nivel_atencao;
-    document.getElementById('profile-dificuldade-leitura').value = String(perfil.dificuldade_leitura || false);
-    if (perfil.preferencia) document.getElementById('profile-preferencia').value = perfil.preferencia;
-    if (perfil.interesses) document.getElementById('profile-interesses').value = perfil.interesses;
-        if (perfil.diagnostico) document.getElementById('profile-diagnostico').value = perfil.diagnostico;
-    })
-    .catch(function() {
-        showToast('Erro ao carregar perfil', 'error');
-    });
-    _trapFocus(modal);
+   acolheFetch('/equipe/alunos/' + alunoId + '/perfil')
+     .then(function(r) {
+       if (!r.ok) throw new Error('HTTP ' + r.status);
+       return r.json();
+     })
+     .then(function(perfil) {
+       if (perfil.nivel_atencao) document.getElementById('profile-nivel-atencao').value = perfil.nivel_atencao;
+       document.getElementById('profile-dificuldade-leitura').value = String(perfil.dificuldade_leitura || false);
+       if (perfil.preferencia) document.getElementById('profile-preferencia').value = perfil.preferencia;
+       if (perfil.interesses) document.getElementById('profile-interesses').value = perfil.interesses;
+           if (perfil.diagnostico) document.getElementById('profile-diagnostico').value = perfil.diagnostico;
+     })
+     .catch(function() {
+       showToast('Erro ao carregar perfil', 'error');
+     });
+   // Load professor observations for this aluno (NAPNE view)
+   loadProfessorObservacoes(alunoId);
+   _trapFocus(modal);
 }
 
 function closeProfileModal() {
@@ -562,6 +564,52 @@ function setupEventListeners() {        var searchInput = document.getElementByI
   var btnInvite = document.getElementById('btn-invite');
   if (btnInvite) btnInvite.addEventListener('click', openInviteModal);
 
+  var btnExportCsv = document.getElementById('btn-export-csv');
+  if (btnExportCsv) btnExportCsv.addEventListener('click', function() {
+    acolheFetch('/alunos/export/csv')
+      .then(function(r) {
+        if (!r.ok) throw new Error('Erro ao exportar CSV');
+        return r.blob();
+      })
+      .then(function(blob) {
+        var url = window.URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'alunos-' + new Date().toISOString().split('T')[0] + '.csv';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+      })
+      .catch(function(err) {
+        console.error(err);
+        showToast('Erro ao exportar CSV.', 'error');
+      });
+  });
+
+  var btnRelatorioUso = document.getElementById('btn-relatorio-uso');
+  if (btnRelatorioUso) btnRelatorioUso.addEventListener('click', function() {
+    acolheFetch('/api/relatorios/uso/csv')
+      .then(function(r) {
+        if (!r.ok) throw new Error('Erro ao gerar relatorio');
+        return r.blob();
+      })
+      .then(function(blob) {
+        var url = window.URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'relatorio-uso-' + new Date().toISOString().split('T')[0] + '.csv';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+      })
+      .catch(function(err) {
+        console.error(err);
+        showToast('Erro ao baixar relatorio.', 'error');
+      });
+  });
+
   var inviteModalClose = document.getElementById('invite-modal-close');
   if (inviteModalClose) inviteModalClose.addEventListener('click', closeInviteModal);
 
@@ -594,5 +642,58 @@ function setupEventListeners() {        var searchInput = document.getElementByI
   if (senhaForm) senhaForm.addEventListener('submit', handleAlterarSenha);
  }
 
-    document.addEventListener('DOMContentLoaded', init);
+     document.addEventListener('DOMContentLoaded', init);
+
+// Load observations of professors for a given aluno (NAPNE view)
+function loadProfessorObservacoes(alunoId) {
+   var container = document.getElementById('profile-observacoes');
+   if (!container) return;
+   acolheFetch('/equipe/alunos/' + alunoId + '/observacoes')
+     .then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+     .then(function(obsList) {
+       if (!obsList || obsList.length === 0) {
+         container.innerHTML = '<p>Nenhuma observação registrada.</p>';
+         return;
+       }
+       var html = '';
+       obsList.forEach(function(obs) {
+         // obs is expected to have: id, aluno_id, disciplina_id, professor_id, disciplina_sigla, professor_nome, texto, criado_em
+         var date = new Date(obs.criado_em);
+         var dateStr = date.toLocaleString('pt-BR');
+         html += '<div class="observacao-item">' +
+                 '<div class="observacao-header">' +
+                 '<strong>Professor ' + escapeHtml(obs.professor_nome) + '</strong> ' +
+                 '<span class="disciplina-sigla">[' + escapeHtml(obs.disciplina_sigla) + ']</span> ' +
+                 '<span class="data">' + escapeHtml(dateStr) + '</span>' +
+                 '</div>' +
+                 '<div class="observacao-texto">' + escapeHtml(obs.texto) + '</div>' +
+                 '</div>';
+       });
+container.innerHTML = html;
+     })
+     .catch(function(err){
+       container.innerHTML = '<p>Erro ao carregar observações</p>';
+       console.error(err);
+     });
+}
+
+function loadDashboardMetrics() {
+ acolheFetch('/equipe/dashboard')
+   .then(function(r) { return r.json(); })
+   .then(function(data) {
+     document.getElementById('metric-alunos-ativos').textContent = data.alunos_ativos !== undefined ? data.alunos_ativos : '0';
+     document.getElementById('metric-pendencias').textContent = data.pendencias_pendentes !== undefined ? data.pendencias_pendentes : '0';
+     document.getElementById('metric-observacoes').textContent = data.observacoes_mes !== undefined ? data.observacoes_mes : '0';
+     document.getElementById('metric-conteudos').textContent = data.conteudos_gerados !== undefined ? data.conteudos_gerados : '0';
+   })
+   .catch(function(err) {
+     console.error('Erro ao carregar dashboard:', err);
+     // Fallback para 0 em caso de erro
+     document.getElementById('metric-alunos-ativos').textContent = '0';
+     document.getElementById('metric-pendencias').textContent = '0';
+     document.getElementById('metric-observacoes').textContent = '0';
+     document.getElementById('metric-conteudos').textContent = '0';
+   });
+}
+
 })();

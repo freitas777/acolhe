@@ -1,4 +1,5 @@
 from backend.repositories.aluno import AlunoRepository
+from backend.repositories.acomodacao_observacao import AcomodacaoObservacaoRepository
 from backend.repositories.conta_local import ContaLocalRepository
 from backend.repositories.conteudo_gerado import ConteudoGeradoRepository
 from backend.repositories.conversa import ConversaRepository
@@ -12,6 +13,7 @@ from backend.repositories.usuario import UsuarioRepository
 
 __all__ = [
     "AlunoRepository",
+    "AcomodacaoObservacaoRepository",
     "ContaLocalRepository",
     "ConteudoGeradoRepository",
     "ConversaRepository",

@@ -1,7 +1,7 @@
 import secrets
 import string
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from urllib.parse import urlencode
@@ -16,6 +16,7 @@ from backend.repositories.conta_local import ContaLocalRepository
 from backend.repositories.usuario import UsuarioRepository
 from backend.security import hash_senha, verificar_senha, criar_jwt
 from backend.services.auth_service import AuthService
+from backend.services.audit_service import AuditService
 from backend.schemas.auth import (
     LoginRequest,
     LoginResponse,
@@ -26,9 +27,16 @@ from backend.schemas.auth import (
     UsuarioSUAPResponse,
     DisciplinaResponse,
     AlunoAssistidoResponse,
+    SolicitarApoioRequest,
+    ObservacaoRequest,
+    ObservacaoResponse,
+    PendenciaResponse,
 )
+from backend.schemas.perfil_aluno import PerfilAlunoResponse
+from backend.schemas.conteudo_gerado import ConteudoGeradoResponse
+from backend.repositories.acomodacao_observacao import AcomodacaoObservacaoRepository
 
-router = APIRouter(prefix="/auth", tags=["Autenticacao"])
+router = APIRouter(prefix="/auth", tags=["Auth"])
 
 
 @router.get("/login")
@@ -65,16 +73,131 @@ async def callback(request: LoginRequest, auth_service: AuthService = Depends())
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Credenciais invalidas. Faca login novamente.",
-            )
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Erro ao comunicar com o SUAP (codigo {e.response.status_code}).",
         )
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Erro interno. Tente novamente.",
+
+# --- Professor Dashboard endpoints ---
+
+# View full student profile (read‑only)
+@router.get("/disciplinas/alunos/{aluno_id}/perfil", response_model=PerfilAlunoResponse)
+async def aluno_perfil(
+    aluno_id: int,
+    request: Request,
+    auth_data: AuthData = Depends(get_current_usuario),
+    auth_service: AuthService = Depends(),
+    db: Session = Depends(get_db),
+):
+    try:
+        perfil = auth_service.obter_perfil_aluno(auth_data.usuario.id, aluno_id)
+        AuditService(db).registrar(
+            usuario_id=auth_data.usuario.id,
+            acao="leitura",
+            recurso_tipo="perfil_aluno",
+            recurso_id=perfil.id if perfil else 0,
+            aluno_id=aluno_id,
+            ip_origem=request.client.host if request.client else None,
         )
+        return perfil
+    except HTTPException as e:
+        raise e
+
+# View adaptive content generated for a student
+@router.get("/disciplinas/alunos/{aluno_id}/conteudos", response_model=list[ConteudoGeradoResponse])
+async def aluno_conteudos(
+    aluno_id: int,
+    request: Request,
+    auth_data: AuthData = Depends(get_current_usuario),
+    auth_service: AuthService = Depends(),
+    db: Session = Depends(get_db),
+):
+    try:
+        conteudos = auth_service.obter_conteudos_aluno(auth_data.usuario.id, aluno_id)
+        AuditService(db).registrar(
+            usuario_id=auth_data.usuario.id,
+            acao="leitura",
+            recurso_tipo="conteudo_gerado",
+            recurso_id=0,
+            aluno_id=aluno_id,
+            detalhes=f"{len(conteudos)} conteudos listados",
+            ip_origem=request.client.host if request.client else None,
+        )
+        return conteudos
+    except HTTPException as e:
+        raise e
+
+# Request NAPNE support for a student (creates a pendência)
+@router.post("/disciplinas/alunos/{aluno_id}/solicitar-apoio", response_model=PendenciaResponse)
+async def solicitar_apoio(
+    aluno_id: int,
+    request: SolicitarApoioRequest,
+    req: Request,
+    auth_data: AuthData = Depends(get_current_usuario),
+    auth_service: AuthService = Depends(),
+    db: Session = Depends(get_db),
+):
+    try:
+        pend = auth_service.solicitar_apoio_napne(auth_data.usuario.id, aluno_id, request.motivo)
+        AuditService(db).registrar(
+            usuario_id=auth_data.usuario.id,
+            acao="criacao",
+            recurso_tipo="pendencia",
+            recurso_id=pend.id,
+            aluno_id=aluno_id,
+            detalhes=request.motivo,
+            ip_origem=req.client.host if req.client else None,
+        )
+        return pend
+    except HTTPException as e:
+        raise e
+
+# Create or update a professor's observation for a student in a discipline
+@router.post("/disciplinas/alunos/{aluno_id}/observacao", response_model=ObservacaoResponse)
+async def criar_observacao(
+    aluno_id: int,
+    request: ObservacaoRequest,
+    req: Request,
+    auth_data: AuthData = Depends(get_current_usuario),
+    auth_service: AuthService = Depends(),
+    db: Session = Depends(get_db),
+):
+    try:
+        obs = auth_service.criar_ou_atualizar_observacao(
+            auth_data.usuario.id, aluno_id, request.disciplina_id, request.texto
+        )
+        is_update = obs.criado_em != obs.atualizado_em if hasattr(obs, 'atualizado_em') else False
+        AuditService(db).registrar(
+            usuario_id=auth_data.usuario.id,
+            acao="atualizacao" if is_update else "criacao",
+            recurso_tipo="observacao_acomodacao",
+            recurso_id=obs.id,
+            aluno_id=aluno_id,
+            detalhes=f"disciplina_id={request.disciplina_id}",
+            ip_origem=req.client.host if req.client else None,
+        )
+        return obs
+    except HTTPException as e:
+        raise e
+
+# Retrieve an existing observation (if any) for a student in a discipline
+@router.get("/disciplinas/alunos/{aluno_id}/observacao", response_model=ObservacaoResponse)
+async def obter_observacao(
+    aluno_id: int,
+    disciplina_id: int,
+    request: Request,
+    auth_data: AuthData = Depends(get_current_usuario),
+    auth_service: AuthService = Depends(),
+    db: Session = Depends(get_db),
+):
+    obs = auth_service.obter_observacao(auth_data.usuario.id, aluno_id, disciplina_id)
+    AuditService(db).registrar(
+        usuario_id=auth_data.usuario.id,
+        acao="leitura",
+        recurso_tipo="observacao_acomodacao",
+        recurso_id=obs.id if obs else 0,
+        aluno_id=aluno_id,
+        detalhes=f"disciplina_id={disciplina_id}",
+        ip_origem=request.client.host if request.client else None,
+    )
+    return obs
 
 
 @router.post("/local-login", response_model=LoginResponse)

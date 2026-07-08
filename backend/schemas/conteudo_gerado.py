@@ -29,5 +29,7 @@ class ConteudoGeradoResponse(BaseModel):
     conteudo: str
     modelo_ia: str
     gerado_em: datetime
+    versao: int = 1
+    conteudo_pai_id: Optional[int] = None
 
     model_config = {"from_attributes": True}

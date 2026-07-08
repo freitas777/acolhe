@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 class ConversaCriar(BaseModel):
     titulo: str = Field(default="Nova conversa", max_length=255)
     aluno_id: Optional[int] = None
+    disciplina_id: Optional[int] = None
 
 
 class ConversaResposta(BaseModel):
@@ -17,6 +18,9 @@ class ConversaResposta(BaseModel):
     user_id: Optional[int] = Field(None, alias="usuario_id")
     aluno_id: Optional[int] = None
     aluno_nome: Optional[str] = None
+    disciplina_id: Optional[int] = None
+    disciplina_descricao: Optional[str] = None
+    disciplina_sigla: Optional[str] = None
 
     model_config = {"from_attributes": True, "populate_by_name": True, "by_alias": False}
 
@@ -34,6 +38,7 @@ class ChatRequisicao(BaseModel):
     message: str = Field(..., min_length=1, max_length=4000)
     conversation_id: Optional[str] = None
     aluno_id: Optional[int] = None
+    disciplina_id: Optional[int] = None
 
 
 class ChatResposta(BaseModel):
@@ -42,6 +47,8 @@ class ChatResposta(BaseModel):
     conversation_id: str
     aluno_id: Optional[int] = None
     aluno_nome: Optional[str] = None
+    disciplina_id: Optional[int] = None
+    disciplina_descricao: Optional[str] = None
 
 
 class PerfilAlunoDict(BaseModel):

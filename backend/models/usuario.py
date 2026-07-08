@@ -12,6 +12,7 @@ class TipoPerfil(enum.Enum):
     aluno = "aluno"
     professor = "professor"
     psicopedagogo = "psicopedagogo"
+    servidor = "servidor"
     admin = "admin"
 
 

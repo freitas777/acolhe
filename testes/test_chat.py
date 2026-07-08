@@ -345,7 +345,107 @@ class TestEnviarMensagem:
         service.conversa_repo.obter_com_mensagens.return_value = None
         with pytest.raises(HTTPException) as exc:
             await service.enviar_mensagem(
-                ChatRequisicao(message="Olá", conversation_id="conv-x"),
+                ChatRequisicao(message="OlÃ¡", conversation_id="conv-x"),
                 usuario_id=1,
             )
         assert exc.value.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# obter_ou_criar_conversa_disciplina
+# ---------------------------------------------------------------------------
+
+class TestObterOuCriarConversaDisciplina:
+    @pytest.mark.asyncio
+    async def test_cria_conversa_com_aluno_id_para_aluno(self, service):
+        aluno = make_aluno(id=5)
+        aluno.perfil = make_perfil(aluno_id=5)
+        service.aluno_repo.get_by_suap_id.return_value = aluno
+        service.disciplina_repo.get_by_id.return_value = MagicMock(
+            descricao="MatemÃ¡tica", sigla="MAT", professor="Prof X",
+            semestre="2026.1", codigo_turma="T01",
+        )
+        conv = make_conversa(id="conv-disc", usuario_id=1, aluno_id=5)
+        conv.disciplina = MagicMock(descricao="MatemÃ¡tica", sigla="MAT")
+        service.conversa_repo.obter_por_usuario_e_disciplina.return_value = None
+        service.conversa_repo.create.return_value = conv
+
+        with patch("backend.services.chat_service.ai_service") as mock_ai:
+            mock_ai.iniciar_sessao = AsyncMock()
+            mock_ai.construir_contexto_aluno.return_value = "contexto aluno"
+            mock_ai.construir_contexto_disciplina.return_value = "contexto disciplina"
+            result = await service.obter_ou_criar_conversa_disciplina(
+                disciplina_id=10, usuario_id=1, tipo_perfil="aluno", suap_id="12345",
+            )
+
+        service.aluno_repo.get_by_suap_id.assert_called_once_with("12345")
+        service.conversa_repo.create.assert_called_once()
+        create_call_kwargs = service.conversa_repo.create.call_args[0][0]
+        assert create_call_kwargs["aluno_id"] == 5
+        mock_ai.iniciar_sessao.assert_called_once()
+        call_kwargs = mock_ai.iniciar_sessao.call_args[1]
+        assert call_kwargs["contexto_aluno"] == "contexto aluno"
+        assert call_kwargs["contexto_disciplina"] == "contexto disciplina"
+
+    @pytest.mark.asyncio
+    async def test_cria_conversa_sem_aluno_id_para_professor(self, service):
+        service.disciplina_repo.get_by_id.return_value = MagicMock(
+            descricao="FÃ­sica", sigla="FIS", professor="Prof Y",
+            semestre="2026.1", codigo_turma="T02",
+        )
+        conv = make_conversa(id="conv-disc2", usuario_id=2)
+        conv.disciplina = MagicMock(descricao="FÃ­sica", sigla="FIS")
+        service.conversa_repo.obter_por_usuario_e_disciplina.return_value = None
+        service.conversa_repo.create.return_value = conv
+
+        with patch("backend.services.chat_service.ai_service") as mock_ai:
+            mock_ai.iniciar_sessao = AsyncMock()
+            mock_ai.construir_contexto_disciplina.return_value = "contexto disciplina"
+            result = await service.obter_ou_criar_conversa_disciplina(
+                disciplina_id=20, usuario_id=2, tipo_perfil="professor", suap_id="99999",
+            )
+
+        service.aluno_repo.get_by_suap_id.assert_not_called()
+        create_call_kwargs = service.conversa_repo.create.call_args[0][0]
+        assert create_call_kwargs["aluno_id"] is None
+
+    @pytest.mark.asyncio
+    async def test_cria_conversa_sem_aluno_id_quando_aluno_nao_encontrado(self, service):
+        service.aluno_repo.get_by_suap_id.return_value = None
+        service.disciplina_repo.get_by_id.return_value = MagicMock(
+            descricao="QuÃ­mica", sigla="QUI", professor="Prof Z",
+            semestre="2026.1", codigo_turma="T03",
+        )
+        conv = make_conversa(id="conv-disc3", usuario_id=3)
+        conv.disciplina = MagicMock(descricao="QuÃ­mica", sigla="QUI")
+        service.conversa_repo.obter_por_usuario_e_disciplina.return_value = None
+        service.conversa_repo.create.return_value = conv
+
+        with patch("backend.services.chat_service.ai_service") as mock_ai:
+            mock_ai.iniciar_sessao = AsyncMock()
+            mock_ai.construir_contexto_disciplina.return_value = "contexto disciplina"
+            result = await service.obter_ou_criar_conversa_disciplina(
+                disciplina_id=30, usuario_id=3, tipo_perfil="aluno", suap_id="00000",
+            )
+
+        service.aluno_repo.get_by_suap_id.assert_called_once_with("00000")
+        create_call_kwargs = service.conversa_repo.create.call_args[0][0]
+        assert create_call_kwargs["aluno_id"] is None
+
+    @pytest.mark.asyncio
+    async def test_reutiliza_conversa_existente(self, service):
+        conv = make_conversa(id="conv-exist", usuario_id=1, aluno_id=5)
+        conv.disciplina = MagicMock(descricao="Biologia", sigla="BIO")
+        conv.mensagens = [make_mensagem()]
+        service.conversa_repo.obter_por_usuario_e_disciplina.return_value = conv
+        service.mensagem_repo.listar_por_conversa.return_value = [make_mensagem()]
+
+        with patch("backend.services.chat_service.ai_service") as mock_ai:
+            mock_ai.garantir_sessao_com_contexto = AsyncMock()
+            mock_ai.construir_contexto_disciplina.return_value = "contexto disciplina"
+            result = await service.obter_ou_criar_conversa_disciplina(
+                disciplina_id=40, usuario_id=1, tipo_perfil="aluno", suap_id="12345",
+            )
+
+        service.conversa_repo.create.assert_not_called()
+        mock_ai.garantir_sessao_com_contexto.assert_called_once()

@@ -16,12 +16,12 @@
 <a href="#main-content" class="skip-link">Pular para o conteudo principal</a>
 <div class="app-container">
     <!-- Sidebar -->
-    <aside class="sidebar" id="sidebar">
+    <aside class="sidebar" id="sidebar" role="navigation" aria-label="Conversas">
 <div class="sidebar-header">
 <a href="#" class="logo-container" id="topbar-logo" title="Pagina inicial">
-<div class="logo-icon">A+</div>
-<h1 class="logo-title">Acolhe+</h1>
-</a>
+  				<div class="logo-icon">A+</div>
+  				<h1 class="logo-title">Acolhe+</h1>
+  			</a>
             <button class="btn-new-chat" id="btn-new-chat" title="Nova conversa">
                 <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <line x1="12" y1="5" x2="12" y2="19"/>
@@ -30,39 +30,6 @@
                 <span>Nova Conversa</span>
             </button>
         </div>
-
-  <div class="sidebar-nav">
-                <a href="/disciplinas" class="nav-item" id="nav-disciplinas" title="Minhas Disciplinas">
-                    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
-                        <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
-                    </svg>
-                    <span>Disciplinas</span>
-                </a>
-<a href="/portal" class="nav-item" id="nav-portal" title="Meu Perfil">
-<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-<circle cx="12" cy="7" r="4"/>
-</svg>
-<span>Meu Perfil</span>
-</a>
-<a href="/painel" class="nav-item" id="nav-painel" title="Painel NAPNE" style="display:none">
-<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-<rect x="3" y="3" width="7" height="7"/>
-<rect x="14" y="3" width="7" height="7"/>
-<rect x="14" y="14" width="7" height="7"/>
-<rect x="3" y="14" width="7" height="7"/>
-</svg>
-<span>Painel NAPNE</span>
-</a>
-<a href="/notificacoes" class="nav-item" id="nav-notificacoes" title="Notificacoes">
-<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-<path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-</svg>
-<span>Notificacoes</span>
-</a>
-</div>
 
       <div class="conversations-list" id="conversations-list">
         </div>
@@ -87,10 +54,10 @@
     </aside>
 
     <!-- Main Content -->
-    <main class="main-content" id="main-content">
+    <main class="main-content" id="main-content" role="main">
         <!-- Chat View -->
         <div id="view-chat">
-            <header class="chat-header">
+            <header class="chat-header" role="banner">
                 <button class="btn-menu-mobile" id="btn-menu-mobile" aria-label="Abrir menu">
                     <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <line x1="3" y1="12" x2="21" y2="12"/>
@@ -99,9 +66,29 @@
                     </svg>
                 </button>
       <h2 class="chat-title" id="chat-title">Nova Conversa</h2>
-      <div class="header-actions">
+<div class="header-actions">
+        <a href="/disciplinas" class="btn-nav" id="nav-disciplinas" title="Minhas Disciplinas">
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
+            <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+          </svg>
+        </a>
+        <a href="/portal" class="btn-nav" id="nav-portal" title="Meu Perfil">
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+            <circle cx="12" cy="7" r="4"/>
+          </svg>
+        </a>
+        <a href="/painel" class="btn-nav" id="nav-painel" title="Painel NAPNE" style="display:none">
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="7" height="7"/>
+            <rect x="14" y="3" width="7" height="7"/>
+            <rect x="14" y="14" width="7" height="7"/>
+            <rect x="3" y="14" width="7" height="7"/>
+          </svg>
+        </a>
         <div class="notificacao-bell-container"></div>
-        <button class="btn-icon" id="btn-aluno-context" title="Vincular aluno a conversa" aria-label="Vincular aluno a conversa">
+        <button class="btn-nav" id="btn-aluno-context" title="Vincular aluno a conversa" aria-label="Vincular aluno a conversa">
         <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
           <circle cx="12" cy="7" r="4"/>
@@ -127,6 +114,12 @@
       </div>
       <div class="aluno-search-wrapper" id="aluno-search-wrapper" hidden>
         <input type="text" id="aluno-search-input" placeholder="Buscar aluno por nome ou matrícula..." autocomplete="off">
+        <button class="aluno-search-close" id="btn-close-aluno-search" title="Fechar busca" aria-label="Fechar busca">
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
         <div class="aluno-search-results" id="aluno-search-results" hidden></div>
       </div>
     </div>

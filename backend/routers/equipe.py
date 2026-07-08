@@ -1,9 +1,18 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from datetime import datetime
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from pydantic import BaseModel
+from sqlalchemy import func
 from sqlalchemy.orm import Session, selectinload
 
 from backend.database import get_db
 from backend.dependencies import AuthData, get_current_usuario, require_napne, require_psicopedagogo_or_admin
+from backend.models.acomodacao_observacao import AcomodacaoObservacao
+from backend.models.aluno import Aluno
+from backend.models.conteudo_gerado import ConteudoGerado
+from backend.models.pendencia_validacao import PendenciaValidacao, StatusPendencia
 from backend.services.auth_service import AuthService
+from backend.services.audit_service import AuditService
 from backend.schemas.auth import (
     PendenciaResponse,
     PendenciaCreateRequest,
@@ -11,6 +20,7 @@ from backend.schemas.auth import (
     AtualizarPerfilRequest,
     AlunoResumoResponse,
     UsuarioSUAPResponse,
+    ObservacaoResponse,
 )
 from backend.schemas.perfil_aluno import PerfilAlunoCreate, PerfilAlunoUpdate, PerfilAlunoResponse
 from backend.models.aluno import Aluno
@@ -18,7 +28,7 @@ from backend.models.usuario import Usuario
 from backend.models.perfil_aluno import PerfilAluno
 from backend.models.conta_local import ContaLocal
 
-router = APIRouter(prefix="/equipe", tags=["Equipe NAPNE"])
+router = APIRouter(prefix="/equipe", tags=["NAPNE"])
 
 
 @router.get("/membros")
@@ -67,12 +77,16 @@ async def desativar_membro(
 
 @router.get("/pendencias", response_model=list[PendenciaResponse])
 async def listar_pendencias(
- auth_data: AuthData = Depends(require_napne),
- auth_service: AuthService = Depends(),
+    skip: int = 0,
+    limit: int = 50,
+    auth_data: AuthData = Depends(require_napne),
+    auth_service: AuthService = Depends(),
 ):
     pendencias = auth_service.obter_pendencias()
+    # Aplicar paginação
+    pendencias_paginadas = pendencias[skip : skip + limit]
     result = []
-    for p in pendencias:
+    for p in pendencias_paginadas:
         resp = PendenciaResponse(
             id=p.id,
             aluno_id=p.aluno_id,
@@ -116,12 +130,23 @@ async def criar_pendencia(
 async def validar_pendencia(
     pendencia_id: int,
     request: PendenciaValidacaoRequest,
+    req: Request,
     auth_data: AuthData = Depends(require_napne),
     auth_service: AuthService = Depends(),
+    db: Session = Depends(get_db),
 ):
     if request.acao not in ("validado", "rejeitado"):
         raise HTTPException(status_code=400, detail="Ação deve ser 'validado' ou 'rejeitado'")
     pendencia = auth_service.validar_pendencia(pendencia_id, auth_data.usuario.id, request.acao)
+    AuditService(db).registrar(
+        usuario_id=auth_data.usuario.id,
+        acao="atualizacao",
+        recurso_tipo="pendencia",
+        recurso_id=pendencia.id,
+        aluno_id=pendencia.aluno_id,
+        detalhes=f"acao={request.acao}",
+        ip_origem=req.client.host if req.client else None,
+    )
     return PendenciaResponse(
         id=pendencia.id,
         aluno_id=pendencia.aluno_id,
@@ -197,13 +222,24 @@ async def atualizar_perfil(
 @router.get("/alunos/{aluno_id}/perfil", response_model=PerfilAlunoResponse)
 async def obter_perfil_aluno(
  aluno_id: int,
+ request: Request,
  auth_data: AuthData = Depends(require_napne),
  db: Session = Depends(get_db),
 ):
     aluno = db.query(Aluno).options(selectinload(Aluno.perfil)).filter(Aluno.id == aluno_id).first()
     if not aluno:
         raise HTTPException(status_code=404, detail="Aluno nao encontrado")
-    if not aluno.perfil:
+    perfil = aluno.perfil
+    perfil_id = perfil.id if perfil else 0
+    AuditService(db).registrar(
+        usuario_id=auth_data.usuario.id,
+        acao="leitura",
+        recurso_tipo="perfil_aluno",
+        recurso_id=perfil_id,
+        aluno_id=aluno_id,
+        ip_origem=request.client.host if request.client else None,
+    )
+    if not perfil:
         return PerfilAlunoResponse(
             id=0,
             aluno_id=aluno_id,
@@ -220,6 +256,7 @@ async def obter_perfil_aluno(
 async def criar_ou_atualizar_perfil_aluno(
     aluno_id: int,
     request: PerfilAlunoCreate,
+    req: Request,
     auth_data: AuthData = Depends(require_napne),
     db: Session = Depends(get_db),
 ):
@@ -227,6 +264,7 @@ async def criar_ou_atualizar_perfil_aluno(
     if not aluno:
         raise HTTPException(status_code=404, detail="Aluno nao encontrado")
     perfil = aluno.perfil
+    is_update = perfil is not None
     if not perfil:
         perfil = PerfilAluno(aluno_id=aluno_id)
         db.add(perfil)
@@ -236,4 +274,84 @@ async def criar_ou_atualizar_perfil_aluno(
         setattr(perfil, key, value)
     db.commit()
     db.refresh(perfil)
+    AuditService(db).registrar(
+        usuario_id=auth_data.usuario.id,
+        acao="atualizacao" if is_update else "criacao",
+        recurso_tipo="perfil_aluno",
+        recurso_id=perfil.id,
+        aluno_id=aluno_id,
+        detalhes=str(list(update_data.keys())),
+        ip_origem=req.client.host if req.client else None,
+    )
     return PerfilAlunoResponse.model_validate(perfil)
+
+
+@router.get("/alunos/{aluno_id}/observacoes", response_model=list[ObservacaoResponse])
+async def listar_observacoes_aluno(
+    aluno_id: int,
+    request: Request,
+    auth_data: AuthData = Depends(require_napne),
+    db: Session = Depends(get_db),
+):
+    from backend.repositories.acomodacao_observacao import AcomodacaoObservacaoRepository
+    repo = AcomodacaoObservacaoRepository(db)
+    observacoes = repo.listar_por_aluno(aluno_id)
+    AuditService(db).registrar(
+        usuario_id=auth_data.usuario.id,
+        acao="leitura",
+        recurso_tipo="observacao_acomodacao",
+        recurso_id=0,
+        aluno_id=aluno_id,
+        detalhes=f"{len(observacoes)} observacoes listadas",
+        ip_origem=request.client.host if request.client else None,
+    )
+    return observacoes
+
+
+# =====================
+# DASHBOARD METRICS
+# =====================
+
+class DashboardMetricsResponse(BaseModel):
+    alunos_ativos: int
+    pendencias_pendentes: int
+    observacoes_mes: int
+    conteudos_gerados: int
+
+@router.get("/dashboard", response_model=DashboardMetricsResponse)
+async def get_dashboard(
+    auth_data: AuthData = Depends(require_napne),
+    db: Session = Depends(get_db),
+):
+    """
+    Retorna métricas agregadas para o dashboard NAPNE.
+    - alunos_ativos: total de alunos com status_acompanhamento = 'ativo'
+    - pendencias_pendentes: total de pendências com status = 'pendente'
+    - observacoes_mes: total de observações criadas no mês atual
+    - conteudos_gerados: total de conteúdos gerados por IA
+    """
+    # Alunos ativos
+    alunos_ativos = db.query(func.count(Aluno.id)).filter(
+        Aluno.status_acompanhamento == 'ativo'
+    ).scalar() or 0
+    
+    # Pendências pendentes
+    pendencias_pendentes = db.query(func.count(PendenciaValidacao.id)).filter(
+        PendenciaValidacao.status == StatusPendencia.pendente.value
+    ).scalar() or 0
+    
+    # Observações do mês atual
+    inicio_mes = datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    observacoes_mes = db.query(func.count(AcomodacaoObservacao.id)).filter(
+        AcomodacaoObservacao.criado_em >= inicio_mes
+    ).scalar() or 0
+    
+    # Conteúdos gerados
+    conteudos_gerados = db.query(func.count(ConteudoGerado.id)).scalar() or 0
+    
+    return DashboardMetricsResponse(
+        alunos_ativos=alunos_ativos,
+        pendencias_pendentes=pendencias_pendentes,
+        observacoes_mes=observacoes_mes,
+        conteudos_gerados=conteudos_gerados,
+    )

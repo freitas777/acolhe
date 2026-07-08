@@ -13,7 +13,7 @@
 </head>
 <body>
 <a href="#main-content" class="skip-link">Pular para o conteudo principal</a>
-<header class="topbar">
+<header class="topbar" role="banner">
         <div class="topbar-left">
             <a href="#" class="topbar-logo" id="topbar-logo" title="Pagina inicial">
                 <div class="logo-icon">A+</div>
@@ -47,10 +47,17 @@
                     <line x1="21" y1="12" x2="9" y2="12"/>
                 </svg>
             </button>
+            <button class="btn-nav" id="btn-export-dados" title="Exportar meus dados (LGPD)">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+            </button>
         </div>
     </header>
 
-    <main class="portal-page" id="main-content">
+    <main class="portal-page" id="main-content" role="main">
         <div class="portal-tabs">
             <button class="portal-tab active" data-tab="perfil" id="tab-perfil">
                 <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

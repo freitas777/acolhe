@@ -114,25 +114,66 @@ class AIService:
 
         return contexto
 
-    def _construir_historico_base(self, contexto_aluno: Optional[str] = None) -> list[dict]:
+    def construir_contexto_disciplina(self, disciplina: object) -> str:
+        descricao = getattr(disciplina, "descricao", None) or "não informada"
+        sigla = getattr(disciplina, "sigla", None) or ""
+        professor = getattr(disciplina, "professor", None) or "não informado"
+        semestre = getattr(disciplina, "semestre", None) or "não informado"
+        codigo_turma = getattr(disciplina, "codigo_turma", None) or ""
+
+        contexto = (
+            f"**CONTEXTO: Você está conversando sobre uma disciplina específica.**\n\n"
+            f"**DADOS DA DISCIPLINA:**\n"
+            f"- Nome: {descricao}\n"
+        )
+        if sigla:
+            contexto += f"- Sigla: {sigla}\n"
+        contexto += f"- Professor: {professor}\n"
+        contexto += f"- Semestre: {semestre}\n"
+        if codigo_turma:
+            contexto += f"- Código da turma: {codigo_turma}\n"
+
+        contexto += (
+            "\n**DIRETRIZES PARA ESTA CONVERSA:**\n"
+            "1. Responda dúvidas relacionadas ao conteúdo desta disciplina\n"
+            "2. Use exemplos e contextos pertinentes à área de conhecimento\n"
+            "3. Adapte a explicação ao nível do estudante\n"
+            "4. Seja claro, paciente e encorajador\n"
+            "5. Quando adequado, sugira materiais complementares e estratégias de estudo\n"
+        )
+
+        return contexto
+
+    def _construir_historico_base(
+        self,
+        contexto_aluno: Optional[str] = None,
+        contexto_disciplina: Optional[str] = None,
+    ) -> list[dict]:
+        instrucao = INSTRUCAO_SISTEMA
         if contexto_aluno:
-            instrucao = INSTRUCAO_SISTEMA + "\n\n" + contexto_aluno
-        else:
-            instrucao = INSTRUCAO_SISTEMA
+            instrucao += "\n\n" + contexto_aluno
+        if contexto_disciplina:
+            instrucao += "\n\n" + contexto_disciplina
         return [
             {"role": "user", "parts": [instrucao]},
             {"role": "model", "parts": ["Entendido. Sou o Acolhe+, pronto para ajudar."]},
         ]
 
-    def _criar_sessao(self, conversa_id: str, contexto_aluno: Optional[str] = None) -> None:
-        if contexto_aluno:
-            modelo = self._obter_modelo_com_contexto(contexto_aluno)
-            self._sessao_contexto[conversa_id] = contexto_aluno
+    def _criar_sessao(
+        self,
+        conversa_id: str,
+        contexto_aluno: Optional[str] = None,
+        contexto_disciplina: Optional[str] = None,
+    ) -> None:
+        if contexto_aluno or contexto_disciplina:
+            chave_contexto = (contexto_aluno or "") + "|" + (contexto_disciplina or "")
+            modelo = self._obter_modelo_com_contexto(chave_contexto)
+            self._sessao_contexto[conversa_id] = chave_contexto
         else:
             modelo = self._obter_modelo()
             self._sessao_contexto.pop(conversa_id, None)
 
-        historico = self._construir_historico_base(contexto_aluno)
+        historico = self._construir_historico_base(contexto_aluno, contexto_disciplina)
         sessao = modelo.start_chat(history=historico)
         self._sessoes[conversa_id] = sessao
 
@@ -142,22 +183,29 @@ class AIService:
             self._sessao_contexto.pop(chave_mais_antiga, None)
             logger.info("Sessão removida por LRU: %s", chave_mais_antiga)
 
-        logger.info("Sessão de chat iniciada: %s (contexto_aluno=%s)", conversa_id, bool(contexto_aluno))
+        logger.info(
+            "Sessão de chat iniciada: %s (contexto_aluno=%s, contexto_disciplina=%s)",
+            conversa_id,
+            bool(contexto_aluno),
+            bool(contexto_disciplina),
+        )
 
     def _reconstruir_sessao(
         self,
         conversa_id: str,
         contexto_aluno: Optional[str] = None,
+        contexto_disciplina: Optional[str] = None,
         mensagens: Optional[list] = None,
     ) -> None:
-        if contexto_aluno:
-            modelo = self._obter_modelo_com_contexto(contexto_aluno)
-            self._sessao_contexto[conversa_id] = contexto_aluno
+        if contexto_aluno or contexto_disciplina:
+            chave_contexto = (contexto_aluno or "") + "|" + (contexto_disciplina or "")
+            modelo = self._obter_modelo_com_contexto(chave_contexto)
+            self._sessao_contexto[conversa_id] = chave_contexto
         else:
             modelo = self._obter_modelo()
             self._sessao_contexto.pop(conversa_id, None)
 
-        historico = self._construir_historico_base(contexto_aluno)
+        historico = self._construir_historico_base(contexto_aluno, contexto_disciplina)
 
         if mensagens:
             for msg in mensagens:
@@ -176,15 +224,21 @@ class AIService:
             logger.info("Sessão removida por LRU: %s", chave_mais_antiga)
 
         logger.info(
-            "Sessão reconstruída: %s (contexto_aluno=%s, mensagens=%d)",
+            "Sessão reconstruída: %s (contexto_aluno=%s, contexto_disciplina=%s, mensagens=%d)",
             conversa_id,
             bool(contexto_aluno),
+            bool(contexto_disciplina),
             len(mensagens) if mensagens else 0,
         )
 
-    async def iniciar_sessao(self, conversa_id: str, contexto_aluno: Optional[str] = None) -> None:
+    async def iniciar_sessao(
+        self,
+        conversa_id: str,
+        contexto_aluno: Optional[str] = None,
+        contexto_disciplina: Optional[str] = None,
+    ) -> None:
         async with self._lock:
-            self._criar_sessao(conversa_id, contexto_aluno)
+            self._criar_sessao(conversa_id, contexto_aluno, contexto_disciplina)
 
     async def obter_sessao(
         self,
@@ -193,27 +247,57 @@ class AIService:
     ) -> genai.ChatSession:
         async with self._lock:
             if conversa_id not in self._sessoes:
-                contexto = self._sessao_contexto.get(conversa_id)
+                contexto_combinado = self._sessao_contexto.get(conversa_id, "")
+                contexto_aluno, contexto_disciplina = self._separar_contextos(contexto_combinado)
                 if mensagens:
-                    self._reconstruir_sessao(conversa_id, contexto_aluno=contexto, mensagens=mensagens)
+                    self._reconstruir_sessao(
+                        conversa_id,
+                        contexto_aluno=contexto_aluno,
+                        contexto_disciplina=contexto_disciplina,
+                        mensagens=mensagens,
+                    )
                 else:
-                    self._criar_sessao(conversa_id, contexto_aluno=contexto)
+                    self._criar_sessao(
+                        conversa_id,
+                        contexto_aluno=contexto_aluno,
+                        contexto_disciplina=contexto_disciplina,
+                    )
             sessao = self._sessoes.pop(conversa_id)
             self._sessoes[conversa_id] = sessao
             return sessao
+
+    @staticmethod
+    def _separar_contextos(chave_combinada: str) -> tuple[str | None, str | None]:
+        if not chave_combinada:
+            return None, None
+        partes = chave_combinada.split("|", 1)
+        ctx_aluno = partes[0] or None
+        ctx_disciplina = partes[1] if len(partes) > 1 else None
+        ctx_disciplina = ctx_disciplina or None
+        return ctx_aluno, ctx_disciplina
 
     async def garantir_sessao_com_contexto(
         self,
         conversa_id: str,
         contexto_aluno: Optional[str] = None,
+        contexto_disciplina: Optional[str] = None,
         mensagens: Optional[list] = None,
     ) -> None:
         async with self._lock:
             if conversa_id not in self._sessoes:
                 if mensagens:
-                    self._reconstruir_sessao(conversa_id, contexto_aluno=contexto_aluno, mensagens=mensagens)
+                    self._reconstruir_sessao(
+                        conversa_id,
+                        contexto_aluno=contexto_aluno,
+                        contexto_disciplina=contexto_disciplina,
+                        mensagens=mensagens,
+                    )
                 else:
-                    self._criar_sessao(conversa_id, contexto_aluno=contexto_aluno)
+                    self._criar_sessao(
+                        conversa_id,
+                        contexto_aluno=contexto_aluno,
+                        contexto_disciplina=contexto_disciplina,
+                    )
 
     async def encerrar_sessao(self, conversa_id: str) -> None:
         async with self._lock:

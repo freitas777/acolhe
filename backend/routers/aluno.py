@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+import csv
+import io
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
@@ -9,7 +13,7 @@ from backend.services.aluno_service import AlunoService
 from backend.schemas.aluno import AlunoBuscaResultado, AlunoCreate, AlunoResponse, AlunoUpdate
 from backend.schemas.perfil_aluno import PerfilAlunoCreate, PerfilAlunoResponse, PerfilAlunoUpdate
 
-router = APIRouter(prefix="/alunos", tags=["Alunos"])
+router = APIRouter(prefix="/alunos", tags=["Aluno"])
 
 
 def _service(db: Session) -> AlunoService:
@@ -126,3 +130,52 @@ def update_perfil(
 ):
     service = _service(db)
     return service.atualizar_perfil(aluno_id, data)
+
+
+@router.get("/export/csv")
+def exportar_alunos_csv(
+    auth_data: AuthData = Depends(require_napne),
+    db: Session = Depends(get_db),
+):
+    """
+    Exporta lista de alunos em formato CSV.
+    Apenas equipe NAPNE pode exportar.
+    """
+    try:
+        service = _service(db)
+        alunos = service.listar_alunos(skip=0, limit=10000)
+        
+        # Criar buffer CSV
+        output = io.StringIO()
+        writer = csv.writer(output, delimiter=";", lineterminator="\n")
+        
+        # Header
+        writer.writerow([
+            "id", "matricula", "nome", "email", "curso",
+            "campus", "status_acompanhamento", "diagnostico"
+        ])
+        
+        # Rows
+        for aluno in alunos:
+            writer.writerow([
+                aluno.id,
+                aluno.matricula or "",
+                aluno.nome,
+                aluno.email or "",
+                aluno.curso or "",
+                aluno.campus or "",
+                aluno.status_acompanhamento or "",
+                (aluno.perfil.diagnostico if aluno.perfil else "") or "",
+            ])
+        
+        output.seek(0)
+        
+        return StreamingResponse(
+            output,
+            media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition": "attachment; filename=alunos.csv"},
+        )
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Erro ao exportar CSV: {str(e)}")

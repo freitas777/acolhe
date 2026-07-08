@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     dev_mode: bool = False
     allowed_origins: str = "http://localhost:8000,http://127.0.0.1:8000"
 
+    uploads_dir: str = "uploads"
+    max_upload_size: int = 10 * 1024 * 1024
+    allowed_extensions: str = "pdf,doc,docx,ppt,pptx,png,jpg,jpeg,txt"
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

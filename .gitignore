@@ -31,3 +31,10 @@ Thumbs.db
 # Logs
 *.log
 
+# Uploads
+uploads/
+
+pytest_cache/
+
+kilo/
+

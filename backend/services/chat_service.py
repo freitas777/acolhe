@@ -14,6 +14,7 @@ from backend.models.conversa import Conversa
 from backend.models.mensagem import Mensagem
 from backend.repositories.aluno import AlunoRepository
 from backend.repositories.conversa import ConversaRepository
+from backend.repositories.disciplina import DisciplinaRepository
 from backend.repositories.mensagem import MensagemRepository
 from backend.schemas.chat import (
     ChatRequisicao,
@@ -43,6 +44,12 @@ def _para_conversa_resposta(conversa: Conversa) -> ConversaResposta:
     if conversa.aluno:
         aluno_nome = conversa.aluno.nome
 
+    disciplina_descricao = None
+    disciplina_sigla = None
+    if conversa.disciplina:
+        disciplina_descricao = conversa.disciplina.descricao
+        disciplina_sigla = conversa.disciplina.sigla
+
     return ConversaResposta(
         id=conversa.id,
         title=conversa.titulo,
@@ -51,6 +58,9 @@ def _para_conversa_resposta(conversa: Conversa) -> ConversaResposta:
         user_id=conversa.usuario_id,
         aluno_id=conversa.aluno_id,
         aluno_nome=aluno_nome,
+        disciplina_id=conversa.disciplina_id,
+        disciplina_descricao=disciplina_descricao,
+        disciplina_sigla=disciplina_sigla,
     )
 
 
@@ -59,6 +69,7 @@ class ChatService:
         self.conversa_repo = ConversaRepository(db)
         self.mensagem_repo = MensagemRepository(db)
         self.aluno_repo = AlunoRepository(db)
+        self.disciplina_repo = DisciplinaRepository(db)
         self.db = db
 
     def _obter_contexto_aluno(self, aluno_id: int) -> Optional[str]:
@@ -70,11 +81,18 @@ class ChatService:
             return None
         return ai_service.construir_contexto_aluno(aluno, perfil)
 
+    def _obter_contexto_disciplina(self, disciplina_id: int) -> Optional[str]:
+        disciplina = self.disciplina_repo.get_by_id(disciplina_id)
+        if not disciplina:
+            return None
+        return ai_service.construir_contexto_disciplina(disciplina)
+
     async def _criar_conversa_com_contexto(
         self,
         titulo: str,
         usuario_id: int,
         aluno_id: int | None = None,
+        disciplina_id: int | None = None,
     ) -> Conversa:
         contexto_aluno = None
         if aluno_id:
@@ -82,14 +100,25 @@ class ChatService:
             if contexto_aluno is None:
                 logger.warning("Aluno id=%s sem perfil — conversa criada sem contexto de aluno", aluno_id)
 
+        contexto_disciplina = None
+        if disciplina_id:
+            contexto_disciplina = self._obter_contexto_disciplina(disciplina_id)
+            if contexto_disciplina is None:
+                logger.warning("Disciplina id=%s não encontrada — conversa criada sem contexto de disciplina", disciplina_id)
+
         conversa = self.conversa_repo.create({
             "id": str(uuid.uuid4()),
             "titulo": titulo,
             "usuario_id": usuario_id,
             "aluno_id": aluno_id,
+            "disciplina_id": disciplina_id,
         })
 
-        await ai_service.iniciar_sessao(conversa.id, contexto_aluno=contexto_aluno)
+        await ai_service.iniciar_sessao(
+            conversa.id,
+            contexto_aluno=contexto_aluno,
+            contexto_disciplina=contexto_disciplina,
+        )
         return conversa
 
     async def criar_conversa(
@@ -101,9 +130,75 @@ class ChatService:
             titulo=dados.titulo,
             usuario_id=usuario_id,
             aluno_id=dados.aluno_id,
+            disciplina_id=dados.disciplina_id,
         )
 
-        logger.info("Conversa criada: id=%s, aluno_id=%s", conversa.id, dados.aluno_id)
+        logger.info(
+            "Conversa criada: id=%s, aluno_id=%s, disciplina_id=%s",
+            conversa.id, dados.aluno_id, dados.disciplina_id,
+        )
+        return _para_conversa_resposta(conversa)
+
+    async def obter_ou_criar_conversa_disciplina(
+        self,
+        disciplina_id: int,
+        usuario_id: int,
+        tipo_perfil: str = "aluno",
+        suap_id: str | None = None,
+    ) -> ConversaResposta:
+        conversa_existente = self.conversa_repo.obter_por_usuario_e_disciplina(
+            usuario_id, disciplina_id,
+        )
+
+        if conversa_existente:
+            self._verificar_propriedade(conversa_existente, usuario_id, tipo_perfil)
+            await ai_service.garantir_sessao_com_contexto(
+                conversa_id=conversa_existente.id,
+                contexto_aluno=self._obter_contexto_aluno(conversa_existente.aluno_id)
+                if conversa_existente.aluno_id else None,
+                contexto_disciplina=self._obter_contexto_disciplina(disciplina_id),
+                mensagens=self.mensagem_repo.listar_por_conversa(conversa_existente.id),
+            )
+            return _para_conversa_resposta(conversa_existente)
+
+        disciplina = self.disciplina_repo.get_by_id(disciplina_id)
+        if not disciplina:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Disciplina nÃ£o encontrada",
+            )
+
+        titulo = f"Conversa sobre {disciplina.descricao}"
+        contexto_disciplina = self._obter_contexto_disciplina(disciplina_id)
+
+        aluno_id = None
+        contexto_aluno = None
+        if tipo_perfil == "aluno" and suap_id:
+            aluno = self.aluno_repo.get_by_suap_id(suap_id)
+            if aluno:
+                aluno_id = aluno.id
+                contexto_aluno = self._obter_contexto_aluno(aluno_id)
+                if contexto_aluno is None:
+                    logger.warning("Aluno id=%s sem perfil â conversa criada sem contexto de aluno", aluno_id)
+
+        conversa = self.conversa_repo.create({
+            "id": str(uuid.uuid4()),
+            "titulo": titulo,
+            "usuario_id": usuario_id,
+            "aluno_id": aluno_id,
+            "disciplina_id": disciplina_id,
+        })
+
+        await ai_service.iniciar_sessao(
+            conversa.id,
+            contexto_aluno=contexto_aluno,
+            contexto_disciplina=contexto_disciplina,
+        )
+
+        logger.info(
+            "Conversa de disciplina criada: id=%s, disciplina_id=%s, aluno_id=%s",
+            conversa.id, disciplina_id, aluno_id,
+        )
         return _para_conversa_resposta(conversa)
 
     def _verificar_propriedade(
@@ -187,6 +282,7 @@ class ChatService:
                 titulo=titulo,
                 usuario_id=usuario_id,
                 aluno_id=aluno_id,
+                disciplina_id=dados.disciplina_id,
             )
             conversa_id = conversa.id
 
@@ -243,12 +339,18 @@ class ChatService:
         if conversa_atualizada and conversa_atualizada.aluno:
             aluno_nome = conversa_atualizada.aluno.nome
 
+        disciplina_descricao = None
+        if conversa_atualizada and conversa_atualizada.disciplina:
+            disciplina_descricao = conversa_atualizada.disciplina.descricao
+
         return ChatResposta(
             user_message=_para_mensagem_resposta(msg_usuario),
             assistant_message=resposta_assistente,
             conversation_id=conversa_id,
             aluno_id=conversa_atualizada.aluno_id if conversa_atualizada else None,
             aluno_nome=aluno_nome,
+            disciplina_id=conversa_atualizada.disciplina_id if conversa_atualizada else None,
+            disciplina_descricao=disciplina_descricao,
         )
 
     async def enviar_mensagem_stream(
@@ -266,7 +368,9 @@ class ChatService:
         conversa = self.conversa_repo.obter_com_mensagens(conversa_id)
         aluno_id = conversa.aluno_id if conversa else None
         aluno_nome = conversa.aluno.nome if conversa and conversa.aluno else None
-        yield f"data: {json.dumps({'type': 'meta', 'aluno_id': aluno_id, 'aluno_nome': aluno_nome})}\n\n"
+        disciplina_id = conversa.disciplina_id if conversa else None
+        disciplina_descricao = conversa.disciplina.descricao if conversa and conversa.disciplina else None
+        yield f"data: {json.dumps({'type': 'meta', 'aluno_id': aluno_id, 'aluno_nome': aluno_nome, 'disciplina_id': disciplina_id, 'disciplina_descricao': disciplina_descricao})}\n\n"
 
         conteudo_completo = []
         try:

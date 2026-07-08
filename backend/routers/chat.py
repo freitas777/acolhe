@@ -30,11 +30,29 @@ def _service(db: Session = Depends(get_db)) -> ChatService:
     status_code=status.HTTP_201_CREATED,
 )
 async def criar_conversa(
- dados: ConversaCriar,
- auth_data: AuthData = Depends(get_current_usuario),
- service: ChatService = Depends(_service),
+	dados: ConversaCriar,
+	auth_data: AuthData = Depends(get_current_usuario),
+	service: ChatService = Depends(_service),
 ):
     return await service.criar_conversa(dados, usuario_id=auth_data.usuario.id)
+
+
+@router.post(
+    "/conversations/disciplina/{disciplina_id}",
+    response_model=ConversaResposta,
+    response_model_by_alias=False,
+)
+async def obter_ou_criar_conversa_disciplina(
+    disciplina_id: int,
+    auth_data: AuthData = Depends(get_current_usuario),
+    service: ChatService = Depends(_service),
+):
+    return await service.obter_ou_criar_conversa_disciplina(
+        disciplina_id=disciplina_id,
+        usuario_id=auth_data.usuario.id,
+        tipo_perfil=auth_data.usuario.tipo_perfil,
+        suap_id=auth_data.usuario.suap_id,
+    )
 
 
 @router.get(

@@ -9,13 +9,93 @@
 
     if (isAluno) document.body.classList.add('role-aluno');
 
-    async function init() {
+    var pendingDisciplina = null;
+    var pendingInitialMessage = null;
+
+    async function handlePendingDisciplina() {
+      var raw = null;
+      try { raw = sessionStorage.getItem('acolhe_open_conversa'); } catch (e) {}
+      if (!raw) return false;
+      try {
+        var data = JSON.parse(raw);
+        if (data && data.tipo === 'disciplina' && data.disciplina_id) {
+          pendingDisciplina = data;
+          pendingInitialMessage = data.mensagem_inicial || null;
+          try { sessionStorage.removeItem('acolhe_open_conversa'); } catch (e) {}
+          return true;
+        }
+      } catch (e) {}
+      try { sessionStorage.removeItem('acolhe_open_conversa'); } catch (e) {}
+      return false;
+    }
+
+    async function openDisciplinaConversa() {
+      var conversa = await ChatService.getOrCreateConversaByDisciplina(pendingDisciplina.disciplina_id);
+      if (!conversa || !conversa.id) {
+        ChatUI.showError('Não foi possível abrir a conversa da disciplina');
+        return;
+      }
+
+      var localConv = {
+        id: conversa.id,
+        title: conversa.title || ('Conversa sobre ' + (pendingDisciplina.disciplina_descricao || '')),
+        messages: conversa.messages || [],
+        created_at: conversa.created_at || new Date().toISOString(),
+        aluno_id: conversa.aluno_id || null,
+        aluno_nome: conversa.aluno_nome || null,
+        disciplina_id: conversa.disciplina_id || pendingDisciplina.disciplina_id,
+        disciplina_descricao: conversa.disciplina_descricao || pendingDisciplina.disciplina_descricao,
+        disciplina_sigla: conversa.disciplina_sigla || null
+      };
+
+      var exists = ChatStore.state.conversations.find(function(c) { return c.id === localConv.id; });
+      if (!exists) {
+        ChatStore.state.conversations.unshift(localConv);
+      } else {
+        Object.assign(exists, localConv);
+      }
+      ChatStore.state.activeConversationId = localConv.id;
+      ChatStore.save();
+
+      ChatUI.updateTitle(localConv.title);
+      ChatUI.renderMessages(localConv.messages);
+      ChatUI.renderConversations(ChatStore.getAllConversations(), localConv.id);
+      ChatUI.showDisciplinaBadge(localConv.disciplina_descricao, localConv.disciplina_sigla);
+      ChatUI.closeSidebar();
+
+      if (pendingInitialMessage && localConv.messages.length === 0) {
+        if (ChatUI.elements.messageInput) {
+          ChatUI.elements.messageInput.value = pendingInitialMessage;
+        }
+        pendingInitialMessage = null;
+        if (ChatUI.elements.btnSend && !ChatUI.elements.btnSend.disabled) {
+          handleSendMessage();
+        } else {
+          try { ChatUI.updateSendButton(); } catch (e) {}
+          setTimeout(function() {
+            if (ChatUI.elements.btnSend && !ChatUI.elements.btnSend.disabled) {
+              handleSendMessage();
+            }
+          }, 100);
+        }
+      } else if (localConv.disciplina_descricao) {
+        ChatUI.showDisciplinaBadge(localConv.disciplina_descricao, localConv.disciplina_sigla);
+      }
+    }
+
+  async function init() {
         ChatStore.init();
         ChatUI.init();
         applyRoleVisibility();
         await loadUserData();
         setupEventListeners();
-        await renderInitialState();
+        var hasDisciplina = await handlePendingDisciplina();
+        if (hasDisciplina && pendingDisciplina) {
+          try { await ChatService.loadConversations(); } catch (e) {}
+          await openDisciplinaConversa();
+        } else {
+          await renderInitialState();
+        }
     }
 
 function applyRoleVisibility() {
@@ -27,11 +107,13 @@ if (ChatUI.elements.alunoContextBar) ChatUI.elements.alunoContextBar.hidden = tr
 var perfil = localStorage.getItem('acolhe_tipo_perfil') || 'aluno';
 var isNapne = perfil === 'psicopedagogo' || perfil === 'admin' || perfil === 'servidor';
 var navPainel = document.getElementById('nav-painel');
+var navNotificacoes = document.getElementById('nav-notificacoes');
 var navPortal = document.getElementById('nav-portal');
 var navDisciplinas = document.getElementById('nav-disciplinas');
 
 if (navPainel) navPainel.style.display = isNapne ? '' : 'none';
-if (navPortal) navPortal.style.display = isAluno ? '' : 'none';
+if (navNotificacoes) navNotificacoes.style.display = isNapne ? '' : 'none';
+if (navPortal) navPortal.style.display = isAluno || perfil === 'professor' ? '' : 'none';
 if (navDisciplinas) navDisciplinas.style.display = isAluno || perfil === 'professor' ? '' : 'none';
 }
 
@@ -95,6 +177,17 @@ if (ChatUI.elements.btnLogout) {
                     } else {
                         ChatUI.hideAlunoContext();
                     }
+                }
+            });
+        }
+        if (ChatUI.elements.btnCloseAlunoSearch) {
+            ChatUI.elements.btnCloseAlunoSearch.addEventListener('click', function() {
+                ChatUI.hideAlunoSearchResults();
+                ChatUI.elements.alunoSearchInput.value = '';
+                if (ChatStore.state.activeAlunoNome) {
+                    ChatUI.updateAlunoBadge(ChatStore.state.activeAlunoNome);
+                } else {
+                    ChatUI.hideAlunoContext();
                 }
             });
         }
@@ -223,6 +316,11 @@ ChatUI.renderMessages(conversation.messages);
 ChatUI.renderConversations(ChatService.getConversationsHistory(), conversation.id);
 ChatUI.closeSidebar();
 syncAlunoBadge();
+if (conversation.disciplina_descricao) {
+ChatUI.showDisciplinaBadge(conversation.disciplina_descricao, conversation.disciplina_sigla);
+} else {
+ChatUI.hideDisciplinaBadge();
+}
 }
 }
 

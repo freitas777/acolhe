@@ -8,7 +8,7 @@ from backend.dependencies import AuthData, get_current_usuario, require_napne, r
 from backend.services.usuario_service import UsuarioService
 from backend.schemas.usuario import UsuarioCreate, UsuarioResponse, UsuarioUpdate
 
-router = APIRouter(prefix="/usuarios", tags=["Usuarios"])
+router = APIRouter(prefix="/usuarios", tags=["Usuario"])
 
 
 def _service(db: Session) -> UsuarioService:

@@ -7,11 +7,14 @@
   <link rel="stylesheet" href="/css/base.css">
 <link rel="stylesheet" href="/css/disciplinas-page.css">
     <link rel="stylesheet" href="/css/notificacoes.css">
+<link rel="stylesheet" href="/css/disciplinas.css">
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
 <a href="#main-content" class="skip-link">Pular para o conteudo principal</a>
-<header class="topbar">
+<header class="topbar" role="banner">
 <div class="topbar-left">
         <a href="#" class="topbar-logo" id="topbar-logo" title="Pagina inicial">
 				<div class="logo-icon">A+</div>
@@ -23,6 +26,12 @@
 		</div>
 <div class="topbar-right">
 <div class="notificacao-bell-container"></div>
+<a href="/portal" class="btn-nav" title="Meu Perfil" id="nav-portal-disciplinas">
+  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+    <circle cx="12" cy="7" r="4"/>
+  </svg>
+</a>
 <a href="/chat" class="btn-nav" title="Chat">
 <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
@@ -55,7 +64,7 @@
     </div>
   </header>
 
-  <main class="disciplinas-page" id="main-content">
+  <main class="disciplinas-page" id="main-content" role="main">
     <div class="semestre-badge" id="semestre-badge">
       <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px">
         <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
@@ -79,6 +88,61 @@
       </div>
     </div>
   </main>
+
+  <div class="modal-overlay" id="student-modal" role="dialog" aria-modal="true" aria-labelledby="modal-student-title" hidden>
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="modal-student-title">Aluno</h2>
+        <button class="modal-close" id="student-modal-close" title="Fechar">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="portal-tabs" id="student-modal-tabs">
+          <button class="portal-tab active" data-tab="perfil">Perfil</button>
+          <button class="portal-tab" data-tab="conteudos">Conteúdos</button>
+          <button class="portal-tab" data-tab="apoio">Solicitar Apoio</button>
+          <button class="portal-tab" data-tab="observacao">Observação</button>
+        </div>
+        <section class="modal-section" id="modal-perfil"></section>
+        <section class="modal-section" id="modal-conteudos" hidden></section>
+        <section class="modal-section" id="modal-apoio" hidden></section>
+        <section class="modal-section" id="modal-observacao" hidden></section>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="materiais-modal" role="dialog" aria-modal="true" aria-labelledby="modal-materiais-title" hidden>
+    <div class="modal modal-large">
+      <div class="modal-header">
+        <h2 id="modal-materiais-title">Materiais da Disciplina</h2>
+        <button class="modal-close" id="materiais-modal-close" title="Fechar">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="materiais-info" id="materiais-info"></div>
+        <div class="materiais-upload-section" id="materiais-upload-section" hidden>
+          <div class="upload-area" id="upload-area">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:48px;height:48px;margin-bottom:12px">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8"/>
+              <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+            <p class="upload-text">Arraste arquivos aqui ou clique para selecionar</p>
+            <p class="upload-hint">PDF, DOC, DOCX, PPT, PPTX, PNG, JPG, TXT (máx. 10MB)</p>
+            <input type="file" id="file-input" hidden accept=".pdf,.doc,.docx,.ppt,.pptx,.png,.jpg,.jpeg,.txt">
+            <button class="btn-upload" id="btn-select-file">Selecionar Arquivo</button>
+          </div>
+          <div class="upload-progress" id="upload-progress" hidden>
+            <div class="progress-bar">
+              <div class="progress-fill" id="progress-fill"></div>
+            </div>
+            <span class="progress-text" id="progress-text">Enviando...</span>
+          </div>
+        </div>
+        <div class="materiais-list" id="materiais-list">
+          <div class="spinner"></div>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <div class="toast" id="toast" role="alert" hidden>
     <span id="toast-icon"></span>

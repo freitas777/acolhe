@@ -11,44 +11,90 @@
 </head>
 <body>
 <a href="#main-content" class="skip-link">Pular para o conteudo principal</a>
-<header class="topbar">
+<header class="topbar" role="banner">
 <div class="topbar-left">
         <a href="#" class="topbar-logo" id="topbar-logo" title="Pagina inicial">
-				<div class="logo-icon">A+</div>
-				<span class="logo-text">Acolhe+</span>
-			</a>
-		</div>
-		<div class="topbar-center">
-			<h1 class="page-title">Painel NAPNE</h1>
-		</div>
+ 				<div class="logo-icon">A+</div>
+ 				<span class="logo-text">Acolhe+</span>
+ 			</a>
+	</div>
+	<div class="topbar-center">
+		<h1 class="page-title">Painel NAPNE</h1>
+	</div>
 <div class="topbar-right">
+<button class="btn-nav" id="btn-dark-mode" title="Alternar tema escuro">
+<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+<circle cx="12" cy="12" r="5"/>
+<path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+</svg>
+</button>
+<button class="btn-nav" id="btn-accessibility" title="Opções de acessibilidade" aria-label="Opções de acessibilidade">
+<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+<circle cx="12" cy="12" r="10"/>
+<path d="M12 16v-4"/>
+<path d="M12 8h.01"/>
+</svg>
+</button>
+<div class="accessibility-menu" id="accessibility-menu" hidden>
+<button class="accessibility-option" id="btn-alto-contraste" title="Alto contraste">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+<circle cx="12" cy="12" r="10"/>
+<line x1="2" y1="12" x2="22" y2="12"/>
+</svg>
+<span>Alto Contraste</span>
+</button>
+<button class="accessibility-option" id="btn-aumentar-fonte" title="Aumentar fonte">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+<polyline points="4 14 10 14 10 20"/>
+<polyline points="20 10 14 10 14 4"/>
+<line x1="14" y1="10" x2="21" y2="3"/>
+<text x="8" y="14" font-size="8" font-weight="bold">A</text>
+</svg>
+<span>Aumentar Fonte</span>
+</button>
+<button class="accessibility-option" id="btn-diminuir-fonte" title="Diminuir fonte">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+<polyline points="4 20 10 20 10 14"/>
+<line x1="14" y1="10" x2="21" y2="3"/>
+<text x="8" y="20" font-size="8" font-weight="bold">A</text>
+</svg>
+<span>Diminuir Fonte</span>
+</button>
+</div>
 <div class="notificacao-bell-container"></div>
 <a href="/chat" class="btn-nav" title="Chat">
 <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2 2h14a2 2 0 0 1 2 2z"/>
 </svg>
 </a>
-<div class="user-pill" id="user-pill">
-                <div class="user-avatar" id="user-avatar">??</div>
-                <span class="user-name" id="user-name">Carregando...</span>
-            </div>
-            <button class="btn-logout" id="btn-senha" title="Alterar Senha">
-       <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-        <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-       </svg>
+<a href="/portal" class="btn-nav" title="Meu Perfil" id="nav-portal">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                    <circle cx="12" cy="7" r="4"/>
+                </svg>
+            </a>
+            <div class="user-pill" id="user-pill">
+        <div class="user-avatar" id="user-avatar">??</div>
+        <span class="user-name" id="user-name">Carregando...</span>
+      </div>
+      <button class="btn-sync" id="btn-sync" title="Sincronizar disciplinas do SUAP">
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="23 4 23 10 17 10"/>
+          <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+        </svg>
+        <span class="btn-sync-text">Sincronizar</span>
       </button>
       <button class="btn-logout" id="btn-logout" title="Sair">
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-                    <polyline points="16 17 21 12 16 7"/>
-                    <line x1="21" y1="12" x2="9" y2="12"/>
-                </svg>
-            </button>
-        </div>
-    </header>
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+          <polyline points="16 17 21 12 16 7"/>
+          <line x1="21" y1="12" x2="9" y2="12"/>
+        </svg>
+      </button>
+    </div>
+  </header>
 
-    <main class="painel-page" id="main-content">
+    <main class="painel-page" id="main-content" role="main">
         <div class="painel-nav">
             <a href="/importacao" class="nav-link nav-importacao" title="Importar alunos do SUAP">
                 <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -58,6 +104,24 @@
                 </svg>
                 <span>Importar Alunos do SUAP</span>
             </a>
+            <button class="nav-link nav-importacao" id="btn-export-csv" title="Exportar alunos em CSV">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                <span>Exportar CSV</span>
+            </button>
+            <button class="nav-link nav-importacao" id="btn-relatorio-uso" title="Baixar relatório de uso">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                    <line x1="16" y1="13" x2="8" y2="13"/>
+                    <line x1="16" y1="17" x2="8" y2="17"/>
+                    <polyline points="10 9 9 9 8 9"/>
+                </svg>
+                <span>Relatório de Uso</span>
+            </button>
         </div>
 
         <div class="painel-section">
@@ -66,7 +130,7 @@
                     <circle cx="11" cy="11" r="8"/>
                     <line x1="21" y1="21" x2="16.65" y2="16.65"/>
                 </svg>
-                <input type="text" id="search-input" class="search-input" placeholder="Buscar aluno por nome ou matricula...">
+                <input type="text" id="search-input" class="search-input" placeholder="Buscar aluno por nome ou matricula..." aria-label="Buscar aluno por nome ou matrícula">
             </div>
             <div class="search-results" id="search-results" hidden></div>
         </div>
@@ -90,9 +154,26 @@
      <span>Convidar</span>
     </button>
    </div>
-   <div class="column-body" id="equipe-list">
-    <div class="empty-col"><p>Carregando...</p></div>
-   </div>
+<div class="column-body" id="equipe-list">
+     <div class="skeleton-card">
+       <div style="display:flex;gap:12px;align-items:center">
+         <div class="skeleton skeleton-circle" style="width:36px;height:36px"></div>
+         <div style="flex:1">
+           <div class="skeleton skeleton-text medium"></div>
+           <div class="skeleton skeleton-text short"></div>
+         </div>
+       </div>
+     </div>
+     <div class="skeleton-card">
+       <div style="display:flex;gap:12px;align-items:center">
+         <div class="skeleton skeleton-circle" style="width:36px;height:36px"></div>
+         <div style="flex:1">
+           <div class="skeleton skeleton-text medium"></div>
+           <div class="skeleton skeleton-text short"></div>
+         </div>
+       </div>
+     </div>
+    </div>
   </div>
 
   <div class="painel-column">
@@ -105,9 +186,28 @@
     <h2>Pendencias de Validacao</h2>
     <span class="badge" id="pendencias-count">0</span>
    </div>
-   <div class="column-body" id="pendencias-list">
-    <div class="empty-col"><p>Carregando...</p></div>
-   </div>
+<div class="column-body" id="pendencias-list">
+     <div class="skeleton-card">
+       <div style="display:flex;gap:12px;align-items:flex-start">
+         <div class="skeleton skeleton-circle" style="width:36px;height:36px;background:#FFE0B2"></div>
+         <div style="flex:1">
+           <div class="skeleton skeleton-text medium"></div>
+           <div class="skeleton skeleton-text short"></div>
+           <div class="skeleton skeleton-text short" style="width:30%"></div>
+         </div>
+       </div>
+     </div>
+     <div class="skeleton-card">
+       <div style="display:flex;gap:12px;align-items:flex-start">
+         <div class="skeleton skeleton-circle" style="width:36px;height:36px;background:#FFE0B2"></div>
+         <div style="flex:1">
+           <div class="skeleton skeleton-text medium"></div>
+           <div class="skeleton skeleton-text short"></div>
+           <div class="skeleton skeleton-text short" style="width:30%"></div>
+         </div>
+       </div>
+     </div>
+    </div>
   </div>
 
   <div class="painel-column">
@@ -121,9 +221,28 @@
     <h2>Alunos Ativos</h2>
     <span class="badge badge-green" id="ativos-count">0</span>
    </div>
-   <div class="column-body" id="ativos-list">
-    <div class="empty-col"><p>Carregando...</p></div>
-   </div>
+<div class="column-body" id="ativos-list">
+     <div class="skeleton-card">
+       <div style="display:flex;gap:12px;align-items:center">
+         <div class="skeleton skeleton-circle" style="width:36px;height:36px;background:#E0F2F1"></div>
+         <div style="flex:1">
+           <div class="skeleton skeleton-text medium"></div>
+           <div class="skeleton skeleton-text short"></div>
+           <div class="skeleton skeleton-text short" style="width:50%"></div>
+         </div>
+       </div>
+     </div>
+     <div class="skeleton-card">
+       <div style="display:flex;gap:12px;align-items:center">
+         <div class="skeleton skeleton-circle" style="width:36px;height:36px;background:#E0F2F1"></div>
+         <div style="flex:1">
+           <div class="skeleton skeleton-text medium"></div>
+           <div class="skeleton skeleton-text short"></div>
+           <div class="skeleton skeleton-text short" style="width:50%"></div>
+         </div>
+       </div>
+     </div>
+    </div>
   </div>
  </div>
     </main>
@@ -139,7 +258,7 @@
 
     <div class="form-group">
      <label for="profile-nivel-atencao">Nivel de Atencao</label>
-     <select id="profile-nivel-atencao">
+     <select id="profile-nivel-atencao" aria-label="Nível de atenção do aluno">
       <option value="">-- Nenhum --</option>
       <option value="alto">Alto</option>
       <option value="medio">Medio</option>
@@ -149,7 +268,7 @@
 
     <div class="form-group">
      <label for="profile-dificuldade-leitura">Dificuldade de Leitura</label>
-     <select id="profile-dificuldade-leitura">
+     <select id="profile-dificuldade-leitura" aria-label="Dificuldade de leitura">
       <option value="false">Nao</option>
       <option value="true">Sim</option>
      </select>
@@ -157,7 +276,7 @@
 
     <div class="form-group">
      <label for="profile-preferencia">Preferencia de Aprendizado</label>
-     <select id="profile-preferencia">
+     <select id="profile-preferencia" aria-label="Preferência de aprendizado">
       <option value="">-- Nenhum --</option>
       <option value="visual">Visual</option>
       <option value="auditivo">Auditivo</option>
@@ -173,13 +292,21 @@
     </div>
 
     <div class="form-group">
-     <label for="profile-diagnostico">Diagnostico</label>
-     <input type="text" id="profile-diagnostico" maxlength="200" placeholder="Diagnostico (opcional)">
+      <label for="profile-diagnostico">Diagnostico</label>
+      <input type="text" id="profile-diagnostico" maxlength="200" placeholder="Diagnostico (opcional)">
+    </div>
+
+    <!-- Observações dos professores -->
+    <div class="form-group">
+      <label>Observações dos Professores</label>
+      <div id="profile-observacoes" class="observacoes-list">
+        <p>Carregando observações...</p>
+      </div>
     </div>
 
     <div class="modal-actions">
-     <button type="button" class="btn-modal-cancel" id="modal-cancel">Cancelar</button>
-     <button type="submit" class="btn-modal-save">Salvar Perfil</button>
+      <button type="button" class="btn-modal-cancel" id="modal-cancel">Cancelar</button>
+      <button type="submit" class="btn-modal-save">Salvar Perfil</button>
     </div>
    </form>
   </div>
@@ -194,15 +321,15 @@
    <form id="invite-form" class="modal-body">
     <div class="form-group">
      <label for="invite-nome">Nome completo</label>
-     <input type="text" id="invite-nome" placeholder="Nome do convidado" required>
+     <input type="text" id="invite-nome" placeholder="Nome do convidado" required aria-label="Nome completo do convidado">
     </div>
     <div class="form-group">
      <label for="invite-email">Email</label>
-     <input type="email" id="invite-email" placeholder="email@exemplo.com" required>
+     <input type="email" id="invite-email" placeholder="email@exemplo.com" required aria-label="Email do convidado">
     </div>
     <div class="form-group">
      <label for="invite-tipo">Funcao</label>
-     <select id="invite-tipo">
+     <select id="invite-tipo" aria-label="Função do convidado">
       <option value="psicopedagogo">Psicopedagogo</option>
       <option value="servidor">Servidor</option>
       <option value="admin">Administrador</option>
@@ -237,18 +364,19 @@
    <h2 id="senha-modal-title">Alterar Senha</h2>
    <button class="modal-close" id="senha-modal-close" title="Fechar">&times;</button>
   </div>
-  <form id="senha-form" class="modal-body">
-   <div class="form-group">
-    <label for="senha-atual">Senha atual</label>
-    <input type="password" id="senha-atual" placeholder="Senha atual" required autocomplete="current-password">
+<form id="senha-form" class="modal-body">
+    <input type="hidden" id="senha-username" name="username" autocomplete="username" value="">
+    <div class="form-group">
+     <label for="senha-atual">Senha atual</label>
+     <input type="password" id="senha-atual" placeholder="Senha atual" required autocomplete="current-password" aria-label="Senha atual">
    </div>
    <div class="form-group">
     <label for="senha-nova">Nova senha</label>
-    <input type="password" id="senha-nova" placeholder="Nova senha" required autocomplete="new-password" minlength="6">
+    <input type="password" id="senha-nova" placeholder="Nova senha" required autocomplete="new-password" minlength="6" aria-label="Nova senha">
    </div>
    <div class="form-group">
     <label for="senha-nova-conf">Confirmar nova senha</label>
-    <input type="password" id="senha-nova-conf" placeholder="Confirme a nova senha" required autocomplete="new-password" minlength="6">
+    <input type="password" id="senha-nova-conf" placeholder="Confirme a nova senha" required autocomplete="new-password" minlength="6" aria-label="Confirmar nova senha">
    </div>
    <div class="senha-temp-notice" id="senha-temp-notice" hidden>
     <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;flex-shrink:0">
@@ -274,6 +402,7 @@
     <script src="/js/js.cookie.js"></script>
     <script src="/js/settings.js"></script>
     <script src="/js/client.js"></script>
+    <script src="/js/theme.js"></script>
     <script src="/js/painel.js"></script>
 <script src="/js/notificacao.js"></script>
 <script>
