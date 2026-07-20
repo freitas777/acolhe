@@ -41,22 +41,6 @@
     --spacing-xl: 2rem;
 }
 
-/* Dark mode theme */
-[data-theme="dark"] {
-    --color-background: #1a1a1a;
-    --color-surface: #2d2d2d;
-    --color-surface-secondary: #383838;
-    --color-text-primary: #E0E0E0;
-    --color-text-secondary: #B0B0B0;
-    --color-text-muted: #666666;
-    --color-border: #404040;
-    --color-border-light: #333333;
-    --color-primary-contrast: #000000;
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4);
-    --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.5);
-}
-
 /* Alto Contraste */
 [data-contrast="high"] {
     --color-background: #000000;

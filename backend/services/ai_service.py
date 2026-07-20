@@ -5,6 +5,7 @@ import hashlib
 import logging
 import os
 import threading
+import time
 import typing
 from collections import OrderedDict
 from typing import Optional
@@ -32,6 +33,7 @@ class AIService:
         self._modelos_por_contexto: OrderedDict[str, genai.GenerativeModel] = OrderedDict()
         self._sessoes: OrderedDict[str, genai.ChatSession] = OrderedDict()
         self._sessao_contexto: dict[str, str] = {}
+        self._cache: OrderedDict[str, tuple[str, float]] = OrderedDict()
         self._lock = asyncio.Lock()
         self._inicializar()
 
@@ -376,18 +378,46 @@ class AIService:
                 raise item[1]
             yield item
 
+    def _cache_get(self, chave: str) -> Optional[str]:
+        if chave in self._cache:
+            resposta, timestamp = self._cache[chave]
+            if time.time() - timestamp < settings.ai_cache_ttl_seconds:
+                self._cache.move_to_end(chave)
+                logger.info("Cache HIT: %s", chave[:16])
+                return resposta
+            else:
+                del self._cache[chave]
+                logger.info("Cache EXPIRED: %s", chave[:16])
+        return None
+
+    def _cache_set(self, chave: str, resposta: str) -> None:
+        self._cache[chave] = (resposta, time.time())
+        self._cache.move_to_end(chave)
+        while len(self._cache) > settings.ai_cache_max_size:
+            chave_antiga = next(iter(self._cache))
+            del self._cache[chave_antiga]
+        logger.info("Cache SET: %s (total=%d)", chave[:16], len(self._cache))
+
     async def gerar_conteudo_educacional(
         self,
         tema: str,
         perfil_aluno: dict,
     ) -> str:
         prompt = self._construir_prompt_educacional(tema, perfil_aluno)
+        chave = hashlib.sha256(prompt.encode()).hexdigest()
+
+        cached = self._cache_get(chave)
+        if cached:
+            return cached
+
         modelo = self._obter_modelo()
         loop = asyncio.get_running_loop()
         resposta = await loop.run_in_executor(
             None,
             lambda: modelo.generate_content(prompt),
         )
+
+        self._cache_set(chave, resposta.text)
         return resposta.text
 
     def _construir_prompt_educacional(

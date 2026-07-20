@@ -12,6 +12,7 @@ class MaterialResponse(BaseModel):
     tipo_arquivo: str
     tamanho: int
     descricao: Optional[str] = None
+    categoria: str = "outro"
     criado_em: datetime
     usuario_nome: Optional[str] = None
 

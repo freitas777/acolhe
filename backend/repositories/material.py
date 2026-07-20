@@ -10,13 +10,11 @@ class MaterialRepository(BaseRepository[Material]):
     def __init__(self, db: Session):
         super().__init__(Material, db)
 
-    def listar_por_disciplina(self, disciplina_id: int) -> list[Material]:
-        return (
-            self.db.query(Material)
-            .filter(Material.disciplina_id == disciplina_id)
-            .order_by(Material.criado_em.desc())
-            .all()
-        )
+    def listar_por_disciplina(self, disciplina_id: int, categoria: str | None = None) -> list[Material]:
+        query = self.db.query(Material).filter(Material.disciplina_id == disciplina_id)
+        if categoria:
+            query = query.filter(Material.categoria == categoria)
+        return query.order_by(Material.criado_em.desc()).all()
 
     def obter_com_relacionamentos(self, material_id: int) -> Material | None:
         return (

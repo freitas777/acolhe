@@ -667,6 +667,18 @@ function initMateriaisModal() {
   var overlay = document.getElementById('materiais-modal');
   if (overlay) overlay.addEventListener('click', function(e){ if (e.target === overlay) closeMateriaisModal(); });
 
+  var filtrosChips = document.querySelectorAll('.filtro-chip');
+  filtrosChips.forEach(function(chip) {
+    chip.addEventListener('click', function() {
+      filtrosChips.forEach(function(c) { c.classList.remove('active'); });
+      chip.classList.add('active');
+      _materiaisCategoriaFiltro = chip.dataset.categoria || '';
+      if (_materiaisDisciplinaId) {
+        loadMateriais(_materiaisDisciplinaId, _materiaisCategoriaFiltro);
+      }
+    });
+  });
+
   var uploadArea = document.getElementById('upload-area');
   var fileInput = document.getElementById('file-input');
   var btnSelectFile = document.getElementById('btn-select-file');
@@ -712,9 +724,12 @@ function initMateriaisModal() {
   }
 }
 
+var _materiaisCategoriaFiltro = '';
+
 function openMateriaisModal(disciplinaId, disciplinaDesc) {
   _materiaisDisciplinaId = disciplinaId;
   _materiaisDisciplinaDesc = disciplinaDesc;
+  _materiaisCategoriaFiltro = '';
 
   var modal = document.getElementById('materiais-modal');
   if (!modal) return;
@@ -722,15 +737,21 @@ function openMateriaisModal(disciplinaId, disciplinaDesc) {
   var titleEl = document.getElementById('modal-materiais-title');
   if (titleEl) titleEl.textContent = 'Materiais - ' + disciplinaDesc;
 
-  var infoEl = document.getElementById('materiais-info');
-  if (infoEl) infoEl.innerHTML = '<strong>Disciplina:</strong> ' + escapeHtml(disciplinaDesc);
-
-  var isProfessor = tipoPerfil === 'professor' || tipoPerfil === 'servidor' || tipoPerfil === 'admin' || tipoPerfil === 'psicopedagogo';
+  var isProfessor = tipoPerfil === 'professor';
   var uploadSection = document.getElementById('materiais-upload-section');
   if (uploadSection) uploadSection.hidden = !isProfessor;
 
   var progressEl = document.getElementById('upload-progress');
   if (progressEl) progressEl.hidden = true;
+
+  var categoriaSelect = document.getElementById('upload-categoria');
+  if (categoriaSelect) categoriaSelect.value = 'outro';
+
+  var filtrosChips = document.querySelectorAll('.filtro-chip');
+  filtrosChips.forEach(function(chip) {
+    chip.classList.remove('active');
+    if (chip.dataset.categoria === '') chip.classList.add('active');
+  });
 
   modal.hidden = false;
   _trapFocus(modal);
@@ -745,12 +766,15 @@ function closeMateriaisModal() {
   _materiaisDisciplinaId = null;
 }
 
-function loadMateriais(disciplinaId) {
+function loadMateriais(disciplinaId, categoria) {
   var listEl = document.getElementById('materiais-list');
   if (!listEl) return;
   listEl.innerHTML = '<div class="spinner"></div>';
 
-  acolheFetch('/api/materiais/disciplina/' + disciplinaId)
+  var url = '/api/materiais/disciplina/' + disciplinaId;
+  if (categoria) url += '?categoria=' + encodeURIComponent(categoria);
+
+  acolheFetch(url)
     .then(function(r) {
       if (!r.ok) throw new Error('HTTP ' + r.status);
       return r.json();
@@ -787,12 +811,15 @@ function renderMateriaisList(materiais) {
     var dateStr = new Date(mat.criado_em).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
     var canDelete = (currentUser && currentUser.id === mat.usuario_id) || tipoPerfil === 'admin';
 
+    var categoriaLabel = mat.categoria ? mat.categoria.charAt(0).toUpperCase() + mat.categoria.slice(1) : 'Outro';
+    var categoriaBadge = '<span class="material-categoria-badge">' + escapeHtml(categoriaLabel) + '</span>';
+
     var item = document.createElement('div');
     item.className = 'material-item';
     item.innerHTML =
       '<div class="material-icon ' + iconClass + '">' + escapeHtml(ext.toUpperCase()) + '</div>' +
       '<div class="material-info">' +
-      '<div class="material-name">' + escapeHtml(mat.nome_original) + '</div>' +
+      '<div class="material-name">' + escapeHtml(mat.nome_original) + categoriaBadge + '</div>' +
       '<div class="material-meta">' + sizeStr + ' &middot; ' + dateStr + (mat.usuario_nome ? ' &middot; ' + escapeHtml(mat.usuario_nome) : '') + '</div>' +
       '</div>' +
       '<div class="material-actions">' +
@@ -853,6 +880,10 @@ function handleFileUpload(file) {
   var formData = new FormData();
   formData.append('file', file);
 
+  var categoriaSelect = document.getElementById('upload-categoria');
+  var categoria = categoriaSelect ? categoriaSelect.value : 'outro';
+  formData.append('categoria', categoria);
+
   var token = acolheGetToken();
   var xhr = new XMLHttpRequest();
   xhr.open('POST', '/api/materiais/disciplina/' + _materiaisDisciplinaId + '/upload');
@@ -872,7 +903,9 @@ function handleFileUpload(file) {
 
     if (xhr.status >= 200 && xhr.status < 300) {
       showToast('Material enviado com sucesso', 'success');
-      loadMateriais(_materiaisDisciplinaId);
+      var categoriaSelect = document.getElementById('upload-categoria');
+      if (categoriaSelect) categoriaSelect.value = 'outro';
+      loadMateriais(_materiaisDisciplinaId, _materiaisCategoriaFiltro);
     } else {
       var detail = 'Erro ao enviar arquivo';
       try {

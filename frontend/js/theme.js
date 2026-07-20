@@ -1,42 +1,10 @@
 (function() {
 'use strict';
 
-var THEME_KEY = 'acolhe-theme';
-var CONTRAST_KEY = 'acolhe-contrast';
-var FONT_SIZE_KEY = 'acolhe-font-size';
+    var CONTRAST_KEY = 'acolhe-contrast';
+    var FONT_SIZE_KEY = 'acolhe-font-size';
 
-function getPreferredTheme() {
-    var stored = localStorage.getItem(THEME_KEY);
-    if (stored) return stored;
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-}
-
-function applyTheme(theme) {
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem(THEME_KEY, theme);
-    updateButtonIcon(theme);
-}
-
-function updateButtonIcon(theme) {
-    var btn = document.getElementById('btn-dark-mode');
-    if (!btn) return;
-    
-    if (theme === 'dark') {
-        btn.innerHTML = '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
-        btn.title = 'Alternar tema claro';
-    } else {
-        btn.innerHTML = '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>';
-        btn.title = 'Alternar tema escuro';
-    }
-}
-
-function toggleTheme() {
-    var current = document.documentElement.getAttribute('data-theme') || 'light';
-    var next = current === 'dark' ? 'light' : 'dark';
-    applyTheme(next);
-}
-
-// Accessibility Menu
+    // Accessibility Menu
 function toggleAccessibilityMenu() {
     var menu = document.getElementById('accessibility-menu');
     if (!menu) return;
@@ -123,22 +91,14 @@ function updateFontSizeButtons(size) {
     }
 }
 
-function init() {
-    var theme = getPreferredTheme();
-    applyTheme(theme);
-    
-    var contrast = getPreferredContrast();
-    applyContrast(contrast);
-    
-    var fontSize = getPreferredFontSize();
-    applyFontSize(fontSize);
-    
-    var btnDarkMode = document.getElementById('btn-dark-mode');
-    if (btnDarkMode) {
-        btnDarkMode.addEventListener('click', toggleTheme);
-    }
-    
-    var btnAccessibility = document.getElementById('btn-accessibility');
+    function init() {
+        var contrast = getPreferredContrast();
+        applyContrast(contrast);
+
+        var fontSize = getPreferredFontSize();
+        applyFontSize(fontSize);
+
+        var btnAccessibility = document.getElementById('btn-accessibility');
     if (btnAccessibility) {
         btnAccessibility.addEventListener('click', function(e) {
             e.stopPropagation();
@@ -187,8 +147,7 @@ if (document.readyState === 'loading') {
     init();
 }
 
-window.ThemeToggle = { toggle: toggleTheme, apply: applyTheme };
-window.AccessibilityToggle = {
+    window.AccessibilityToggle = {
     toggleContrast: toggleContrast,
     increaseFontSize: increaseFontSize,
     decreaseFontSize: decreaseFontSize,

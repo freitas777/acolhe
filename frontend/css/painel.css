@@ -947,3 +947,22 @@ body {
     line-height: 1.5;
     color: #333;
 }
+.btn-modal-pdf {
+    padding: 8px 16px;
+    background: #0A7F70;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+    margin-right: auto;
+}
+.btn-modal-pdf:hover {
+    background: #08665a;
+}
+.btn-modal-pdf:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}

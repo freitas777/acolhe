@@ -60,8 +60,8 @@ class MaterialService:
         self.aluno_repo = AlunoRepository(db)
         self.usuario_repo = UsuarioRepository(db)
 
-    def listar_materiais(self, disciplina_id: int) -> list[MaterialResponse]:
-        materiais = self.repo.listar_por_disciplina(disciplina_id)
+    def listar_materiais(self, disciplina_id: int, categoria: str | None = None) -> list[MaterialResponse]:
+        materiais = self.repo.listar_por_disciplina(disciplina_id, categoria=categoria)
         result = []
         for m in materiais:
             resp = MaterialResponse.model_validate(m)
@@ -70,16 +70,24 @@ class MaterialService:
             result.append(resp)
         return result
 
+    def _get_categorias(self) -> set[str]:
+        return {c.strip().lower() for c in settings.material_categorias.split(",") if c.strip()}
+
     async def upload_material(
         self,
         disciplina_id: int,
         usuario_id: int,
         file: UploadFile,
         descricao: str | None = None,
+        categoria: str | None = None,
     ) -> MaterialResponse:
         content = await file.read()
         size = len(content)
         _validate_file(file.filename or "", file.content_type or "", size)
+
+        cat = (categoria or "outro").strip().lower()
+        if cat not in self._get_categorias():
+            cat = "outro"
 
         ext = _get_extension(file.filename or "")
         nome_arquivo = f"{uuid.uuid4().hex}.{ext}"
@@ -98,6 +106,7 @@ class MaterialService:
                 "tipo_arquivo": file.content_type or "application/octet-stream",
                 "tamanho": size,
                 "descricao": descricao,
+                "categoria": cat,
             })
             logger.info(
                 "Material enviado: id=%s, disciplina_id=%s, arquivo=%s",

@@ -27,6 +27,7 @@ class Material(Base):
     tipo_arquivo: Mapped[str] = mapped_column(String(50), nullable=False)
     tamanho: Mapped[int] = mapped_column(BigInteger, nullable=False)
     descricao: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    categoria: Mapped[str] = mapped_column(String(50), nullable=False, default="outro", server_default="outro")
     criado_em: Mapped[datetime] = mapped_column(
         DateTime,
         nullable=False,

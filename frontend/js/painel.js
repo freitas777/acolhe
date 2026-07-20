@@ -561,54 +561,11 @@ function setupEventListeners() {        var searchInput = document.getElementByI
   var profileForm = document.getElementById('profile-form');
   if (profileForm) profileForm.addEventListener('submit', saveProfile);
 
+  var btnGerarRelatorioPdf = document.getElementById('btn-gerar-relatorio-pdf');
+  if (btnGerarRelatorioPdf) btnGerarRelatorioPdf.addEventListener('click', gerarRelatorioPDF);
+
   var btnInvite = document.getElementById('btn-invite');
   if (btnInvite) btnInvite.addEventListener('click', openInviteModal);
-
-  var btnExportCsv = document.getElementById('btn-export-csv');
-  if (btnExportCsv) btnExportCsv.addEventListener('click', function() {
-    acolheFetch('/alunos/export/csv')
-      .then(function(r) {
-        if (!r.ok) throw new Error('Erro ao exportar CSV');
-        return r.blob();
-      })
-      .then(function(blob) {
-        var url = window.URL.createObjectURL(blob);
-        var a = document.createElement('a');
-        a.href = url;
-        a.download = 'alunos-' + new Date().toISOString().split('T')[0] + '.csv';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
-      })
-      .catch(function(err) {
-        console.error(err);
-        showToast('Erro ao exportar CSV.', 'error');
-      });
-  });
-
-  var btnRelatorioUso = document.getElementById('btn-relatorio-uso');
-  if (btnRelatorioUso) btnRelatorioUso.addEventListener('click', function() {
-    acolheFetch('/api/relatorios/uso/csv')
-      .then(function(r) {
-        if (!r.ok) throw new Error('Erro ao gerar relatorio');
-        return r.blob();
-      })
-      .then(function(blob) {
-        var url = window.URL.createObjectURL(blob);
-        var a = document.createElement('a');
-        a.href = url;
-        a.download = 'relatorio-uso-' + new Date().toISOString().split('T')[0] + '.csv';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
-      })
-      .catch(function(err) {
-        console.error(err);
-        showToast('Erro ao baixar relatorio.', 'error');
-      });
-  });
 
   var inviteModalClose = document.getElementById('invite-modal-close');
   if (inviteModalClose) inviteModalClose.addEventListener('click', closeInviteModal);
@@ -693,7 +650,73 @@ function loadDashboardMetrics() {
      document.getElementById('metric-pendencias').textContent = '0';
      document.getElementById('metric-observacoes').textContent = '0';
      document.getElementById('metric-conteudos').textContent = '0';
-   });
+    });
+}
+
+function gerarRelatorioPDF() {
+  var alunoId = document.getElementById('profile-aluno-id').value;
+  if (!alunoId) {
+    showToast('Selecione um aluno primeiro', 'warning');
+    return;
+  }
+
+  var btn = document.getElementById('btn-gerar-relatorio-pdf');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Gerando...';
+  }
+
+  var token = acolheGetToken();
+  var xhr = new XMLHttpRequest();
+  xhr.open('GET', '/api/relatorios/aluno/' + alunoId + '/pdf');
+  xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+  xhr.responseType = 'blob';
+
+  xhr.onload = function() {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Gerar Relatório PDF';
+    }
+
+    if (xhr.status === 200) {
+      var blob = xhr.response;
+      var url = window.URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'relatorio-aluno-' + alunoId + '-' + new Date().toISOString().split('T')[0] + '.pdf';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      showToast('Relatório PDF gerado com sucesso', 'success');
+    } else {
+      var msg = 'Erro ao gerar relatório PDF';
+      try {
+        var reader = new FileReader();
+        reader.onload = function() {
+          try {
+            var err = JSON.parse(reader.result);
+            showToast(err.detail || msg, 'error');
+          } catch(e) {
+            showToast(msg, 'error');
+          }
+        };
+        reader.readAsText(xhr.response);
+      } catch(e) {
+        showToast(msg, 'error');
+      }
+    }
+  };
+
+  xhr.onerror = function() {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Gerar Relatório PDF';
+    }
+    showToast('Erro de conexão ao gerar relatório', 'error');
+  };
+
+  xhr.send();
 }
 
 })();

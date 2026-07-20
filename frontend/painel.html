@@ -1,12 +1,14 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
+<script>(function(){document.documentElement.removeAttribute("data-theme");document.documentElement.removeAttribute("data-contrast");localStorage.removeItem("acolhe-theme");localStorage.removeItem("acolhe-contrast");localStorage.removeItem("acolhe-font-size")})()</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Acolhe+ | Painel NAPNE</title>
     <link rel="stylesheet" href="/css/base.css">
 <link rel="stylesheet" href="/css/painel.css">
     <link rel="stylesheet" href="/css/notificacoes.css">
+    <link rel="stylesheet" href="/css/acessibilidade.css">
     <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -22,45 +24,7 @@
 		<h1 class="page-title">Painel NAPNE</h1>
 	</div>
 <div class="topbar-right">
-<button class="btn-nav" id="btn-dark-mode" title="Alternar tema escuro">
-<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-<circle cx="12" cy="12" r="5"/>
-<path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
-</svg>
-</button>
-<button class="btn-nav" id="btn-accessibility" title="Opções de acessibilidade" aria-label="Opções de acessibilidade">
-<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-<circle cx="12" cy="12" r="10"/>
-<path d="M12 16v-4"/>
-<path d="M12 8h.01"/>
-</svg>
-</button>
-<div class="accessibility-menu" id="accessibility-menu" hidden>
-<button class="accessibility-option" id="btn-alto-contraste" title="Alto contraste">
-<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-<circle cx="12" cy="12" r="10"/>
-<line x1="2" y1="12" x2="22" y2="12"/>
-</svg>
-<span>Alto Contraste</span>
-</button>
-<button class="accessibility-option" id="btn-aumentar-fonte" title="Aumentar fonte">
-<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-<polyline points="4 14 10 14 10 20"/>
-<polyline points="20 10 14 10 14 4"/>
-<line x1="14" y1="10" x2="21" y2="3"/>
-<text x="8" y="14" font-size="8" font-weight="bold">A</text>
-</svg>
-<span>Aumentar Fonte</span>
-</button>
-<button class="accessibility-option" id="btn-diminuir-fonte" title="Diminuir fonte">
-<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-<polyline points="4 20 10 20 10 14"/>
-<line x1="14" y1="10" x2="21" y2="3"/>
-<text x="8" y="20" font-size="8" font-weight="bold">A</text>
-</svg>
-<span>Diminuir Fonte</span>
-</button>
-</div>
+
 <div class="notificacao-bell-container"></div>
 <a href="/chat" class="btn-nav" title="Chat">
 <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -104,24 +68,7 @@
                 </svg>
                 <span>Importar Alunos do SUAP</span>
             </a>
-            <button class="nav-link nav-importacao" id="btn-export-csv" title="Exportar alunos em CSV">
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                    <polyline points="7 10 12 15 17 10"/>
-                    <line x1="12" y1="15" x2="12" y2="3"/>
-                </svg>
-                <span>Exportar CSV</span>
-            </button>
-            <button class="nav-link nav-importacao" id="btn-relatorio-uso" title="Baixar relatório de uso">
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                    <polyline points="14 2 14 8 20 8"/>
-                    <line x1="16" y1="13" x2="8" y2="13"/>
-                    <line x1="16" y1="17" x2="8" y2="17"/>
-                    <polyline points="10 9 9 9 8 9"/>
-                </svg>
-                <span>Relatório de Uso</span>
-            </button>
+
         </div>
 
         <div class="painel-section">
@@ -305,6 +252,7 @@
     </div>
 
     <div class="modal-actions">
+      <button type="button" class="btn-modal-pdf" id="btn-gerar-relatorio-pdf">Gerar Relatório PDF</button>
       <button type="button" class="btn-modal-cancel" id="modal-cancel">Cancelar</button>
       <button type="submit" class="btn-modal-save">Salvar Perfil</button>
     </div>
@@ -402,9 +350,9 @@
     <script src="/js/js.cookie.js"></script>
     <script src="/js/settings.js"></script>
     <script src="/js/client.js"></script>
-    <script src="/js/theme.js"></script>
     <script src="/js/painel.js"></script>
 <script src="/js/notificacao.js"></script>
+<script src="/js/acessibilidade.js"></script>
 <script>
 (function() { if (typeof NotificacaoService !== 'undefined') NotificacaoService.init(); })();
 </script>

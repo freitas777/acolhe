@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, File, Form, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
+from backend.config import settings
 from backend.database import get_db
 from backend.dependencies import AuthData, get_current_usuario
 from backend.schemas.material import MaterialResponse
@@ -18,16 +19,24 @@ def _service(db: Session = Depends(get_db)) -> MaterialService:
     return MaterialService(db)
 
 
+@router.get("/categorias")
+async def listar_categorias(
+    auth_data: AuthData = Depends(get_current_usuario),
+):
+    return [c.strip() for c in settings.material_categorias.split(",") if c.strip()]
+
+
 @router.get(
     "/disciplina/{disciplina_id}",
     response_model=list[MaterialResponse],
 )
 async def listar_materiais(
     disciplina_id: int,
+    categoria: Optional[str] = None,
     auth_data: AuthData = Depends(get_current_usuario),
     service: MaterialService = Depends(_service),
 ):
-    return service.listar_materiais(disciplina_id)
+    return service.listar_materiais(disciplina_id, categoria=categoria)
 
 
 @router.post(
@@ -39,20 +48,22 @@ async def upload_material(
     disciplina_id: int,
     file: UploadFile = File(...),
     descricao: Optional[str] = Form(None),
+    categoria: Optional[str] = Form("outro"),
     auth_data: AuthData = Depends(get_current_usuario),
     service: MaterialService = Depends(_service),
 ):
-    if auth_data.usuario.tipo_perfil not in ("professor", "servidor", "admin", "psicopedagogo"):
+    if auth_data.usuario.tipo_perfil != "professor":
         from fastapi import HTTPException
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Apenas professores e servidores podem enviar materiais",
+            detail="Apenas professores podem enviar materiais",
         )
     return await service.upload_material(
         disciplina_id=disciplina_id,
         usuario_id=auth_data.usuario.id,
         file=file,
         descricao=descricao,
+        categoria=categoria,
     )
 
 

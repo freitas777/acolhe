@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     uploads_dir: str = "uploads"
     max_upload_size: int = 10 * 1024 * 1024
     allowed_extensions: str = "pdf,doc,docx,ppt,pptx,png,jpg,jpeg,txt"
+    material_categorias: str = "prova,exercicio,slides,apostila,video,atividade,resumo,outro"
+
+    ai_cache_max_size: int = 200
+    ai_cache_ttl_seconds: int = 86400
 
     class Config:
         env_file = ".env"
