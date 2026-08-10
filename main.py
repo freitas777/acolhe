@@ -29,6 +29,11 @@ FRONTEND_DIR = BASE_DIR / "frontend"
 # =====================
 # ROTAS DE PÁGINAS
 # =====================
+
+@app.get("/teste")
+async def teste():
+    return {"mensagem": "ESTOU RODANDO ESTE MAIN.PY"}
+
 @app.get("/")
 async def root():
     return FileResponse(str(BASE_DIR / "index.html"))
