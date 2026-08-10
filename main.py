@@ -59,7 +59,17 @@ async def portal():
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "frontend_dir": str(FRONTEND_DIR)}
+    css_file = FRONTEND_DIR / "css" / "index.css"
+
+    return {
+        "status": "ok",
+        "base_dir": str(BASE_DIR),
+        "frontend_dir": str(FRONTEND_DIR),
+        "frontend_exists": FRONTEND_DIR.exists(),
+        "css_dir_exists": (FRONTEND_DIR / "css").exists(),
+        "index_css_exists": css_file.exists(),
+        "index_css_path": str(css_file),
+    }
 
 # =====================
 # API ROUTERS
