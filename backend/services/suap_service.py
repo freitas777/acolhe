@@ -12,35 +12,49 @@ logger = logging.getLogger(__name__)
 class SUAPService:
     def __init__(self):
         self.base_url = settings.suap_base_url
+        self._client: Optional[httpx.AsyncClient] = None
+
+    async def _get_client(self) -> httpx.AsyncClient:
+        if self._client is None or self._client.is_closed:
+            self._client = httpx.AsyncClient(timeout=15.0)
+        return self._client
 
     async def _get(self, token: str, path: str, params: Optional[dict] = None, timeout: float = 15.0) -> httpx.Response:
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            response = await client.get(
-                f"{self.base_url}{path}",
-                params=params,
-                headers={
-                    "Authorization": f"Bearer {token}",
-                    "Accept": "application/json",
-                },
-            )
-            response.raise_for_status()
-            return response
+        logger.info("[SUAP] GET %s%s (params=%s)", self.base_url, path, params)
+        client = await self._get_client()
+        response = await client.get(
+            f"{self.base_url}{path}",
+            params=params,
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/json",
+            },
+            timeout=timeout,
+        )
+        logger.info("[SUAP] Resposta: status=%s", response.status_code)
+        response.raise_for_status()
+        return response
 
-    async def get_meus_dados(self, token: str) -> dict:
-        response = await self._get(token, "/api/rh/meus-dados/")
-        return response.json()
+    async def get_eu(self, token: str, scope: str = "") -> dict:
+        params = {}
+        if scope:
+            params["scope"] = scope
+        logger.info("[SUAP] GET /api/rh/eu/ (scope=%s)", scope)
+        response = await self._get(token, "/api/rh/eu/", params=params)
+        data = response.json()
+        logger.info("[SUAP] /api/rh/eu/ resposta: keys=%s", list(data.keys()) if isinstance(data, dict) else "N/A")
+        return data
 
-    async def get_eu(self, token: str) -> dict:
-        response = await self._get(token, "/api/rh/eu/")
-        return response.json()
-
-    async def get_meus_vinculos(self, token: str) -> list[dict]:
+    async def get_meus_vinculos(self, token: str, scope: str = "") -> list[dict]:
         all_results = []
         page = 1
         while True:
+            params = {"page": page}
+            if scope:
+                params["scope"] = scope
             response = await self._get(
                 token, "/api/rh/meus-vinculos/",
-                params={"page": page},
+                params=params,
             )
             data = response.json()
             results = data.get("results", [])
@@ -51,18 +65,29 @@ class SUAPService:
                 break
         return all_results
 
-    async def get_disciplinas(self, token: str, semestre: str) -> list[dict]:
-        response = await self._get(token, f"/api/ensino/disciplinas/{semestre}/")
+    async def get_disciplinas(self, token: str, semestre: str, scope: str = "") -> list[dict]:
+        logger.info("[SUAP] Buscando disciplinas para semestre=%s", semestre)
+        params = {}
+        if scope:
+            params["scope"] = scope
+        response = await self._get(token, f"/api/ensino/disciplinas/{semestre}/", params=params)
         data = response.json()
-        return data if isinstance(data, list) else data.get("results", [])
+        logger.info("[SUAP] Resposta de disciplinas: tipo=%s, tamanho=%s",
+                   type(data).__name__, len(data) if isinstance(data, (list, dict)) else "N/A")
+        result = data if isinstance(data, list) else data.get("results", [])
+        logger.info("[SUAP] Total de disciplinas extraidas: %d", len(result))
+        return result
 
-    async def get_meus_diarios(self, token: str, ano_letivo: int, periodo_letivo: int) -> list[dict]:
+    async def get_meus_diarios(self, token: str, ano_letivo: int, periodo_letivo: int, scope: str = "") -> list[dict]:
         all_results = []
         page = 1
         while True:
+            params = {"page": page}
+            if scope:
+                params["scope"] = scope
             response = await self._get(
                 token, f"/api/ensino/meus-diarios/{ano_letivo}/{periodo_letivo}/",
-                params={"page": page},
+                params=params,
             )
             data = response.json()
             results = data.get("results", [])
@@ -73,13 +98,16 @@ class SUAPService:
                 break
         return all_results
 
-    async def get_alunos_diario(self, token: str, id_diario: int) -> list[dict]:
+    async def get_alunos_diario(self, token: str, id_diario: int, scope: str = "") -> list[dict]:
         all_results = []
         page = 1
         while True:
+            params = {"page": page}
+            if scope:
+                params["scope"] = scope
             response = await self._get(
                 token, f"/api/ensino/diarios/{id_diario}/alunos/",
-                params={"page": page},
+                params=params,
             )
             data = response.json()
             results = data.get("results", [])
@@ -126,7 +154,7 @@ class SUAPService:
 
     async def validar_token(self, token: str) -> bool:
         try:
-            await self.get_meus_dados(token)
+            await self.get_eu(token, scope="identificacao")
             return True
         except httpx.HTTPStatusError:
             return False

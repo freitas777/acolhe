@@ -15,10 +15,8 @@ if (!acolheRequireRole(['psicopedagogo', 'servidor', 'admin'])) return;
   }
 
   function loadUserInfo() {
-    var savedUser = localStorage.getItem('acolhe_user');
-    if (savedUser) {
-      try { currentUser = JSON.parse(savedUser); } catch(e) {}
-    }
+    var userName = acolheGetUserName();
+    currentUser = { nome: userName };
     updateUserInfoUI();
   }
 

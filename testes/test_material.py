@@ -22,7 +22,9 @@ def make_material(
     tipo_arquivo: str = "application/pdf",
     tamanho: int = 1024,
     descricao: str | None = None,
+    categoria: str = "outro",
 ) -> Material:
+    from datetime import datetime, timezone
     m = Material()
     m.id = id
     m.disciplina_id = disciplina_id
@@ -32,6 +34,8 @@ def make_material(
     m.tipo_arquivo = tipo_arquivo
     m.tamanho = tamanho
     m.descricao = descricao
+    m.categoria = categoria
+    m.criado_em = datetime.now(timezone.utc)
     m.usuario = MagicMock(nome="Professor Teste")
     return m
 
@@ -41,6 +45,9 @@ def service():
     svc = MaterialService.__new__(MaterialService)
     svc.repo = MagicMock()
     svc.db = MagicMock()
+    svc.diario_aluno_repo = MagicMock()
+    svc.aluno_repo = MagicMock()
+    svc.usuario_repo = MagicMock()
     return svc
 
 
@@ -60,21 +67,32 @@ class TestGetExtension:
 
 class TestValidateFile:
     def test_valid_pdf(self):
-        _validate_file("test.pdf", "application/pdf", 1000)
+        _validate_file("test.pdf", "application/pdf", 1000, b"%PDF-1.4")
 
     def test_invalid_extension(self):
         with pytest.raises(HTTPException) as exc:
-            _validate_file("test.exe", "application/exe", 1000)
+            _validate_file("test.exe", "application/exe", 1000, b"fake")
         assert exc.value.status_code == 400
 
     def test_file_too_large(self):
         with pytest.raises(HTTPException) as exc:
-            _validate_file("test.pdf", "application/pdf", 20 * 1024 * 1024)
+            _validate_file("test.pdf", "application/pdf", 20 * 1024 * 1024, b"%PDF-1.4")
         assert exc.value.status_code == 400
 
     def test_valid_extensions(self):
+        magic_bytes = {
+            "pdf": b"%PDF-1.4",
+            "doc": b"\xd0\xcf\x11\xe0",
+            "docx": b"PK\x03\x04",
+            "ppt": b"\xd0\xcf\x11\xe0",
+            "pptx": b"PK\x03\x04",
+            "png": b"\x89PNG",
+            "jpg": b"\xff\xd8\xff",
+            "jpeg": b"\xff\xd8\xff",
+            "txt": b"qualquer texto",
+        }
         for ext in ["pdf", "doc", "docx", "ppt", "pptx", "png", "jpg", "jpeg", "txt"]:
-            _validate_file(f"test.{ext}", "application/octet-stream", 1000)
+            _validate_file(f"test.{ext}", "application/octet-stream", 1000, magic_bytes[ext])
 
 
 class TestListarMateriais:
@@ -91,6 +109,13 @@ class TestListarMateriais:
         result = service.listar_materiais(1)
         assert result == []
 
+    def test_lista_com_categoria(self, service):
+        mat = make_material()
+        mat.categoria = "prova"
+        service.repo.listar_por_disciplina.return_value = [mat]
+        result = service.listar_materiais(1, categoria="prova")
+        assert len(result) == 1
+
 
 class TestUploadMaterial:
     @pytest.mark.asyncio
@@ -98,8 +123,7 @@ class TestUploadMaterial:
         mat = make_material()
         service.repo.create.return_value = mat
         file = UploadFile(filename="test.pdf", file=MagicMock())
-        file.file.read = AsyncMock(return_value=b"fake content")
-        file.content_type = "application/pdf"
+        file.read = AsyncMock(return_value=b"%PDF-1.4 fake content")
         with patch("backend.services.material_service._get_upload_dir") as mock_dir:
             tmp = Path(tempfile.mkdtemp())
             mock_dir.return_value = tmp
@@ -116,8 +140,7 @@ class TestUploadMaterial:
     @pytest.mark.asyncio
     async def test_upload_extensao_invalida(self, service):
         file = UploadFile(filename="virus.exe", file=MagicMock())
-        file.file.read = AsyncMock(return_value=b"fake")
-        file.content_type = "application/exe"
+        file.read = AsyncMock(return_value=b"fake")
         with pytest.raises(HTTPException) as exc:
             await service.upload_material(disciplina_id=1, usuario_id=1, file=file)
         assert exc.value.status_code == 400
@@ -125,8 +148,7 @@ class TestUploadMaterial:
     @pytest.mark.asyncio
     async def test_upload_arquivo_grande(self, service):
         file = UploadFile(filename="big.pdf", file=MagicMock())
-        file.file.read = AsyncMock(return_value=b"x" * (20 * 1024 * 1024))
-        file.content_type = "application/pdf"
+        file.read = AsyncMock(return_value=b"x" * (20 * 1024 * 1024))
         with pytest.raises(HTTPException) as exc:
             await service.upload_material(disciplina_id=1, usuario_id=1, file=file)
         assert exc.value.status_code == 400
@@ -190,8 +212,7 @@ class TestNotificarAlunos:
         mat = make_material()
         service.repo.create.return_value = mat
         file = UploadFile(filename="test.pdf", file=MagicMock())
-        file.file.read = AsyncMock(return_value=b"fake content")
-        file.content_type = "application/pdf"
+        file.read = AsyncMock(return_value=b"%PDF-1.4 fake content")
 
         disciplina_mock = MagicMock()
         disciplina_mock.id = 1
@@ -236,8 +257,7 @@ class TestNotificarAlunos:
         mat = make_material()
         service.repo.create.return_value = mat
         file = UploadFile(filename="test.pdf", file=MagicMock())
-        file.file.read = AsyncMock(return_value=b"fake content")
-        file.content_type = "application/pdf"
+        file.read = AsyncMock(return_value=b"%PDF-1.4 fake content")
 
         disciplina_mock = MagicMock()
         disciplina_mock.id = 1
@@ -267,8 +287,7 @@ class TestNotificarAlunos:
         mat = make_material()
         service.repo.create.return_value = mat
         file = UploadFile(filename="test.pdf", file=MagicMock())
-        file.file.read = AsyncMock(return_value=b"fake content")
-        file.content_type = "application/pdf"
+        file.read = AsyncMock(return_value=b"%PDF-1.4 fake content")
 
         disciplina_mock = MagicMock()
         disciplina_mock.id = 1

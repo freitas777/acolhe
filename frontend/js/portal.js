@@ -38,12 +38,8 @@
     }
 
     function loadUserInfo() {
-        var savedUser = localStorage.getItem('acolhe_user');
-        if (savedUser) {
-            try {
-                currentUser = JSON.parse(savedUser);
-            } catch (e) {}
-        }
+        var userName = acolheGetUserName();
+        currentUser = { nome: userName };
         updateUserInfoUI();
     }
 
@@ -117,7 +113,25 @@
   var btnExportDados = document.getElementById('btn-export-dados');
   if (btnExportDados) {
     btnExportDados.addEventListener('click', function() {
-      window.location.href = '/api/lgpd/export/meus-dados';
+      acolheFetch('/api/lgpd/export/meus-dados')
+        .then(function(r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.blob();
+        })
+        .then(function(blob) {
+          var url = window.URL.createObjectURL(blob);
+          var a = document.createElement('a');
+          a.href = url;
+          a.download = 'meus-dados.json';
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          window.URL.revokeObjectURL(url);
+          showToast('Dados exportados com sucesso!', 'success');
+        })
+        .catch(function(err) {
+          showToast('Erro ao exportar dados: ' + err.message, 'error');
+        });
     });
   }
     }
@@ -273,7 +287,11 @@
             }
 
             conteudos.forEach(function(conteudo) {
-                listEl.appendChild(createConteudoCard(conteudo));
+                if (conteudo.tipo === 'conversa') {
+                    listEl.appendChild(createConversaCard(conteudo));
+                } else {
+                    listEl.appendChild(createConteudoCard(conteudo));
+                }
             });
         })
     .catch(function(error) {
@@ -289,11 +307,11 @@
         var card = document.createElement('div');
         card.className = 'conteudo-card';
 
-        var dateStr = formatDate(conteudo.gerado_em);
+        var dateStr = formatDate(conteudo.data);
 
         card.innerHTML =
             '<div class="conteudo-card-header">' +
-                '<div class="conteudo-tema">' + escapeHtml(conteudo.tema) + '</div>' +
+                '<div class="conteudo-tema">' + escapeHtml(conteudo.titulo) + '</div>' +
                 '<div class="conteudo-meta">' +
                     '<span class="conteudo-modelo">' + escapeHtml(conteudo.modelo_ia) + '</span>' +
                     '<span class="conteudo-data">' + dateStr + '</span>' +
@@ -523,6 +541,141 @@ function escapeHtml(text) {
             hour: '2-digit',
             minute: '2-digit'
         });
+    }
+
+    function createConversaCard(conversa) {
+        var card = document.createElement('div');
+        card.className = 'conteudo-card';
+
+        var dateStr = formatDate(conversa.data);
+        var messageCount = conversa.messages ? conversa.messages.length : 0;
+
+        card.innerHTML =
+            '<div class="conteudo-card-header">' +
+                '<div class="conteudo-tema">' + escapeHtml(conversa.titulo) + '</div>' +
+                '<div class="conteudo-meta">' +
+                    '<span class="conteudo-data">' + dateStr + '</span>' +
+                    '<span class="conteudo-versao">' + messageCount + ' mensagens</span>' +
+                '</div>' +
+            '</div>' +
+            '<div class="conteudo-card-actions">' +
+                '<button class="btn-toggle-conteudo" data-conversa-id="' + conversa.id + '">' +
+                    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px">' +
+                        '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>' +
+                        '<circle cx="12" cy="12" r="3"/>' +
+                    '</svg>' +
+                    '<span>Ver conversa</span>' +
+                '</button>' +
+            '</div>' +
+            '<div class="conteudo-card-body" id="conversa-body-' + conversa.id + '" hidden>' +
+                '<div class="conversa-timeline">' +
+                    renderConversaTimeline(conversa.messages || [], conversa.usuario_tipo) +
+                '</div>' +
+            '</div>';
+
+        var toggleBtn = card.querySelector('.btn-toggle-conteudo');
+        toggleBtn.addEventListener('click', function() {
+            var body = document.getElementById('conversa-body-' + conversa.id);
+            var isHidden = body.hidden;
+            body.hidden = !isHidden;
+            toggleBtn.querySelector('span').textContent = isHidden ? 'Ocultar conversa' : 'Ver conversa';
+            if (isHidden) {
+                card.classList.add('conteudo-expanded');
+            } else {
+                card.classList.remove('conteudo-expanded');
+            }
+        });
+
+        var actorItems = card.querySelectorAll('.timeline-actor');
+        console.log('Found', actorItems.length, 'actor items');
+        actorItems.forEach(function(item) {
+            item.addEventListener('click', function() {
+                var msgId = this.dataset.messageId;
+                console.log('Clicked actor, msgId:', msgId);
+                showMessageContent(msgId, this);
+            });
+        });
+
+        return card;
+    }
+
+    function renderConversaTimeline(messages, usuarioTipo) {
+        if (!messages || messages.length === 0) {
+            return '<p class="conversa-empty">Nenhuma mensagem nesta conversa.</p>';
+        }
+
+        console.log('Messages:', messages);
+
+        var html = '';
+        messages.forEach(function(msg) {
+            var papel = msg.papel || msg.role || '';
+            var conteudo = msg.conteudo || msg.content || '';
+            var actorLabel = '';
+            var actorClass = '';
+            if (papel === 'usuario') {
+                actorLabel = usuarioTipo ? getTipoPerfilLabel(usuarioTipo) : 'Servidor';
+                actorClass = 'actor-user';
+            } else {
+                actorLabel = 'Assistente';
+                actorClass = 'actor-assistant';
+            }
+
+            var userIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>';
+            var botIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></svg>';
+
+            console.log('Message:', { id: msg.id, papel: papel, conteudo: conteudo ? conteudo.substring(0, 50) : '' });
+
+            html +=
+                '<div class="timeline-item">' +
+                    '<div class="timeline-actor ' + actorClass + '" data-message-id="' + msg.id + '">' +
+                        '<div class="actor-icon">' + (papel === 'usuario' ? userIcon : botIcon) + '</div>' +
+                        '<div class="actor-label">' + escapeHtml(actorLabel) + '</div>' +
+                    '</div>' +
+                    '<div class="timeline-message" id="msg-' + msg.id + '" hidden>' +
+                        '<div class="message-content">' + renderMarkdown(conteudo) + '</div>' +
+                    '</div>' +
+                '</div>';
+        });
+        return html;
+    }
+
+    function showMessageContent(msgId, actorElement) {
+        var elementId = 'msg-' + msgId;
+        console.log('showMessageContent called with msgId:', msgId, 'looking for element:', elementId);
+        var messageDiv = document.getElementById(elementId);
+        if (!messageDiv) {
+            console.error('Message element not found:', elementId);
+            return;
+        }
+
+        var isHidden = messageDiv.hidden;
+        console.log('Message div found, isHidden:', isHidden);
+
+        document.querySelectorAll('.timeline-message').forEach(function(div) {
+            div.hidden = true;
+        });
+        document.querySelectorAll('.timeline-actor').forEach(function(actor) {
+            actor.classList.remove('active');
+        });
+
+        if (isHidden) {
+            messageDiv.hidden = false;
+            actorElement.classList.add('active');
+            console.log('Message shown');
+        } else {
+            console.log('Message hidden');
+        }
+    }
+
+    function getTipoPerfilLabel(tipo) {
+        var labels = {
+            'napne': 'NAPNE',
+            'psicopedagogo': 'Psicopedagogo',
+            'servidor': 'Servidor',
+            'professor': 'Professor',
+            'aluno': 'Aluno'
+        };
+        return labels[tipo] || tipo.charAt(0).toUpperCase() + tipo.slice(1);
     }
 
     document.addEventListener('DOMContentLoaded', init);

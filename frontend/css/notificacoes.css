@@ -5,19 +5,19 @@
 }
 
 .notificacao-bell {
- background: #F8F9FA;
- border: 1px solid #E0E0E0;
- cursor: pointer;
- padding: 6px;
- color: #666;
- width: 36px;
- height: 36px;
- border-radius: 8px;
- transition: background 0.2s, color 0.2s;
- display: flex;
- align-items: center;
- justify-content: center;
- position: relative;
+    background: transparent;
+    border: 1px solid var(--color-border, #E0E0E0);
+    cursor: pointer;
+    padding: 0;
+    color: var(--color-text-secondary, #666);
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    transition: all var(--transition-fast, 150ms ease);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
 }
 
 .notificacao-bell:hover {

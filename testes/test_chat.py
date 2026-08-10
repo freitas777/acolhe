@@ -78,6 +78,9 @@ def service():
     svc.conversa_repo = MagicMock()
     svc.mensagem_repo = MagicMock()
     svc.aluno_repo = MagicMock()
+    svc.disciplina_repo = MagicMock()
+    svc.acomodacao_repo = MagicMock()
+    svc.perfil_aluno_repo = MagicMock()
     svc.db = MagicMock()
     return svc
 
@@ -216,10 +219,10 @@ class TestCriarConversa:
         aluno = make_aluno()
         aluno.perfil = make_perfil()
         service.aluno_repo.get_with_profile.return_value = aluno
+        service.acomodacao_repo.listar_por_aluno.return_value = []
 
         with patch("backend.services.chat_service.ai_service") as mock_ai:
             mock_ai.iniciar_sessao = AsyncMock()
-            mock_ai.construir_contexto_aluno.return_value = "contexto do aluno"
             result = await service.criar_conversa(
                 ConversaCriar(titulo="Teste", aluno_id=1), usuario_id=1
             )
@@ -234,6 +237,7 @@ class TestCriarConversa:
         aluno = make_aluno()
         aluno.perfil = None
         service.aluno_repo.get_with_profile.return_value = aluno
+        service.acomodacao_repo.listar_por_aluno.return_value = []
 
         with patch("backend.services.chat_service.ai_service") as mock_ai:
             mock_ai.iniciar_sessao = AsyncMock()
@@ -241,7 +245,9 @@ class TestCriarConversa:
                 ConversaCriar(titulo="Teste", aluno_id=1), usuario_id=1
             )
 
-        mock_ai.iniciar_sessao.assert_called_once_with(conv.id, contexto_aluno=None)
+        mock_ai.iniciar_sessao.assert_called_once()
+        call_kwargs = mock_ai.iniciar_sessao.call_args[1]
+        assert "system_instruction" in call_kwargs
 
 
 # ---------------------------------------------------------------------------
@@ -361,10 +367,12 @@ class TestObterOuCriarConversaDisciplina:
         aluno = make_aluno(id=5)
         aluno.perfil = make_perfil(aluno_id=5)
         service.aluno_repo.get_by_suap_id.return_value = aluno
+        service.aluno_repo.get_with_profile.return_value = aluno
         service.disciplina_repo.get_by_id.return_value = MagicMock(
             descricao="MatemÃ¡tica", sigla="MAT", professor="Prof X",
             semestre="2026.1", codigo_turma="T01",
         )
+        service.acomodacao_repo.listar_por_aluno.return_value = []
         conv = make_conversa(id="conv-disc", usuario_id=1, aluno_id=5)
         conv.disciplina = MagicMock(descricao="MatemÃ¡tica", sigla="MAT")
         service.conversa_repo.obter_por_usuario_e_disciplina.return_value = None
@@ -372,8 +380,6 @@ class TestObterOuCriarConversaDisciplina:
 
         with patch("backend.services.chat_service.ai_service") as mock_ai:
             mock_ai.iniciar_sessao = AsyncMock()
-            mock_ai.construir_contexto_aluno.return_value = "contexto aluno"
-            mock_ai.construir_contexto_disciplina.return_value = "contexto disciplina"
             result = await service.obter_ou_criar_conversa_disciplina(
                 disciplina_id=10, usuario_id=1, tipo_perfil="aluno", suap_id="12345",
             )
@@ -384,8 +390,7 @@ class TestObterOuCriarConversaDisciplina:
         assert create_call_kwargs["aluno_id"] == 5
         mock_ai.iniciar_sessao.assert_called_once()
         call_kwargs = mock_ai.iniciar_sessao.call_args[1]
-        assert call_kwargs["contexto_aluno"] == "contexto aluno"
-        assert call_kwargs["contexto_disciplina"] == "contexto disciplina"
+        assert "system_instruction" in call_kwargs
 
     @pytest.mark.asyncio
     async def test_cria_conversa_sem_aluno_id_para_professor(self, service):
@@ -393,6 +398,7 @@ class TestObterOuCriarConversaDisciplina:
             descricao="FÃ­sica", sigla="FIS", professor="Prof Y",
             semestre="2026.1", codigo_turma="T02",
         )
+        service.acomodacao_repo.listar_por_aluno.return_value = []
         conv = make_conversa(id="conv-disc2", usuario_id=2)
         conv.disciplina = MagicMock(descricao="FÃ­sica", sigla="FIS")
         service.conversa_repo.obter_por_usuario_e_disciplina.return_value = None
@@ -400,7 +406,6 @@ class TestObterOuCriarConversaDisciplina:
 
         with patch("backend.services.chat_service.ai_service") as mock_ai:
             mock_ai.iniciar_sessao = AsyncMock()
-            mock_ai.construir_contexto_disciplina.return_value = "contexto disciplina"
             result = await service.obter_ou_criar_conversa_disciplina(
                 disciplina_id=20, usuario_id=2, tipo_perfil="professor", suap_id="99999",
             )
@@ -416,6 +421,7 @@ class TestObterOuCriarConversaDisciplina:
             descricao="QuÃ­mica", sigla="QUI", professor="Prof Z",
             semestre="2026.1", codigo_turma="T03",
         )
+        service.acomodacao_repo.listar_por_aluno.return_value = []
         conv = make_conversa(id="conv-disc3", usuario_id=3)
         conv.disciplina = MagicMock(descricao="QuÃ­mica", sigla="QUI")
         service.conversa_repo.obter_por_usuario_e_disciplina.return_value = None
@@ -423,7 +429,6 @@ class TestObterOuCriarConversaDisciplina:
 
         with patch("backend.services.chat_service.ai_service") as mock_ai:
             mock_ai.iniciar_sessao = AsyncMock()
-            mock_ai.construir_contexto_disciplina.return_value = "contexto disciplina"
             result = await service.obter_ou_criar_conversa_disciplina(
                 disciplina_id=30, usuario_id=3, tipo_perfil="aluno", suap_id="00000",
             )
@@ -439,10 +444,12 @@ class TestObterOuCriarConversaDisciplina:
         conv.mensagens = [make_mensagem()]
         service.conversa_repo.obter_por_usuario_e_disciplina.return_value = conv
         service.mensagem_repo.listar_por_conversa.return_value = [make_mensagem()]
+        service.aluno_repo.get_with_profile.return_value = make_aluno(id=5)
+        service.disciplina_repo.get_by_id.return_value = MagicMock(descricao="Biologia")
+        service.acomodacao_repo.listar_por_aluno.return_value = []
 
         with patch("backend.services.chat_service.ai_service") as mock_ai:
             mock_ai.garantir_sessao_com_contexto = AsyncMock()
-            mock_ai.construir_contexto_disciplina.return_value = "contexto disciplina"
             result = await service.obter_ou_criar_conversa_disciplina(
                 disciplina_id=40, usuario_id=1, tipo_perfil="aluno", suap_id="12345",
             )

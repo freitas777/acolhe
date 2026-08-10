@@ -7,7 +7,7 @@ from backend.database import get_db
 from backend.dependencies import AuthData, get_current_usuario
 from backend.schemas.conteudo_gerado import ConteudoGeradoResponse
 from backend.schemas.perfil_aluno import PerfilAlunoResponse
-from backend.schemas.portal import MeuPerfilResponse, PerfilAlunoSelfUpdate
+from backend.schemas.portal import ConteudoPortalResponse, MeuPerfilResponse, PerfilAlunoSelfUpdate
 from backend.services.portal_service import PortalService
 from backend.services.audit_service import AuditService
 
@@ -69,7 +69,7 @@ def update_meu_perfil(
     return perfil
 
 
-@router.get("/meus-conteudos", response_model=list[ConteudoGeradoResponse])
+@router.get("/meus-conteudos", response_model=list[ConteudoPortalResponse])
 def get_meus_conteudos(
     request: Request,
     auth_data: AuthData = Depends(get_current_usuario),
@@ -82,7 +82,7 @@ def get_meus_conteudos(
     AuditService(db).registrar(
         usuario_id=auth_data.usuario.id,
         acao="leitura",
-        recurso_tipo="conteudo_gerado",
+        recurso_tipo="conteudo",
         recurso_id=0,
         aluno_id=aluno_id,
         detalhes=f"{len(conteudos)} conteudos listados",

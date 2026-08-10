@@ -1,19 +1,10 @@
-import enum
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import Enum, String, DateTime, Boolean
+from sqlalchemy import String, DateTime, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.database import Base
-
-
-class TipoPerfil(enum.Enum):
-    aluno = "aluno"
-    professor = "professor"
-    psicopedagogo = "psicopedagogo"
-    servidor = "servidor"
-    admin = "admin"
 
 
 class Usuario(Base):
@@ -23,9 +14,9 @@ class Usuario(Base):
     suap_id: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
     nome: Mapped[str] = mapped_column(String(200), nullable=False)
     email: Mapped[str] = mapped_column(String(200), nullable=False)
-    matricula: Mapped[str] = mapped_column(String(50), nullable=True)
-    campus: Mapped[str] = mapped_column(String(200), nullable=True)
-    tipo_vinculo: Mapped[str] = mapped_column(String(100), nullable=True)
+    matricula: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    campus: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    tipo_vinculo: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     tipo_perfil: Mapped[str] = mapped_column(
         String(50), nullable=False, default="aluno"
     )

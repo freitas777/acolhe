@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from backend.database import get_db
 from backend.dependencies import AuthData, get_current_usuario, require_napne, require_admin
+from backend.models.conteudo_gerado import ConteudoGerado
 from backend.repositories.aluno import AlunoRepository
 from backend.repositories.conteudo_gerado import ConteudoGeradoRepository
 from backend.schemas.conteudo_gerado import (
@@ -114,7 +115,7 @@ class ConteudoIteracaoRequest(BaseModel):
   response_model=ConteudoGeradoResponse,
   status_code=status.HTTP_201_CREATED,
 )
-def criar_iteracao(
+async def criar_iteracao(
   conteudo_id: int,
   data: ConteudoIteracaoRequest,
   auth_data: AuthData = Depends(require_napne),
@@ -153,26 +154,25 @@ def criar_iteracao(
       prompt_completo += f"- Interesses: {perfil.interesses}\n"
   
   # Gerar nova versão com IA
-  ai_service = AIService()
-  nova_resposta = ai_service.gerar_conteudo_educacional(
+  from backend.services.ai_service import ai_service
+  conteudo_gerado = await ai_service.gerar_conteudo_educacional(
     tema=conteudo_pai.tema,
     perfil_aluno={
-      "nivel_atencao": perfil.nivel_atencao if perfil else None,
+      "nivel_atencao": perfil.nivel_atencao.value if perfil and perfil.nivel_atencao else None,
       "dificuldade_leitura": perfil.dificuldade_leitura if perfil else False,
-      "preferencia": perfil.preferencia if perfil else None,
+      "preferencia": perfil.preferencia.value if perfil and perfil.preferencia else None,
       "interesses": perfil.interesses if perfil else None,
-    } if perfil else None,
-    prompt_personalizado=prompt_completo,
+    } if perfil else {},
   )
-  
+
   # Criar nova iteração
   nova_iteracao = ConteudoGerado(
     aluno_id=aluno_id,
     usuario_id=auth_data.usuario.id,
     tema=conteudo_pai.tema,
     prompt_utilizado=prompt_completo,
-    conteudo=nova_resposta.conteudo,
-    modelo_ia=nova_resposta.modelo_ia,
+    conteudo=conteudo_gerado,
+    modelo_ia="gemini-2.5-flash",
     versao=conteudo_pai.versao + 1,
     conteudo_pai_id=conteudo_id,
   )

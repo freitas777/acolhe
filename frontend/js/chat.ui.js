@@ -6,7 +6,7 @@ const ChatUI = {
   elements: {},
 
   isAluno() {
-    return (localStorage.getItem('acolhe_tipo_perfil') || 'aluno') === 'aluno';
+    return acolheGetTipoPerfil() === 'aluno';
   },
 
   /**
@@ -79,16 +79,28 @@ const ChatUI = {
       return;
     }
 
-    conversations.forEach(conv => {
+    const sortedConversations = [...conversations].sort((a, b) => {
+      const dateA = new Date(a.updated_at || a.created_at || 0);
+      const dateB = new Date(b.updated_at || b.created_at || 0);
+      return dateB - dateA;
+    });
+
+    sortedConversations.forEach(conv => {
       const item = document.createElement('div');
       item.className = `conversation-item ${conv.id === activeId ? 'active' : ''}`;
       item.dataset.conversationId = conv.id;
-      
+
+      const updatedAt = conv.updated_at || conv.created_at;
+      const timeAgo = this.formatTimeAgo(updatedAt);
+
       item.innerHTML = `
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
         </svg>
-        <span>${this.escapeHtml(conv.title)}</span>
+        <div class="conversation-item-content">
+          <span class="conversation-item-title">${this.escapeHtml(conv.title)}</span>
+          <span class="conversation-item-time">${timeAgo}</span>
+        </div>
         ${(!this.isAluno() && conv.aluno_id) ? '<svg class="aluno-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>' : ''}
         <button class="delete-btn" title="Excluir conversa">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -98,9 +110,9 @@ const ChatUI = {
         </button>
       `;
 
-      // Clique para selecionar
       item.addEventListener('click', (e) => {
         if (e.target.closest('.delete-btn')) {
+          e.stopPropagation();
           this.onConversationDelete(conv.id);
           return;
         }
@@ -153,9 +165,7 @@ const ChatUI = {
 
     var contentHtml;
     if (isUser) {
-      let user = null;
-      try { user = JSON.parse(localStorage.getItem('acolhe_user') || '{}'); } catch(e) {}
-      const userName = (user && (user.nome || user.nome_usual)) || 'Usuário';
+      const userName = acolheGetUserName();
       avatar = this.getUserInitials(userName);
       const roleLabels = {
         aluno: 'Aluno',
@@ -164,7 +174,8 @@ const ChatUI = {
         admin: 'Administrador',
         servidor: 'Servidor'
       };
-      const role = user && user.tipo_perfil ? (roleLabels[user.tipo_perfil] || user.tipo_perfil) : '';
+      const tipoPerfil = acolheGetTipoPerfil();
+      const role = roleLabels[tipoPerfil] || tipoPerfil || '';
       authorHtml = `<span class="message-author">${this.escapeHtml(userName)}</span>` +
         (role ? `<span class="message-role">${this.escapeHtml(role)}</span>` : '');
       contentHtml = this.escapeHtml(message.content);
@@ -228,7 +239,15 @@ const ChatUI = {
       this.elements.userNameSmall.textContent = user.nome || 'Usuário';
     }
     if (this.elements.userRoleSmall) {
-      this.elements.userRoleSmall.textContent = user.tipo_vinculo || user.matricula || '-';
+      var roleLabels = {
+        aluno: 'Aluno',
+        professor: 'Professor',
+        psicopedagogo: 'Psicopedagogo',
+        admin: 'Administrador',
+        servidor: 'Servidor'
+      };
+      var perfil = user.tipo_perfil || acolheGetTipoPerfil();
+      this.elements.userRoleSmall.textContent = roleLabels[perfil] || perfil || '';
     }
   },
 
@@ -414,6 +433,48 @@ const ChatUI = {
         return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     },
 
+    formatTimeAgo(isoString) {
+        if (!isoString) return '';
+        const date = new Date(isoString);
+        if (isNaN(date.getTime())) return '';
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+
+        if (diffMins < 1) return 'agora';
+        if (diffMins < 60) return `${diffMins}min`;
+        if (diffHours < 24) return `${diffHours}h`;
+        if (diffDays < 7) return `${diffDays}d`;
+        return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    },
+
+    showLoadingMessages() {
+        const wrapper = this.elements.messagesWrapper;
+        if (!wrapper) return;
+        const existingMessages = wrapper.querySelectorAll('.message');
+        existingMessages.forEach(msg => msg.remove());
+        const emptyState = this.elements.emptyState;
+        if (emptyState) emptyState.style.display = 'none';
+        const loadingDiv = document.createElement('div');
+        loadingDiv.className = 'message loading-message';
+        loadingDiv.id = 'loading-message';
+        loadingDiv.innerHTML = `
+            <div class="message-content" style="text-align: center; width: 100%;">
+                <div class="typing-dots" style="justify-content: center;">
+                    <span></span><span></span><span></span>
+                </div>
+            </div>
+        `;
+        wrapper.appendChild(loadingDiv);
+    },
+
+    removeLoadingMessage() {
+        const loading = document.getElementById('loading-message');
+        if (loading) loading.remove();
+    },
+
   escapeHtml(text) {
     if (!text) return '';
     const div = document.createElement('div');
@@ -423,8 +484,25 @@ const ChatUI = {
 
   renderMarkdown(text) {
     if (!text) return '';
-    if (typeof window.marked !== 'undefined' && typeof window.DOMPurify !== 'undefined') {
-      return DOMPurify.sanitize(marked.parse(text));
+    if (typeof marked !== 'undefined' && typeof DOMPurify !== 'undefined') {
+      try {
+        marked.setOptions({
+          breaks: true,
+          gfm: true,
+          smartLists: true,
+          smartypants: false,
+          headerIds: false,
+          mangle: false
+        });
+        var html = marked.parse(text);
+        return DOMPurify.sanitize(html, {
+          ADD_TAGS: ['input'],
+          ADD_ATTR: ['type', 'checked', 'disabled']
+        });
+      } catch (e) {
+        console.error('Erro ao renderizar Markdown:', e);
+        return this.escapeHtml(text);
+      }
     }
     return this.escapeHtml(text);
   },
@@ -541,12 +619,7 @@ const ChatUI = {
       }
     }
 
-    if (typeof window.marked !== 'undefined' && typeof window.DOMPurify !== 'undefined') {
-      textEl.innerHTML = DOMPurify.sanitize(marked.parse(fullContent));
-    } else {
-      textEl.textContent = fullContent;
-    }
-
+    textEl.innerHTML = this.renderMarkdown(fullContent);
     this.scrollToBottom();
   },
 

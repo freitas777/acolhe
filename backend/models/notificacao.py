@@ -22,7 +22,6 @@ class Notificacao(Base):
     )
     destino_tipo: Mapped[str] = mapped_column(String(50), nullable=False)
     destino_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    lida: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     criada_em: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, default=lambda: datetime.now(timezone.utc),
         server_default=func.now(),

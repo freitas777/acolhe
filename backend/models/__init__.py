@@ -12,6 +12,7 @@ from backend.models.notificacao import Notificacao, NotificacaoLeitura
 from backend.models.acomodacao_observacao import AcomodacaoObservacao
 from backend.models.audit_log import AuditLog
 from backend.models.material import Material
+from backend.models.token_revogado import TokenRevogado
 
 __all__ = [
     "Usuario",
@@ -28,4 +29,6 @@ __all__ = [
     "NotificacaoLeitura",
     "AcomodacaoObservacao",
     "AuditLog",
+    "Material",
+    "TokenRevogado",
 ]

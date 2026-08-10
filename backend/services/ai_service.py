@@ -150,12 +150,16 @@ class AIService:
         self,
         contexto_aluno: Optional[str] = None,
         contexto_disciplina: Optional[str] = None,
+        system_instruction: Optional[str] = None,
     ) -> list[dict]:
-        instrucao = INSTRUCAO_SISTEMA
-        if contexto_aluno:
-            instrucao += "\n\n" + contexto_aluno
-        if contexto_disciplina:
-            instrucao += "\n\n" + contexto_disciplina
+        if system_instruction:
+            instrucao = system_instruction
+        else:
+            instrucao = INSTRUCAO_SISTEMA
+            if contexto_aluno:
+                instrucao += "\n" + contexto_aluno
+            if contexto_disciplina:
+                instrucao += "\n" + contexto_disciplina
         return [
             {"role": "user", "parts": [instrucao]},
             {"role": "model", "parts": ["Entendido. Sou o Acolhe+, pronto para ajudar."]},
@@ -166,6 +170,7 @@ class AIService:
         conversa_id: str,
         contexto_aluno: Optional[str] = None,
         contexto_disciplina: Optional[str] = None,
+        system_instruction: Optional[str] = None,
     ) -> None:
         if contexto_aluno or contexto_disciplina:
             chave_contexto = (contexto_aluno or "") + "|" + (contexto_disciplina or "")
@@ -175,7 +180,7 @@ class AIService:
             modelo = self._obter_modelo()
             self._sessao_contexto.pop(conversa_id, None)
 
-        historico = self._construir_historico_base(contexto_aluno, contexto_disciplina)
+        historico = self._construir_historico_base(contexto_aluno, contexto_disciplina, system_instruction)
         sessao = modelo.start_chat(history=historico)
         self._sessoes[conversa_id] = sessao
 
@@ -198,6 +203,7 @@ class AIService:
         contexto_aluno: Optional[str] = None,
         contexto_disciplina: Optional[str] = None,
         mensagens: Optional[list] = None,
+        system_instruction: Optional[str] = None,
     ) -> None:
         if contexto_aluno or contexto_disciplina:
             chave_contexto = (contexto_aluno or "") + "|" + (contexto_disciplina or "")
@@ -207,7 +213,7 @@ class AIService:
             modelo = self._obter_modelo()
             self._sessao_contexto.pop(conversa_id, None)
 
-        historico = self._construir_historico_base(contexto_aluno, contexto_disciplina)
+        historico = self._construir_historico_base(contexto_aluno, contexto_disciplina, system_instruction)
 
         if mensagens:
             for msg in mensagens:
@@ -238,9 +244,10 @@ class AIService:
         conversa_id: str,
         contexto_aluno: Optional[str] = None,
         contexto_disciplina: Optional[str] = None,
+        system_instruction: Optional[str] = None,
     ) -> None:
         async with self._lock:
-            self._criar_sessao(conversa_id, contexto_aluno, contexto_disciplina)
+            self._criar_sessao(conversa_id, contexto_aluno, contexto_disciplina, system_instruction)
 
     async def obter_sessao(
         self,
@@ -284,6 +291,7 @@ class AIService:
         contexto_aluno: Optional[str] = None,
         contexto_disciplina: Optional[str] = None,
         mensagens: Optional[list] = None,
+        system_instruction: Optional[str] = None,
     ) -> None:
         async with self._lock:
             if conversa_id not in self._sessoes:
@@ -293,12 +301,14 @@ class AIService:
                         contexto_aluno=contexto_aluno,
                         contexto_disciplina=contexto_disciplina,
                         mensagens=mensagens,
+                        system_instruction=system_instruction,
                     )
                 else:
                     self._criar_sessao(
                         conversa_id,
                         contexto_aluno=contexto_aluno,
                         contexto_disciplina=contexto_disciplina,
+                        system_instruction=system_instruction,
                     )
 
     async def encerrar_sessao(self, conversa_id: str) -> None:

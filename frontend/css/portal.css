@@ -726,6 +726,131 @@ body {
     margin-left: 8px;
 }
 
+.conversa-timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    padding: 1rem 0;
+    position: relative;
+}
+
+.conversa-timeline::before {
+    content: '';
+    position: absolute;
+    left: 24px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--color-border-light);
+}
+
+.timeline-item {
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    padding-left: 60px;
+    margin-bottom: 1rem;
+}
+
+.timeline-actor {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-light);
+}
+
+.timeline-actor:hover {
+    background: var(--color-surface-secondary);
+    border-color: var(--color-primary);
+}
+
+.timeline-actor.active {
+    background: var(--color-surface-secondary);
+    border-color: var(--color-primary);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.actor-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.actor-icon svg {
+    width: 18px;
+    height: 18px;
+}
+
+.timeline-actor.actor-user .actor-icon {
+    background: var(--suap-green);
+    color: white;
+}
+
+.timeline-actor.actor-assistant .actor-icon {
+    background: var(--color-primary);
+    color: white;
+}
+
+.actor-label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-text-primary);
+}
+
+.timeline-message {
+    margin-top: 0.5rem;
+    padding: 0.75rem 1rem;
+    background: var(--color-surface);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border-light);
+    animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.timeline-message .message-content {
+    font-size: 0.875rem;
+    line-height: 1.6;
+    color: var(--color-text-primary);
+}
+
+.timeline-message .message-content p {
+    margin: 0.5rem 0;
+}
+
+.timeline-message .message-content p:first-child {
+    margin-top: 0;
+}
+
+.timeline-message .message-content p:last-child {
+    margin-bottom: 0;
+}
+
+.conversa-empty {
+    text-align: center;
+    color: var(--color-text-muted);
+    font-size: 0.875rem;
+    padding: 2rem;
+}
+
 @media (max-width: 768px) {
     .topbar { padding: 0 1rem; gap: 0.5rem; }
     .topbar-center { display: none; }

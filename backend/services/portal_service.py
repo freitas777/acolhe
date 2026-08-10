@@ -46,7 +46,10 @@ class PortalService:
         self.db.refresh(perfil)
         return perfil
 
-    def listar_meus_conteudos(self, suap_id: str) -> list[ConteudoGerado]:
+    def listar_meus_conteudos(self, suap_id: str) -> list:
+        from backend.models.conversa import Conversa
+        from backend.schemas.portal import ConteudoPortalResponse
+        
         aluno = (
             self.db.query(Aluno)
             .filter(Aluno.suap_id == suap_id)
@@ -55,12 +58,59 @@ class PortalService:
         if not aluno:
             return []
 
-        return (
+        conteudos_gerados = (
             self.db.query(ConteudoGerado)
             .filter(ConteudoGerado.aluno_id == aluno.id)
-            .order_by(ConteudoGerado.gerado_em.desc())
             .all()
         )
+
+        conversas = (
+            self.db.query(Conversa)
+            .options(selectinload(Conversa.mensagens), selectinload(Conversa.usuario))
+            .filter(Conversa.aluno_id == aluno.id)
+            .all()
+        )
+
+        resultado = []
+        
+        for cg in conteudos_gerados:
+            resultado.append(ConteudoPortalResponse(
+                id=str(cg.id),
+                tipo="conteudo_gerado",
+                titulo=cg.tema,
+                data=cg.gerado_em,
+                conteudo=cg.conteudo,
+                modelo_ia=cg.modelo_ia,
+                versao=cg.versao,
+            ))
+        
+        for conv in conversas:
+            usuario_tipo = None
+            if conv.usuario:
+                usuario_tipo = conv.usuario.tipo_perfil
+            
+            resultado.append(ConteudoPortalResponse(
+                id=conv.id,
+                tipo="conversa",
+                titulo=conv.titulo,
+                data=conv.atualizada_em,
+                conteudo=None,
+                modelo_ia=None,
+                versao=None,
+                usuario_tipo=usuario_tipo,
+                messages=[
+                    {
+                        "id": m.id,
+                        "role": m.papel,
+                        "content": m.conteudo,
+                        "created_at": m.criada_em,
+                    }
+                    for m in conv.mensagens
+                ],
+            ))
+        
+        resultado.sort(key=lambda x: x.data, reverse=True)
+        return resultado
 
     def obter_conteudo(self, suap_id: str, conteudo_id: int) -> ConteudoGerado | None:
         aluno = (
@@ -80,3 +130,5 @@ class PortalService:
             .first()
         )
         return conteudo
+
+

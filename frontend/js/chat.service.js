@@ -40,7 +40,30 @@ const ChatService = {
           var errorData = await response.json();
           detail = errorData.detail || detail;
         } catch (_) {}
-        throw new Error(detail);
+
+        if (response.status === 404 && body.conversation_id) {
+          ChatStore.state.activeConversationId = null;
+          ChatStore.save();
+          body.conversation_id = null;
+          response = await acolheFetch(this.API_BASE_URL + '/api/chat/stream', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'text/event-stream'
+            },
+            body: JSON.stringify(body)
+          });
+          if (!response.ok) {
+            var detail2 = 'Erro na API';
+            try {
+              var errorData2 = await response.json();
+              detail2 = errorData2.detail || detail2;
+            } catch (_) {}
+            throw new Error(detail2);
+          }
+        } else {
+          throw new Error(detail);
+        }
       }
 
       var reader = response.body.getReader();
@@ -76,6 +99,22 @@ const ChatService = {
             userMessage = event.message;
           } else if (event.type === 'conversation_id') {
             conversationId = event.conversation_id;
+            if (conversationId && !ChatStore.state.activeConversationId) {
+              ChatStore.state.activeConversationId = conversationId;
+              var newConv = {
+                id: conversationId,
+                title: trimmedContent.substring(0, 50) + (trimmedContent.length > 50 ? '...' : ''),
+                messages: [],
+                created_at: new Date().toISOString(),
+                aluno_id: alunoId || null,
+                aluno_nome: null
+              };
+              ChatStore.state.conversations.unshift(newConv);
+              ChatStore.save();
+              if (typeof ChatUI !== 'undefined' && ChatUI.renderConversations) {
+                ChatUI.renderConversations(ChatStore.getAllConversations(), conversationId);
+              }
+            }
           } else if (event.type === 'meta') {
             alunoIdResult = event.aluno_id || null;
             alunoNomeResult = event.aluno_nome || null;
@@ -156,9 +195,9 @@ throw error;
         return ChatStore.getAllConversations();
       }
     } catch (error) {
-      ChatUI.showError('Erro ao carregar conversas');
+      ChatUI.showError('Erro ao criar conversa');
     }
-    return ChatStore.getAllConversations();
+    return null;
   },
 
   /**
@@ -201,7 +240,7 @@ throw error;
     } catch (error) {
       ChatUI.showError('Erro ao criar conversa');
     }
-    return ChatStore.createConversation();
+    return null;
   },
 
   /**
@@ -209,13 +248,20 @@ throw error;
    */
   async deleteConversation(id) {
     try {
-      await acolheFetch(`${this.API_BASE_URL}/api/chat/conversations/${id}`, {
+      const response = await acolheFetch(`${this.API_BASE_URL}/api/chat/conversations/${id}`, {
         method: 'DELETE'
       });
+      if (!response.ok) {
+        console.error('Erro ao deletar conversa:', response.status);
+        ChatUI.showError('Erro ao excluir conversa');
+        return false;
+      }
+      return true;
     } catch (error) {
+      console.error('Erro ao deletar conversa:', error);
       ChatUI.showError('Erro ao excluir conversa');
+      return false;
     }
-    return ChatStore.deleteConversation(id);
   },
 
   getActiveConversation() {
@@ -236,6 +282,46 @@ throw error;
   } catch (error) {
   }
   return [];
+  },
+
+  async loadConversationHistory(conversationId) {
+    try {
+      const response = await acolheFetch(`${this.API_BASE_URL}/api/chat/conversations/${conversationId}`);
+      if (response.ok) {
+        return await response.json();
+      }
+    } catch (error) {
+      console.error('Erro ao carregar histÃ³rico da conversa:', error);
+    }
+    return null;
+  },
+
+  async vincularAluno(conversationId, alunoId) {
+    try {
+      const response = await acolheFetch(`${this.API_BASE_URL}/api/chat/conversations/${conversationId}/aluno/${alunoId}`, {
+        method: 'PUT'
+      });
+      if (response.ok) {
+        return await response.json();
+      }
+    } catch (error) {
+      console.error('Erro ao vincular aluno:', error);
+    }
+    return null;
+  },
+
+  async desvincularAluno(conversationId) {
+    try {
+      const response = await acolheFetch(`${this.API_BASE_URL}/api/chat/conversations/${conversationId}/aluno`, {
+        method: 'DELETE'
+      });
+      if (response.ok) {
+        return await response.json();
+      }
+    } catch (error) {
+      console.error('Erro ao desvincular aluno:', error);
+    }
+    return null;
   }
 };
 

@@ -8,7 +8,7 @@ from fastapi import HTTPException
 
 from backend.models.pendencia_validacao import PendenciaValidacao, StatusPendencia
 from backend.models.aluno import Aluno
-from backend.models.usuario import Usuario, TipoPerfil
+from backend.models.usuario import Usuario
 from backend.services.auth_service import AuthService
 from backend.security import (
     hash_senha,
@@ -24,12 +24,12 @@ from backend.security import (
 # ---------------------------------------------------------------------------
 
 class TestHashSenha:
-    def test_retorna_formato_salt_dolar_hash(self):
+    def test_retorna_formato_bcrypt(self):
         result = hash_senha("minhasenha")
-        assert "$" in result
-        parts = result.split("$", 1)
-        assert len(parts) == 2
-        assert len(parts[0]) == 32
+        assert result.startswith("$2b$") or result.startswith("$2a$")
+        parts = result.split("$")
+        assert len(parts) == 4
+        assert parts[1] in ["2a", "2b"]
 
     def test_senhas_iguais_geram_hashes_diferentes(self):
         h1 = hash_senha("minhasenha")

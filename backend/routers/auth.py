@@ -1,11 +1,15 @@
 import secrets
 import string
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from urllib.parse import urlencode
 import httpx
+
+logger = logging.getLogger(__name__)
 
 from backend.config import settings
 from backend.database import get_db
@@ -73,6 +77,16 @@ async def callback(request: LoginRequest, auth_service: AuthService = Depends())
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Credenciais invalidas. Faca login novamente.",
+            )
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Erro ao comunicar com SUAP: {e.response.status_code}",
+        )
+    except Exception as e:
+        logger.error("Erro inesperado no callback SUAP: %s", e, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Erro interno ao processar login. Tente novamente.",
         )
 
 # --- Professor Dashboard endpoints ---
@@ -200,8 +214,43 @@ async def obter_observacao(
     return obs
 
 
+@router.post("/logout")
+async def logout(
+    request: Request,
+    auth_data: AuthData = Depends(get_current_usuario),
+    db: Session = Depends(get_db),
+):
+    from datetime import datetime, timezone
+    from backend.security import validar_jwt
+    from backend.repositories.token_revogado import TokenRevogadoRepository
+    from backend.services.audit_service import AuditService
+
+    auth_header = request.headers.get("authorization", "")
+    if auth_header.startswith("Bearer "):
+        token = auth_header.split(" ", 1)[1]
+        payload = validar_jwt(token)
+        if payload:
+            jti = payload.get("jti")
+            exp = payload.get("exp")
+            if jti and exp:
+                token_repo = TokenRevogadoRepository(db)
+                expira_em = datetime.fromtimestamp(exp, tz=timezone.utc)
+                token_repo.revogar_token(jti, auth_data.usuario.id, expira_em)
+
+                AuditService(db).registrar(
+                    usuario_id=auth_data.usuario.id,
+                    acao="logout",
+                    recurso_tipo="usuario",
+                    recurso_id=auth_data.usuario.id,
+                )
+
+    return {"detail": "Logout realizado com sucesso."}
+
+
 @router.post("/local-login", response_model=LoginResponse)
-async def local_login(request: LocalLoginRequest, db: Session = Depends(get_db)):
+async def local_login(request: LocalLoginRequest, req: Request, db: Session = Depends(get_db)):
+    from backend.services.audit_service import AuditService
+    from datetime import datetime, timezone, timedelta
     conta_repo = ContaLocalRepository(db)
     conta = conta_repo.get_by_email(request.email)
     if not conta:
@@ -214,15 +263,41 @@ async def local_login(request: LocalLoginRequest, db: Session = Depends(get_db))
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Conta desativada.",
         )
-    if not verificar_senha(request.senha, conta.senha_hash):
+    if conta.bloqueado_ate:
+        agora = datetime.now(timezone.utc)
+        bloqueado_ate = conta.bloqueado_ate if conta.bloqueado_ate.tzinfo else conta.bloqueado_ate.replace(tzinfo=timezone.utc)
+        if bloqueado_ate > agora:
+            minutos_restantes = int((bloqueado_ate - agora).total_seconds() / 60)
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Conta bloqueada. Tente novamente em {minutos_restantes} minutos.",
+            )
+    import asyncio
+    senha_valida = await asyncio.to_thread(verificar_senha, request.senha, conta.senha_hash)
+    if not senha_valida:
+        conta.tentativas_login += 1
+        if conta.tentativas_login >= 10:
+            conta.bloqueado_ate = datetime.now(timezone.utc) + timedelta(minutes=30)
+        db.commit()
+        AuditService(db).registrar(
+            usuario_id=conta.usuario_id,
+            acao="login_falha",
+            recurso_tipo="usuario",
+            recurso_id=conta.usuario_id,
+            ip_origem=req.client.host if req.client else None,
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Email ou senha invalidos.",
         )
 
-    if "$" not in conta.senha_hash:
+    if not (conta.senha_hash.startswith('$2b$') or conta.senha_hash.startswith('$2a$')):
         conta.senha_hash = hash_senha(request.senha)
         db.commit()
+
+    conta.tentativas_login = 0
+    conta.bloqueado_ate = None
+    db.commit()
 
     usuario_repo = UsuarioRepository(db)
     usuario = usuario_repo.get_by_id(conta.usuario_id)
@@ -232,7 +307,20 @@ async def local_login(request: LocalLoginRequest, db: Session = Depends(get_db))
             detail="Email ou senha invalidos.",
         )
 
-    jwt_token = criar_jwt({"usuario_id": usuario.id, "tipo_perfil": usuario.tipo_perfil})
+    AuditService(db).registrar(
+        usuario_id=usuario.id,
+        acao="login_sucesso",
+        recurso_tipo="usuario",
+        recurso_id=usuario.id,
+        ip_origem=req.client.host if req.client else None,
+    )
+
+    jwt_token = criar_jwt({
+        "usuario_id": usuario.id,
+        "tipo_perfil": usuario.tipo_perfil,
+        "nome": usuario.nome,
+        "senha_temporaria": conta.senha_temporaria,
+    })
 
     resp = LoginResponse(
         usuario=UsuarioSUAPResponse.model_validate(usuario),
@@ -287,6 +375,7 @@ async def criar_convite(
         "senha_hash": hash_senha(senha_temp),
         "usuario_id": novo_usuario.id,
         "ativo": True,
+        "senha_temporaria": request.tipo_perfil != "admin",
     })
 
     return ConviteResponse(
@@ -309,15 +398,23 @@ async def alterar_senha(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Usuario nao possui conta local.",
         )
-    if not verificar_senha(request.senha_atual, conta.senha_hash):
+    import asyncio
+    senha_valida = await asyncio.to_thread(verificar_senha, request.senha_atual, conta.senha_hash)
+    if not senha_valida:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Senha atual incorreta.",
         )
-    conta.senha_hash = hash_senha(request.nova_senha)
+    conta.senha_hash = await asyncio.to_thread(hash_senha, request.nova_senha)
     conta.senha_temporaria = False
     db.commit()
-    return {"detail": "Senha alterada com sucesso."}
+    new_token = criar_jwt({
+        "usuario_id": auth_data.usuario.id,
+        "tipo_perfil": auth_data.usuario.tipo_perfil,
+        "nome": auth_data.usuario.nome,
+        "senha_temporaria": False,
+    })
+    return {"detail": "Senha alterada com sucesso.", "token": new_token}
 
 
 @router.get("/me", response_model=UsuarioSUAPResponse)

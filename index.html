@@ -39,9 +39,6 @@
  </button>
  </div>
  <div class="help-links">
- <a href="https://suap.ifrn.edu.br/accounts/password/reset/" target="_blank" rel="noopener" class="help-link">
- Esqueceu sua senha?
- </a>
  </div>
  </div>
 
@@ -119,6 +116,7 @@ if (suap.isAuthenticated() && window.location.hash && window.location.hash.inclu
   localStorage.setItem('acolhe_user_id', data.usuario.id);
   localStorage.setItem('acolhe_access_token', data.token || accessToken);
   localStorage.setItem('acolhe_tipo_perfil', data.tipo_perfil || data.usuario.tipo_perfil || 'aluno');
+  localStorage.setItem('acolhe_user_nome', data.usuario.nome || '');
   localStorage.setItem('acolhe_senha_temporaria', data.usuario.senha_temporaria ? 'true' : 'false');
   redirectByPerfil();
  })
@@ -197,6 +195,7 @@ document.getElementById('local-login-form').addEventListener('submit', function(
   localStorage.setItem('acolhe_user_id', data.usuario.id);
   localStorage.setItem('acolhe_access_token', data.token);
   localStorage.setItem('acolhe_tipo_perfil', data.tipo_perfil || data.usuario.tipo_perfil || 'aluno');
+  localStorage.setItem('acolhe_user_nome', data.usuario.nome || '');
   localStorage.setItem('acolhe_senha_temporaria', data.usuario.senha_temporaria ? 'true' : 'false');
   redirectByPerfil();
  })

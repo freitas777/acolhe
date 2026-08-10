@@ -41,6 +41,12 @@ class Conversa(Base):
         default=lambda: datetime.now(timezone.utc),
         server_default=func.now(),
     )
+    atualizada_em: Mapped[datetime] = mapped_column(
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        server_default=func.now(),
+    )
 
     mensagens = relationship(
         "Mensagem",
@@ -48,6 +54,7 @@ class Conversa(Base):
         cascade="all, delete-orphan",
         order_by="Mensagem.criada_em",
     )
+    usuario = relationship("Usuario")
     aluno = relationship("Aluno")
     disciplina = relationship("Disciplina")
 

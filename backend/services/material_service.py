@@ -5,6 +5,7 @@ import uuid
 from pathlib import Path
 from fastapi import HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
+import magic
 from backend.config import settings
 from backend.models.disciplina import Disciplina
 from backend.models.material import Material
@@ -19,6 +20,17 @@ logger = logging.getLogger(__name__)
 
 ALLOWED_EXTENSIONS: set[str] = set()
 
+MAGIC_BYTES = {
+    "pdf": [b"%PDF"],
+    "doc": [b"\xd0\xcf\x11\xe0"],
+    "docx": [b"PK\x03\x04"],
+    "ppt": [b"\xd0\xcf\x11\xe0"],
+    "pptx": [b"PK\x03\x04"],
+    "png": [b"\x89PNG"],
+    "jpg": [b"\xff\xd8\xff"],
+    "jpeg": [b"\xff\xd8\xff"],
+    "txt": None,
+}
 
 def _get_allowed_extensions() -> set[str]:
     if not ALLOWED_EXTENSIONS:
@@ -30,7 +42,7 @@ def _get_extension(filename: str) -> str:
     return Path(filename).suffix.lower().lstrip(".")
 
 
-def _validate_file(filename: str, content_type: str, size: int) -> None:
+def _validate_file(filename: str, content_type: str, size: int, content: bytes) -> None:
     ext = _get_extension(filename)
     if ext not in _get_allowed_extensions():
         raise HTTPException(
@@ -43,6 +55,23 @@ def _validate_file(filename: str, content_type: str, size: int) -> None:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Arquivo muito grande. Tamanho maximo: {max_mb}MB",
         )
+    expected_magic = MAGIC_BYTES.get(ext)
+    if expected_magic:
+        if not any(content.startswith(m) for m in expected_magic):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Arquivo corrompido ou tipo invalido para extensao .{ext}",
+            )
+    
+    # Validação de MIME type é apenas informativa, não bloqueante
+    # Browsers podem enviar MIME types diferentes do detectado por magic
+    if content_type:
+        detected_mime = magic.from_buffer(content, mime=True)
+        if detected_mime != content_type:
+            logger.warning(
+                "MIME type mismatch: esperado=%s, detectado=%s para arquivo %s",
+                content_type, detected_mime, filename
+            )
 
 
 def _get_upload_dir() -> Path:
@@ -83,7 +112,7 @@ class MaterialService:
     ) -> MaterialResponse:
         content = await file.read()
         size = len(content)
-        _validate_file(file.filename or "", file.content_type or "", size)
+        _validate_file(file.filename or "", file.content_type or "", size, content)
 
         cat = (categoria or "outro").strip().lower()
         if cat not in self._get_categorias():

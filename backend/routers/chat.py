@@ -70,6 +70,59 @@ async def listar_conversas(
     )
 
 
+@router.get(
+    "/conversations/{conversa_id}",
+    response_model=ConversaResposta,
+    response_model_by_alias=False,
+)
+async def obter_conversa(
+    conversa_id: str,
+    auth_data: AuthData = Depends(get_current_usuario),
+    service: ChatService = Depends(_service),
+):
+    return service.obter_conversa(
+        conversa_id,
+        usuario_id=auth_data.usuario.id,
+        tipo_perfil=auth_data.usuario.tipo_perfil,
+    )
+
+
+@router.put(
+    "/conversations/{conversa_id}/aluno/{aluno_id}",
+    response_model=ConversaResposta,
+    response_model_by_alias=False,
+)
+async def vincular_aluno_conversa(
+    conversa_id: str,
+    aluno_id: int,
+    auth_data: AuthData = Depends(get_current_usuario),
+    service: ChatService = Depends(_service),
+):
+    return await service.vincular_aluno(
+        conversa_id=conversa_id,
+        aluno_id=aluno_id,
+        usuario_id=auth_data.usuario.id,
+        tipo_perfil=auth_data.usuario.tipo_perfil,
+    )
+
+
+@router.delete(
+    "/conversations/{conversa_id}/aluno",
+    response_model=ConversaResposta,
+    response_model_by_alias=False,
+)
+async def desvincular_aluno_conversa(
+    conversa_id: str,
+    auth_data: AuthData = Depends(get_current_usuario),
+    service: ChatService = Depends(_service),
+):
+    return await service.desvincular_aluno(
+        conversa_id=conversa_id,
+        usuario_id=auth_data.usuario.id,
+        tipo_perfil=auth_data.usuario.tipo_perfil,
+    )
+
+
 @router.post("/send", response_model=ChatResposta, response_model_by_alias=False)
 async def enviar_mensagem(
     dados: ChatRequisicao,

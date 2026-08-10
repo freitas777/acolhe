@@ -1,9 +1,12 @@
 (function() {
 'use strict';
 
- if (!acolheRequireRole(['psicopedagogo', 'servidor', 'admin'])) return;
+ var _token = acolheGetToken();
+ var _payload = _token ? acolheDecodeJWTPayload(_token) : null;
+ var _isTemp = _payload && _payload.senha_temporaria === true;
+ if (!_isTemp && !acolheRequireRole(['psicopedagogo', 'servidor', 'admin'])) return;
 
- var userId = localStorage.getItem('acolhe_user_id');
+ var userId = acolheGetUserId();
     var currentUser = null;
     var searchTimeout = null;
 
@@ -17,16 +20,17 @@ function init() {
 }
 
 function checkSenhaTemporaria() {
- if (localStorage.getItem('acolhe_senha_temporaria') === 'true') {
+ var token = acolheGetToken();
+ if (!token) return;
+ var payload = acolheDecodeJWTPayload(token);
+ if (payload && payload.senha_temporaria === true) {
   openSenhaModal(true);
  }
 }
 
     function loadUserInfo() {
-        var savedUser = localStorage.getItem('acolhe_user');
-        if (savedUser) {
-            try { currentUser = JSON.parse(savedUser); } catch(e) {}
-        }
+        var userName = acolheGetUserName();
+        currentUser = { nome: userName };
         updateUserInfoUI();
     }
 
@@ -456,19 +460,42 @@ function openSenhaModal(forceTemp) {
  var isTemp = !!forceTemp;
  if (noticeEl) noticeEl.hidden = !isTemp;
  var cancelBtn = document.getElementById('senha-cancel');
+ var closeBtn = document.getElementById('senha-modal-close');
  if (cancelBtn) cancelBtn.style.display = isTemp ? 'none' : '';
+ if (closeBtn) closeBtn.style.display = isTemp ? 'none' : '';
  var submitBtn = document.getElementById('senha-submit');
     if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Alterar Senha'; }
     modal.hidden = false;
+    
+    // Se é senha temporária, bloquear fechamento do modal
+    if (isTemp) {
+        modal.setAttribute('data-force-open', 'true');
+        document.body.style.overflow = 'hidden';
+    }
+    
     _trapFocus(modal);
 }
 
 function closeSenhaModal() {
-    _untrapFocus();
     var modal = document.getElementById('senha-modal');
-    if (modal) modal.hidden = true;
-    if (localStorage.getItem('acolhe_senha_temporaria') === 'true') {
-        acolheLogout();
+    if (modal && modal.getAttribute('data-force-open') === 'true') {
+        // Não permitir fechar se for senha temporária
+        return;
+    }
+    
+    _untrapFocus();
+    if (modal) {
+        modal.hidden = true;
+        modal.removeAttribute('data-force-open');
+    }
+    document.body.style.overflow = '';
+    
+    var token = acolheGetToken();
+    if (token) {
+        var payload = acolheDecodeJWTPayload(token);
+        if (payload && payload.senha_temporaria === true) {
+            acolheLogout();
+        }
     }
 }
 
@@ -504,12 +531,21 @@ function handleAlterarSenha(e) {
   if (!r.ok) return r.json().then(function(d) { throw new Error(d.detail || 'HTTP ' + r.status); });
   return r.json();
  })
- .then(function() {
-  localStorage.setItem('acolhe_senha_temporaria', 'false');
-  showToast('Senha alterada com sucesso!', 'success');
-  closeSenhaModal();
-  loadEquipe();
- })
+  .then(function(data) {
+   // Atualizar token no localStorage
+   if (data && data.token) {
+       localStorage.setItem('acolhe_access_token', data.token);
+   }
+   showToast('Senha alterada com sucesso!', 'success');
+   
+   var modal = document.getElementById('senha-modal');
+   if (modal) {
+       modal.removeAttribute('data-force-open');
+   }
+   document.body.style.overflow = '';
+   closeSenhaModal();
+   loadEquipe();
+  })
  .catch(function(err) {
   showToast('Erro: ' + err.message, 'error');
   btn.disabled = false;

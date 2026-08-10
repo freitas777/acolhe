@@ -176,25 +176,26 @@ class _RateLimiter:
 
 # Rate limiters para diferentes categorias de endpoints
 _CHAT_LIMITER = _RateLimiter(max_requests=10, window_seconds=60)
-_SENSITIVE_LIMITER = _RateLimiter(max_requests=20, window_seconds=60)  # Para operações sensíveis
+_SENSITIVE_LIMITER = _RateLimiter(max_requests=20, window_seconds=60)  # Para operaÃ§Ãµes sensÃ­veis
+_LOGIN_LIMITER = _RateLimiter(max_requests=5, window_seconds=300)  # 5 tentativas a cada 5 min
 
-# Endpoints de chat (limitação mais restrita)
+# Endpoints de chat (limitaÃ§Ã£o mais restrita)
 _RATE_LIMIT_PATHS = {"/api/chat/send", "/api/chat/stream"}
 
-# Endpoints sensíveis (importação, observações, solicitação de apoio)
+# Endpoints sensÃ­veis (importaÃ§Ã£o, observaÃ§Ãµes, solicitaÃ§Ã£o de apoio)
 _SENSITIVE_PATHS = {
     "/api/importacao",
     "/api/importacao/search",
     "/api/importacao/importar",
 }
 
-# Prefixos sensíveis (para matching parcial)
+# Prefixos sensÃ­veis (para matching parcial)
 _SENSITIVE_PREFIXES = {
-    "/auth/disciplinas/alunos/",  # Observações, solicitação de apoio
+    "/auth/disciplinas/alunos/",  # ObservaÃ§Ãµes, solicitaÃ§Ã£o de apoio
 }
 
 def _is_sensitive_path(path: str) -> bool:
-    """Verifica se o path é um endpoint sensível."""
+    """Verifica se o path Ã© um endpoint sensÃ­vel."""
     if path in _SENSITIVE_PATHS:
         return True
     for prefix in _SENSITIVE_PREFIXES:
@@ -214,7 +215,7 @@ async def request_id_middleware(request: Request, call_next):
 
 @app.middleware("http")
 async def rate_limit_middleware(request: Request, call_next):
-    # Determinar chave de rate limit: usuário autenticado > IP
+    # Determinar chave de rate limit: usuÃ¡rio autenticado > IP
     auth_header = request.headers.get("authorization", "")
     if auth_header:
         # Extrair usuario_id do token (simplificado: usar hash do token)
@@ -223,21 +224,30 @@ async def rate_limit_middleware(request: Request, call_next):
         client_key = f"ip:{request.client.host}"
     else:
         client_key = "unknown"
-    
+
+    # Rate limit especÃ­fico para login
+    if request.url.path == "/auth/local-login":
+        login_key = f"login:{request.client.host}" if request.client else "login:unknown"
+        if _LOGIN_LIMITER.is_limited(login_key):
+            return JSONResponse(
+                status_code=429,
+                content={"detail": "Muitas tentativas de login. Aguarde 5 minutos."},
+            )
+
     # Aplicar rate limit baseado no tipo de endpoint
     if request.url.path in _RATE_LIMIT_PATHS:
         if _CHAT_LIMITER.is_limited(client_key):
             return JSONResponse(
                 status_code=429,
-                content={"detail": "Muitas requisições. Aguarde um momento e tente novamente."},
+                content={"detail": "Muitas requisiÃ§Ãµes. Aguarde um momento e tente novamente."},
             )
     elif _is_sensitive_path(request.url.path):
         if _SENSITIVE_LIMITER.is_limited(client_key):
             return JSONResponse(
                 status_code=429,
-                content={"detail": "Muitas requisições. Aguarde um momento e tente novamente."},
+                content={"detail": "Muitas requisiÃ§Ãµes. Aguarde um momento e tente novamente."},
             )
-    
+
     return await call_next(request)
 
 # =====================
@@ -252,6 +262,21 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# =====================
+# SECURITY HEADERS
+# =====================
+@app.middleware("http")
+async def security_headers_middleware(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' https://fonts.googleapis.com;"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    return response
 
 # =====================
 # CAMINHOS

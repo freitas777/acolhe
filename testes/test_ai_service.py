@@ -125,7 +125,7 @@ class TestCriarSessao:
             svc._criar_sessao("conv-1", contexto_aluno="contexto do aluno")
 
         assert "conv-1" in svc._sessoes
-        assert svc._sessao_contexto["conv-1"] == "contexto do aluno"
+        assert svc._sessao_contexto["conv-1"] == "contexto do aluno|"
         history = mock_model_ctx.start_chat.call_args[1]["history"]
         assert "contexto do aluno" in history[0]["parts"][0]
 

@@ -15,6 +15,7 @@ class ConversaResposta(BaseModel):
     title: str = Field(alias="titulo")
     messages: list["MensagemResposta"] = []
     created_at: datetime = Field(alias="criada_em")
+    updated_at: Optional[datetime] = Field(None, alias="atualizada_em")
     user_id: Optional[int] = Field(None, alias="usuario_id")
     aluno_id: Optional[int] = None
     aluno_nome: Optional[str] = None

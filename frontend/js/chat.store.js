@@ -66,10 +66,11 @@ const ChatStore = {
       title: title,
       messages: [],
       created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
       aluno_id: alunoId,
       aluno_nome: alunoNome
     };
-    
+
     this.state.conversations.unshift(conversation);
     this.state.activeConversationId = conversation.id;
     this.save();
@@ -124,12 +125,8 @@ const ChatStore = {
     };
 
     conversation.messages.push(message);
+    conversation.updated_at = new Date().toISOString();
 
-    // Atualiza título se for primeira mensagem do usuário
-    if (conversation.messages.length === 1 && role === 'user') {
-      conversation.title = content.substring(0, 50) + (content.length > 50 ? '...' : '');
-    }
-    
     this.save();
     return message;
   },

@@ -3,9 +3,9 @@
 
 if (!acolheRequireAuth()) return;
 
-  var userId = localStorage.getItem('acolhe_user_id');
+  var userId = acolheGetUserId();
   var currentUser = null;
-  var tipoPerfil = localStorage.getItem('acolhe_tipo_perfil') || 'aluno';
+  var tipoPerfil = acolheGetTipoPerfil();
   var currentView = 'grid';
 
   function init() {
@@ -35,34 +35,24 @@ var semestreEl = document.getElementById('semestre-text');
       if (!response.ok) throw new Error('HTTP ' + response.status);
       return response.json();
     })
-    .then(function(data) {
-      if (data.usuario) {
-        currentUser = data.usuario;
-        tipoPerfil = data.tipo_perfil || data.usuario.tipo_perfil || 'aluno';
-        localStorage.setItem('acolhe_user', JSON.stringify(data.usuario));
-        localStorage.setItem('acolhe_user_id', data.usuario.id);
-        localStorage.setItem('acolhe_tipo_perfil', tipoPerfil);
-        userId = data.usuario.id;
-        updateUserInfoUI();
-      }
-      if (callback) callback();
-    })
+     .then(function(data) {
+       if (data.usuario) {
+         currentUser = data.usuario;
+         tipoPerfil = acolheGetTipoPerfil();
+         userId = data.usuario.id;
+         updateUserInfoUI();
+       }
+       if (callback) callback();
+     })
     .catch(function(error) {
       if (callback) callback();
     });
   }
 
   function loadUserInfo() {
-  var savedUser = localStorage.getItem('acolhe_user');
-    if (savedUser) {
-        try {
-            var parsed = JSON.parse(savedUser);
-            currentUser = parsed;
-            tipoPerfil = parsed.tipo_perfil || localStorage.getItem('acolhe_tipo_perfil') || 'aluno';
-        } catch (e) {}
+    tipoPerfil = acolheGetTipoPerfil();
+    updateUserInfoUI();
   }
-  updateUserInfoUI();
-}
 
   function updateUserInfoUI() {
     if (!currentUser) return;
@@ -143,17 +133,14 @@ var semestreEl = document.getElementById('semestre-text');
       }
       return response.json();
     })
-    .then(function(data) {
-      if (data.usuario) {
-        currentUser = data.usuario;
-        tipoPerfil = data.tipo_perfil || data.usuario.tipo_perfil || 'aluno';
-        localStorage.setItem('acolhe_user', JSON.stringify(data.usuario));
-        localStorage.setItem('acolhe_user_id', data.usuario.id);
-        localStorage.setItem('acolhe_tipo_perfil', tipoPerfil);
-        userId = data.usuario.id;
-        updateUserInfoUI();
-      }
-      loadDisciplinas();
+     .then(function(data) {
+       if (data.usuario) {
+         currentUser = data.usuario;
+         tipoPerfil = acolheGetTipoPerfil();
+         userId = data.usuario.id;
+         updateUserInfoUI();
+       }
+       loadDisciplinas();
       if (data.disciplinas && data.disciplinas.length > 0) {
         showToast(data.disciplinas.length + ' disciplina(s) sincronizada(s)', 'success');
       } else {

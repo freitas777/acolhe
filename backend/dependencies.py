@@ -14,6 +14,7 @@ from backend.database import get_db
 from backend.models.usuario import Usuario
 from backend.models.conta_local import ContaLocal
 from backend.repositories.usuario import UsuarioRepository
+from backend.repositories.token_revogado import TokenRevogadoRepository
 from backend.security import is_jwt_local, validar_jwt
 from backend.services.suap_service import SUAPService
 
@@ -62,6 +63,14 @@ async def _authenticate_local(token: str, db: Session) -> "AuthData | None":
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token local invalido ou expirado. Faca login novamente.",
         )
+    jti = payload.get("jti")
+    if jti:
+        token_repo = TokenRevogadoRepository(db)
+        if token_repo.esta_revogado(jti):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token revogado. Faca login novamente.",
+            )
     usuario_id = payload.get("usuario_id")
     if not usuario_id:
         raise HTTPException(
@@ -95,7 +104,7 @@ async def _authenticate_suap(suap_token: str, db: Session) -> AuthData:
 
     suap_service = SUAPService()
     try:
-        meus_dados = await suap_service.get_meus_dados(suap_token)
+        eu_dados = await suap_service.get_eu(suap_token, scope="identificacao email")
     except httpx.HTTPStatusError as e:
         if e.response.status_code in (401, 403):
             _cache_pop(suap_token)
@@ -103,7 +112,7 @@ async def _authenticate_suap(suap_token: str, db: Session) -> AuthData:
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Token invalido ou expirado. Faca login novamente.",
             )
-            logger.warning("Erro HTTP SUAP ao validar token: %s", e)
+        logger.warning("Erro HTTP SUAP ao validar token: %s", e)
         if cached_entry:
             usuario_repo_fallback = UsuarioRepository(db)
             usuario = usuario_repo_fallback.get_by_suap_id(cached_entry[1])
@@ -125,7 +134,7 @@ async def _authenticate_suap(suap_token: str, db: Session) -> AuthData:
             detail="SUAP indisponivel. Tente novamente em alguns segundos.",
         )
 
-    suap_id = str(meus_dados.get("id", ""))
+    suap_id = str(eu_dados.get("identificacao", "") or eu_dados.get("id", ""))
     if not suap_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -140,16 +149,12 @@ async def _authenticate_suap(suap_token: str, db: Session) -> AuthData:
             detail="Usuario nao encontrado no sistema local. Faca login novamente.",
         )
 
-    try:
-        eu_dados = await suap_service.get_eu(suap_token)
-        novo_campus = eu_dados.get("campus", "")
-        if novo_campus and novo_campus != (usuario.campus or ""):
-            usuario.campus = novo_campus
-            db.commit()
-            db.refresh(usuario)
-            logger.info("Campus atualizado para usuario %s: %s", usuario.id, novo_campus)
-    except Exception as e:
-        logger.warning("Nao foi possivel atualizar campus do usuario %s: %s", usuario.id, e)
+    novo_campus = eu_dados.get("campus", "")
+    if novo_campus and novo_campus != (usuario.campus or ""):
+        usuario.campus = novo_campus
+        db.commit()
+        db.refresh(usuario)
+        logger.info("Campus atualizado para usuario %s: %s", usuario.id, novo_campus)
 
     _cache_set(suap_token, (now, suap_id))
     return AuthData(usuario=usuario, suap_token=suap_token)

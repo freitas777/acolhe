@@ -4,7 +4,10 @@ import base64
 import json
 import os
 import time
+import uuid
 from typing import Optional
+
+import bcrypt
 
 from backend.config import settings
 
@@ -16,14 +19,13 @@ def _get_legacy_keys() -> list:
 
 
 def hash_senha(senha: str) -> str:
-    salt = os.urandom(16).hex()
-    hash_val = hashlib.pbkdf2_hmac(
-        "sha256", senha.encode("utf-8"), salt.encode("utf-8"), 100000
-    ).hex()
-    return f"{salt}${hash_val}"
+    salt = bcrypt.gensalt(rounds=12)
+    return bcrypt.hashpw(senha.encode('utf-8'), salt).decode('utf-8')
 
 
 def verificar_senha(senha: str, senha_hash: str) -> bool:
+    if senha_hash.startswith('$2b$') or senha_hash.startswith('$2a$'):
+        return bcrypt.checkpw(senha.encode('utf-8'), senha_hash.encode('utf-8'))
     if "$" in senha_hash:
         salt, stored_hash = senha_hash.split("$", 1)
         computed = hashlib.pbkdf2_hmac(
@@ -42,10 +44,16 @@ def verificar_senha(senha: str, senha_hash: str) -> bool:
 _JWT_HEADER = base64.urlsafe_b64encode(json.dumps({"alg": "HS256", "typ": "acolhe-local"}).encode()).rstrip(b"=")
 
 
-def criar_jwt(payload: dict, expira_em_horas: int = 24) -> str:
+def criar_jwt(payload: dict, expira_em_horas: int = 2) -> str:
     now = int(time.time())
-    payload["iat"] = now
-    payload["exp"] = now + (expira_em_horas * 3600)
+    payload.update({
+        "iat": now,
+        "nbf": now,
+        "exp": now + (expira_em_horas * 3600),
+        "aud": "acolhe-api",
+        "iss": "acolhe-auth",
+        "jti": str(uuid.uuid4()),
+    })
     payload_b64 = base64.urlsafe_b64encode(json.dumps(payload).encode()).rstrip(b"=")
     signing_input = _JWT_HEADER + b"." + payload_b64
     signature = hmac.new(settings.secret_key.encode(), signing_input, hashlib.sha256).digest()
@@ -76,6 +84,12 @@ def validar_jwt(token: str) -> Optional[dict]:
 
         payload = json.loads(base64.urlsafe_b64decode(payload_b64))
         if payload.get("exp", 0) < int(time.time()):
+            return None
+        if payload.get("nbf", 0) > int(time.time()):
+            return None
+        if payload.get("aud") != "acolhe-api":
+            return None
+        if payload.get("iss") != "acolhe-auth":
             return None
 
         return payload

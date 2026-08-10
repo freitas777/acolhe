@@ -151,7 +151,7 @@ if (btnLogout) {
 btnLogout.addEventListener('click', function() { acolheLogout(); });
 }
 
-var perfil = localStorage.getItem('acolhe_tipo_perfil') || 'aluno';
+var perfil = acolheGetTipoPerfil();
 var isNapne = perfil === 'psicopedagogo' || perfil === 'admin' || perfil === 'servidor';
 var alunoNavs = document.querySelectorAll('.btn-nav-aluno');
 var napneNavs = document.querySelectorAll('.btn-nav-napne');

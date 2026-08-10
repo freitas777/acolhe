@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from backend.database import SessionLocal
 from backend.models.conversa import Conversa
 from backend.models.mensagem import Mensagem
+from backend.repositories.acomodacao_observacao import AcomodacaoObservacaoRepository
 from backend.repositories.aluno import AlunoRepository
 from backend.repositories.conversa import ConversaRepository
 from backend.repositories.disciplina import DisciplinaRepository
@@ -26,6 +27,7 @@ from backend.schemas.chat import (
     MensagemResposta,
 )
 from backend.services.ai_service import ai_service
+from backend.services.prompt_builder import prompt_builder
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +57,7 @@ def _para_conversa_resposta(conversa: Conversa) -> ConversaResposta:
         title=conversa.titulo,
         messages=[_para_mensagem_resposta(m) for m in conversa.mensagens],
         created_at=conversa.criada_em,
+        updated_at=conversa.atualizada_em,
         user_id=conversa.usuario_id,
         aluno_id=conversa.aluno_id,
         aluno_nome=aluno_nome,
@@ -70,22 +73,37 @@ class ChatService:
         self.mensagem_repo = MensagemRepository(db)
         self.aluno_repo = AlunoRepository(db)
         self.disciplina_repo = DisciplinaRepository(db)
+        self.acomodacao_repo = AcomodacaoObservacaoRepository(db)
         self.db = db
 
-    def _obter_contexto_aluno(self, aluno_id: int) -> Optional[str]:
-        aluno = self.aluno_repo.get_with_profile(aluno_id)
-        if not aluno:
-            return None
-        perfil = aluno.perfil if hasattr(aluno, "perfil") else None
-        if not perfil:
-            return None
-        return ai_service.construir_contexto_aluno(aluno, perfil)
+    def _construir_system_instruction(
+        self,
+        aluno_id: int | None = None,
+        disciplina_id: int | None = None,
+        mensagens: list[Mensagem] | None = None,
+    ) -> str:
+        aluno = None
+        perfil = None
+        if aluno_id:
+            aluno = self.aluno_repo.get_with_profile(aluno_id)
+            if aluno:
+                perfil = getattr(aluno, "perfil", None)
 
-    def _obter_contexto_disciplina(self, disciplina_id: int) -> Optional[str]:
-        disciplina = self.disciplina_repo.get_by_id(disciplina_id)
-        if not disciplina:
-            return None
-        return ai_service.construir_contexto_disciplina(disciplina)
+        disciplina = None
+        if disciplina_id:
+            disciplina = self.disciplina_repo.get_by_id(disciplina_id)
+
+        observacoes = []
+        if aluno_id:
+            observacoes = self.acomodacao_repo.listar_por_aluno(aluno_id)
+
+        return prompt_builder.build_session_instruction(
+            aluno=aluno,
+            perfil=perfil,
+            disciplina=disciplina,
+            observacoes=observacoes,
+            mensagens=mensagens,
+        )
 
     async def _criar_conversa_com_contexto(
         self,
@@ -94,17 +112,15 @@ class ChatService:
         aluno_id: int | None = None,
         disciplina_id: int | None = None,
     ) -> Conversa:
-        contexto_aluno = None
         if aluno_id:
-            contexto_aluno = self._obter_contexto_aluno(aluno_id)
-            if contexto_aluno is None:
-                logger.warning("Aluno id=%s sem perfil — conversa criada sem contexto de aluno", aluno_id)
+            aluno = self.aluno_repo.get_with_profile(aluno_id)
+            if not aluno or not getattr(aluno, "perfil", None):
+                logger.warning("Aluno id=%s sem perfil → conversa criada sem contexto de aluno", aluno_id)
 
-        contexto_disciplina = None
         if disciplina_id:
-            contexto_disciplina = self._obter_contexto_disciplina(disciplina_id)
-            if contexto_disciplina is None:
-                logger.warning("Disciplina id=%s não encontrada — conversa criada sem contexto de disciplina", disciplina_id)
+            disciplina = self.disciplina_repo.get_by_id(disciplina_id)
+            if not disciplina:
+                logger.warning("Disciplina id=%s não encontrada → conversa criada sem contexto de disciplina", disciplina_id)
 
         conversa = self.conversa_repo.create({
             "id": str(uuid.uuid4()),
@@ -114,10 +130,14 @@ class ChatService:
             "disciplina_id": disciplina_id,
         })
 
+        system_instruction = self._construir_system_instruction(
+            aluno_id=aluno_id,
+            disciplina_id=disciplina_id,
+        )
+
         await ai_service.iniciar_sessao(
             conversa.id,
-            contexto_aluno=contexto_aluno,
-            contexto_disciplina=contexto_disciplina,
+            system_instruction=system_instruction,
         )
         return conversa
 
@@ -152,12 +172,16 @@ class ChatService:
 
         if conversa_existente:
             self._verificar_propriedade(conversa_existente, usuario_id, tipo_perfil)
+            mensagens_existentes = self.mensagem_repo.listar_por_conversa(conversa_existente.id)
+            system_instruction = self._construir_system_instruction(
+                aluno_id=conversa_existente.aluno_id,
+                disciplina_id=disciplina_id,
+                mensagens=mensagens_existentes,
+            )
             await ai_service.garantir_sessao_com_contexto(
                 conversa_id=conversa_existente.id,
-                contexto_aluno=self._obter_contexto_aluno(conversa_existente.aluno_id)
-                if conversa_existente.aluno_id else None,
-                contexto_disciplina=self._obter_contexto_disciplina(disciplina_id),
-                mensagens=self.mensagem_repo.listar_por_conversa(conversa_existente.id),
+                system_instruction=system_instruction,
+                mensagens=mensagens_existentes,
             )
             return _para_conversa_resposta(conversa_existente)
 
@@ -169,17 +193,14 @@ class ChatService:
             )
 
         titulo = f"Conversa sobre {disciplina.descricao}"
-        contexto_disciplina = self._obter_contexto_disciplina(disciplina_id)
 
         aluno_id = None
-        contexto_aluno = None
         if tipo_perfil == "aluno" and suap_id:
             aluno = self.aluno_repo.get_by_suap_id(suap_id)
             if aluno:
                 aluno_id = aluno.id
-                contexto_aluno = self._obter_contexto_aluno(aluno_id)
-                if contexto_aluno is None:
-                    logger.warning("Aluno id=%s sem perfil â conversa criada sem contexto de aluno", aluno_id)
+                if not getattr(aluno, "perfil", None):
+                    logger.warning("Aluno id=%s sem perfil â conversa criada sem contexto de aluno", aluno.id)
 
         conversa = self.conversa_repo.create({
             "id": str(uuid.uuid4()),
@@ -189,10 +210,14 @@ class ChatService:
             "disciplina_id": disciplina_id,
         })
 
+        system_instruction = self._construir_system_instruction(
+            aluno_id=aluno_id,
+            disciplina_id=disciplina_id,
+        )
+
         await ai_service.iniciar_sessao(
             conversa.id,
-            contexto_aluno=contexto_aluno,
-            contexto_disciplina=contexto_disciplina,
+            system_instruction=system_instruction,
         )
 
         logger.info(
@@ -260,22 +285,28 @@ class ChatService:
                 self._verificar_propriedade(conversa, usuario_id, tipo_perfil)
 
             if aluno_id and conversa.aluno_id != aluno_id:
-                contexto_aluno = self._obter_contexto_aluno(aluno_id)
-                if contexto_aluno:
+                system_instruction = self._construir_system_instruction(
+                    aluno_id=aluno_id,
+                    disciplina_id=conversa.disciplina_id,
+                )
+                if system_instruction:
                     self.conversa_repo.update(conversa_id, {"aluno_id": aluno_id})
                     await ai_service.encerrar_sessao(conversa_id)
-                    await ai_service.iniciar_sessao(conversa_id, contexto_aluno=contexto_aluno)
+                    await ai_service.iniciar_sessao(conversa_id, system_instruction=system_instruction)
                     conversa = self.conversa_repo.obter_com_mensagens(conversa_id)
                 else:
-                    logger.warning("Aluno id=%s sem perfil — contexto de aluno não aplicado", aluno_id)
+                    logger.warning("Aluno id=%s sem perfil → contexto de aluno não aplicado", aluno_id)
 
             if not aluno_id and conversa.aluno_id:
-                contexto_aluno = self._obter_contexto_aluno(conversa.aluno_id)
-                if contexto_aluno:
-                    mensagens_existentes = self.mensagem_repo.listar_por_conversa(conversa_id)
-                    await ai_service.garantir_sessao_com_contexto(
-                        conversa_id, contexto_aluno=contexto_aluno, mensagens=mensagens_existentes,
-                    )
+                mensagens_existentes = self.mensagem_repo.listar_por_conversa(conversa_id)
+                system_instruction = self._construir_system_instruction(
+                    aluno_id=conversa.aluno_id,
+                    disciplina_id=conversa.disciplina_id,
+                    mensagens=mensagens_existentes,
+                )
+                await ai_service.garantir_sessao_com_contexto(
+                    conversa_id, system_instruction=system_instruction, mensagens=mensagens_existentes,
+                )
         else:
             titulo = dados.message[:50] + ("..." if len(dados.message) > 50 else "")
             conversa = await self._criar_conversa_com_contexto(
@@ -294,10 +325,10 @@ class ChatService:
         })
 
         conversa = self.conversa_repo.obter_com_mensagens(conversa_id)
+        update_data = {"atualizada_em": datetime.now(timezone.utc)}
         if len(conversa.mensagens) == 1 and conversa.titulo == "Nova conversa":
-            self.conversa_repo.update(conversa_id, {
-                "titulo": dados.message[:50] + ("..." if len(dados.message) > 50 else ""),
-            })
+            update_data["titulo"] = dados.message[:50] + ("..." if len(dados.message) > 50 else "")
+        self.conversa_repo.update(conversa_id, update_data)
 
         logger.info("Mensagem recebida: conversa=%s", conversa_id)
         return conversa_id, msg_usuario
@@ -401,6 +432,9 @@ class ChatService:
                 conteudo=texto_completo,
             )
             db.add(msg_assistente)
+            conversa_db = db.query(Conversa).filter(Conversa.id == conversa_id).first()
+            if conversa_db:
+                conversa_db.atualizada_em = datetime.now(timezone.utc)
             db.commit()
             db.refresh(msg_assistente)
             assistant_msg_data = MensagemResposta(
@@ -415,6 +449,78 @@ class ChatService:
             yield f"data: {json.dumps({'type': 'done', 'message': None})}\n\n"
         finally:
             db.close()
+
+    async def vincular_aluno(
+        self,
+        conversa_id: str,
+        aluno_id: int,
+        usuario_id: int,
+        tipo_perfil: str = "aluno",
+    ) -> ConversaResposta:
+        conversa = self.conversa_repo.obter_com_mensagens(conversa_id)
+        if not conversa:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Conversa nao encontrada",
+            )
+        self._verificar_propriedade(conversa, usuario_id, tipo_perfil)
+
+        aluno = self.aluno_repo.get_with_profile(aluno_id)
+        if not aluno:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Aluno nao encontrado",
+            )
+
+        self.conversa_repo.update(conversa_id, {"aluno_id": aluno_id})
+
+        mensagens_existentes = self.mensagem_repo.listar_por_conversa(conversa_id)
+        system_instruction = self._construir_system_instruction(
+            aluno_id=aluno_id,
+            disciplina_id=conversa.disciplina_id,
+            mensagens=mensagens_existentes,
+        )
+        await ai_service.encerrar_sessao(conversa_id)
+        await ai_service.iniciar_sessao(
+            conversa_id,
+            system_instruction=system_instruction,
+        )
+
+        conversa_atualizada = self.conversa_repo.obter_com_mensagens(conversa_id)
+        logger.info("Aluno id=%s vinculado a conversa id=%s", aluno_id, conversa_id)
+        return _para_conversa_resposta(conversa_atualizada)
+
+    async def desvincular_aluno(
+        self,
+        conversa_id: str,
+        usuario_id: int,
+        tipo_perfil: str = "aluno",
+    ) -> ConversaResposta:
+        conversa = self.conversa_repo.obter_com_mensagens(conversa_id)
+        if not conversa:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Conversa nao encontrada",
+            )
+        self._verificar_propriedade(conversa, usuario_id, tipo_perfil)
+
+        self.conversa_repo.update(conversa_id, {"aluno_id": None})
+
+        mensagens_existentes = self.mensagem_repo.listar_por_conversa(conversa_id)
+        system_instruction = self._construir_system_instruction(
+            aluno_id=None,
+            disciplina_id=conversa.disciplina_id,
+            mensagens=mensagens_existentes,
+        )
+        await ai_service.encerrar_sessao(conversa_id)
+        await ai_service.iniciar_sessao(
+            conversa_id,
+            system_instruction=system_instruction,
+        )
+
+        conversa_atualizada = self.conversa_repo.obter_com_mensagens(conversa_id)
+        logger.info("Aluno desvinculado da conversa id=%s", conversa_id)
+        return _para_conversa_resposta(conversa_atualizada)
 
     async def deletar_conversa(
         self,

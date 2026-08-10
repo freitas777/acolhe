@@ -312,6 +312,24 @@
    <h2 id="senha-modal-title">Alterar Senha</h2>
    <button class="modal-close" id="senha-modal-close" title="Fechar">&times;</button>
   </div>
+  <script>
+  // Impedir fechamento por clique no overlay quando for senha temporária
+  document.getElementById('senha-modal').addEventListener('click', function(e) {
+      if (e.target === this && this.getAttribute('data-force-open') === 'true') {
+          e.stopPropagation();
+      }
+  });
+  // Impedir fechamento por tecla ESC
+  document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+          var modal = document.getElementById('senha-modal');
+          if (modal && modal.getAttribute('data-force-open') === 'true') {
+              e.preventDefault();
+              e.stopPropagation();
+          }
+      }
+  });
+  </script>
 <form id="senha-form" class="modal-body">
     <input type="hidden" id="senha-username" name="username" autocomplete="username" value="">
     <div class="form-group">
