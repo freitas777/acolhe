@@ -155,11 +155,11 @@ class AuthService:
                     self.db.commit()
                     logger.info("[LOGIN SUAP] Dados do aluno atualizados para suap_id=%s", suap_id)
 
+        disciplinas_salvas = []
         try:
             logger.info("[LOGIN SUAP] Iniciando sincronizacao para usuario %s (tipo=%s)", usuario.id, tipo_perfil)
             if tipo_perfil == "psicopedagogo":
                 logger.info("[LOGIN SUAP] Usuario psicopedagogo - pulando sincronizacao de disciplinas")
-                pass
             elif tipo_perfil in ("professor", "servidor"):
                 logger.info("[LOGIN SUAP] Usuario professor/servidor - sincronizando diarios")
                 await self._sincronizar_diarios_professor(usuario, token, semestre, scope=scope)
@@ -170,11 +170,10 @@ class AuthService:
                 if disciplinas_raw:
                     logger.info("[LOGIN SUAP] Primeira disciplina: %s", disciplinas_raw[0] if disciplinas_raw else "N/A")
                 self._sincronizar_disciplinas(usuario.id, disciplinas_raw, semestre)
-                disciplinas_salvas = self.disciplina_repo.listar_por_usuario(usuario.id, semestre)
-                logger.info("[LOGIN SUAP] Disciplinas salvas no banco: %d", len(disciplinas_salvas))
+            disciplinas_salvas = self.disciplina_repo.listar_por_usuario(usuario.id, semestre)
+            logger.info("[LOGIN SUAP] Disciplinas salvas no banco: %d", len(disciplinas_salvas))
         except Exception as e:
             logger.error("[LOGIN SUAP] Falha ao sincronizar para usuario %s: %s", usuario.id, e, exc_info=True)
-            disciplinas_salvas = []
 
         self.db.refresh(usuario)
 
