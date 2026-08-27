@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 import logging
-import os
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 import httpx
@@ -15,14 +14,17 @@ from backend.dependencies import AuthData, get_current_usuario, require_napne
 from backend.models.aluno import Aluno
 from backend.repositories.aluno import AlunoRepository
 from backend.repositories.pendencia_validacao import PendenciaValidacaoRepository
-from backend.schemas.aluno import AlunoSUAPSearchResult, ImportarAlunoRequest, AlunoResponse
+from backend.models.pendencia_validacao import StatusPendencia
+from backend.schemas.aluno import AlunoSUAPSearchResult, ImportarAlunoRequest, AlunoResponse, AlunoManualCreate
 from backend.services.suap_service import SUAPService
+from backend.config import settings
+from backend.services.notificacao_service import NotificacaoService
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/importacao", tags=["Importação SUAP"])
+router = APIRouter(prefix="/importacao", tags=["NAPNE"])
 
-DEV_MODE = os.getenv("DEV_MODE", "false").lower() == "true"
+DEV_MODE = settings.dev_mode
 
 _MOCK_ALUNOS = [
     {
@@ -366,16 +368,87 @@ async def importar_aluno(
         "email": dados.get("email_pessoal", "") or dados.get("email_academico", ""),
         "cpf": dados.get("cpf", ""),
         "status_acompanhamento": "aguardando_indicacao",
-        "data_importacao": datetime.utcnow(),
+        "data_importacao": datetime.now(timezone.utc),
     })
     logger.info(f"[IMPORTAR] Aluno {novo.nome} ({novo.matricula}) importado com sucesso (id={novo.id})")
 
     pendencia_repo = PendenciaValidacaoRepository(db)
     pendencia_repo.create({
         "aluno_id": novo.id,
-        "status": "pendente",
+        "status": StatusPendencia.pendente,
         "motivo": "Aguardando indicacao",
         "criado_em": novo.data_importacao or novo.criado_em,
     })
+
+    try:
+        notif_service = NotificacaoService(db)
+        notif_service.criar_notificacao(
+            tipo="aluno_importado",
+            titulo=f"Aluno importado: {novo.nome}",
+            mensagem=f"O aluno {novo.nome} (matricula {novo.matricula}) foi importado no sistema e aguarda indicacao.",
+            remetente_id=auth_data.usuario.id,
+            aluno_id=novo.id,
+            destino_tipo="napne",
+        )
+    except Exception as e:
+        logger.warning("Falha ao criar notificacao de importacao: %s", e)
+
+    return novo
+
+
+@router.post("/manual", response_model=AlunoResponse, status_code=status.HTTP_201_CREATED)
+async def cadastrar_aluno_manual(
+    request: AlunoManualCreate,
+    auth_data: AuthData = Depends(require_napne),
+    db: Session = Depends(get_db),
+):
+    matricula = request.matricula.strip()
+    nome = request.nome.strip()
+
+    if not nome:
+        raise HTTPException(status_code=422, detail="Nome do aluno e obrigatorio.")
+    if not matricula:
+        raise HTTPException(status_code=422, detail="Matricula e obrigatoria.")
+
+    aluno_repo = AlunoRepository(db)
+
+    existing = aluno_repo.get_by_matricula(matricula)
+    if existing:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Aluno com matricula {matricula} ja cadastrado (status: {existing.status_acompanhamento}).",
+        )
+
+    novo = aluno_repo.create({
+        "nome": nome,
+        "matricula": matricula,
+        "curso": (request.curso or "").strip() or None,
+        "campus": (request.campus or "").strip() or None,
+        "email": (request.email or "").strip() or None,
+        "status_acompanhamento": "aguardando_indicacao",
+        "data_importacao": datetime.now(timezone.utc),
+    })
+    logger.info("[CADASTRO_MANUAL] Aluno %s (%s) cadastrado manualmente (id=%s)", novo.nome, novo.matricula, novo.id)
+
+    pendencia_repo = PendenciaValidacaoRepository(db)
+    pendencia_repo.create({
+        "aluno_id": novo.id,
+        "status": StatusPendencia.pendente,
+        "motivo": "Cadastro manual - aguardando indicacao",
+        "criado_em": novo.data_importacao or novo.criado_em,
+    })
+
+    try:
+        notif_service = NotificacaoService(db)
+        notif_service.criar_notificacao(
+            tipo="aluno_cadastrado_manual",
+            titulo=f"Aluno cadastrado: {novo.nome}",
+            mensagem=f"O aluno {novo.nome} (matricula {novo.matricula}) foi cadastrado manualmente e aguarda indicacao.",
+            remetente_id=auth_data.usuario.id,
+            aluno_id=novo.id,
+            destino_tipo="napne",
+        )
+    except Exception as e:
+        logger.warning("Falha ao criar notificacao de cadastro manual: %s", e)
 
     return novo

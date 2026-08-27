@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session, selectinload
 
-from backend.models.pendencia_validacao import PendenciaValidacao
+from backend.models.pendencia_validacao import PendenciaValidacao, StatusPendencia
 from backend.models.aluno import Aluno
 from backend.repositories.base import BaseRepository
 
@@ -14,7 +14,7 @@ class PendenciaValidacaoRepository(BaseRepository[PendenciaValidacao]):
     def listar_pendentes(self) -> list[PendenciaValidacao]:
         return (
             self.db.query(PendenciaValidacao)
-            .filter(PendenciaValidacao.status == "pendente")
+            .filter(PendenciaValidacao.status == StatusPendencia.pendente)
             .options(
                 selectinload(PendenciaValidacao.aluno),
                 selectinload(PendenciaValidacao.indicado_por),
@@ -26,6 +26,6 @@ class PendenciaValidacaoRepository(BaseRepository[PendenciaValidacao]):
     def get_pendente_por_aluno(self, aluno_id: int) -> PendenciaValidacao | None:
         return (
             self.db.query(PendenciaValidacao)
-            .filter(PendenciaValidacao.aluno_id == aluno_id, PendenciaValidacao.status == "pendente")
+            .filter(PendenciaValidacao.aluno_id == aluno_id, PendenciaValidacao.status == StatusPendencia.pendente)
             .first()
         )

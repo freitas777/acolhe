@@ -5,6 +5,10 @@
 const ChatUI = {
   elements: {},
 
+  isAluno() {
+    return acolheGetTipoPerfil() === 'aluno';
+  },
+
   /**
    * Inicializa referências do DOM
    */
@@ -18,15 +22,43 @@ const ChatUI = {
       btnSend: document.getElementById('btn-send'),
       btnNewChat: document.getElementById('btn-new-chat'),
       btnMenuMobile: document.getElementById('btn-menu-mobile'),
-      btnDeleteConversation: document.getElementById('btn-delete-conversation'),
       btnLogout: document.getElementById('btn-logout'),
       chatTitle: document.getElementById('chat-title'),
       userAvatarSmall: document.getElementById('user-avatar-small'),
       userNameSmall: document.getElementById('user-name-small'),
-      userRoleSmall: document.getElementById('user-role-small')
-    };
+      userRoleSmall: document.getElementById('user-role-small'),
+      alunoContextBar: document.getElementById('aluno-context-bar'),
+      alunoBadge: document.getElementById('aluno-badge'),
+      alunoBadgeName: document.getElementById('aluno-badge-name'),
+      btnRemoveAluno: document.getElementById('btn-remove-aluno'),
+      btnAlunoContext: document.getElementById('btn-aluno-context'),
+      alunoSearchWrapper: document.getElementById('aluno-search-wrapper'),
+      alunoSearchInput: document.getElementById('aluno-search-input'),
+      alunoSearchResults: document.getElementById('aluno-search-results'),
+      btnCloseAlunoSearch: document.getElementById('btn-close-aluno-search'),
+      disciplinaContextBar: document.getElementById('disciplina-context-bar'),
+      disciplinaBadgeName: document.getElementById('disciplina-badge-name'),
+      disciplinaBadgeSigla: document.getElementById('disciplina-badge-sigla')
+   };
 
-    console.log('🎨 ChatUI inicializado');
+  },
+
+  showDisciplinaBadge(descricao, sigla) {
+    const bar = this.elements.disciplinaContextBar;
+    if (!bar) return;
+    bar.hidden = false;
+    const nameEl = this.elements.disciplinaBadgeName;
+    const siglaEl = this.elements.disciplinaBadgeSigla;
+    if (nameEl) nameEl.textContent = descricao || '';
+    if (siglaEl) {
+      siglaEl.textContent = sigla || '';
+      siglaEl.style.display = sigla ? '' : 'none';
+    }
+  },
+
+  hideDisciplinaBadge() {
+    const bar = this.elements.disciplinaContextBar;
+    if (bar) bar.hidden = true;
   },
 
   /**
@@ -47,16 +79,29 @@ const ChatUI = {
       return;
     }
 
-    conversations.forEach(conv => {
+    const sortedConversations = [...conversations].sort((a, b) => {
+      const dateA = new Date(a.updated_at || a.created_at || 0);
+      const dateB = new Date(b.updated_at || b.created_at || 0);
+      return dateB - dateA;
+    });
+
+    sortedConversations.forEach(conv => {
       const item = document.createElement('div');
       item.className = `conversation-item ${conv.id === activeId ? 'active' : ''}`;
       item.dataset.conversationId = conv.id;
-      
+
+      const updatedAt = conv.updated_at || conv.created_at;
+      const timeAgo = this.formatTimeAgo(updatedAt);
+
       item.innerHTML = `
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
         </svg>
-        <span>${this.escapeHtml(conv.title)}</span>
+        <div class="conversation-item-content">
+          <span class="conversation-item-title">${this.escapeHtml(conv.title)}</span>
+          <span class="conversation-item-time">${timeAgo}</span>
+        </div>
+        ${(!this.isAluno() && conv.aluno_id) ? '<svg class="aluno-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>' : ''}
         <button class="delete-btn" title="Excluir conversa">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="3 6 5 6 21 6"/>
@@ -65,18 +110,13 @@ const ChatUI = {
         </button>
       `;
 
-      // Clique para selecionar
       item.addEventListener('click', (e) => {
-        if (!e.target.closest('.delete-btn')) {
-          this.onConversationSelect(conv.id);
+        if (e.target.closest('.delete-btn')) {
+          e.stopPropagation();
+          this.onConversationDelete(conv.id);
+          return;
         }
-      });
-
-      // Clique para deletar
-      const deleteBtn = item.querySelector('.delete-btn');
-      deleteBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        this.onConversationDelete(conv.id);
+        this.onConversationSelect(conv.id);
       });
 
       list.appendChild(item);
@@ -118,20 +158,43 @@ const ChatUI = {
   createMessageElement(message) {
     const div = document.createElement('div');
     div.className = 'message';
-    
+
     const isUser = message.role === 'user';
-    const avatar = isUser ? this.getUserInitials() : 'AI';
-    const author = isUser ? 'Você' : 'Acolhe+';
-    const time = this.formatTime(message.created_at);
+    let avatar, authorHtml, time;
+    time = this.formatTime(message.created_at);
+
+    var contentHtml;
+    if (isUser) {
+      const userName = acolheGetUserName();
+      avatar = this.getUserInitials(userName);
+      const roleLabels = {
+        aluno: 'Aluno',
+        professor: 'Professor',
+        psicopedagogo: 'Psicopedagogo',
+        admin: 'Administrador',
+        servidor: 'Servidor'
+      };
+      const tipoPerfil = acolheGetTipoPerfil();
+      const role = roleLabels[tipoPerfil] || tipoPerfil || '';
+      authorHtml = `<span class="message-author">${this.escapeHtml(userName)}</span>` +
+        (role ? `<span class="message-role">${this.escapeHtml(role)}</span>` : '');
+      contentHtml = this.escapeHtml(message.content);
+    } else {
+      avatar = 'AI';
+      authorHtml = `<span class="message-author">Acolhe+</span>`;
+      contentHtml = this.renderMarkdown(message.content);
+    }
 
     div.innerHTML = `
       <div class="message-avatar ${message.role}">${avatar}</div>
       <div class="message-content">
         <div class="message-header">
-          <span class="message-author">${author}</span>
+          <div class="message-author-info">
+            ${authorHtml}
+          </div>
           <span class="message-time">${time}</span>
         </div>
-        <div class="message-text">${this.escapeHtml(message.content)}</div>
+        <div class="message-text">${contentHtml}</div>
       </div>
     `;
 
@@ -176,7 +239,15 @@ const ChatUI = {
       this.elements.userNameSmall.textContent = user.nome || 'Usuário';
     }
     if (this.elements.userRoleSmall) {
-      this.elements.userRoleSmall.textContent = user.tipo_vinculo || user.matricula || '-';
+      var roleLabels = {
+        aluno: 'Aluno',
+        professor: 'Professor',
+        psicopedagogo: 'Psicopedagogo',
+        admin: 'Administrador',
+        servidor: 'Servidor'
+      };
+      var perfil = user.tipo_perfil || acolheGetTipoPerfil();
+      this.elements.userRoleSmall.textContent = roleLabels[perfil] || perfil || '';
     }
   },
 
@@ -233,13 +304,113 @@ const ChatUI = {
    * Handlers de eventos
    */
   onConversationSelect(id) {
-    // Implementado no dashboard.js
-    console.log('📍 Selecionar conversa:', id);
   },
 
   onConversationDelete(id) {
-    // Implementado no dashboard.js
-    console.log('🗑️ Deletar conversa:', id);
+  },
+
+    updateAlunoBadge(alunoNome) {
+        if (this.isAluno()) return;
+
+        const bar = this.elements.alunoContextBar;
+    const badge = this.elements.alunoBadge;
+    const badgeName = this.elements.alunoBadgeName;
+    const searchWrapper = this.elements.alunoSearchWrapper;
+
+    if (!bar) return;
+
+    bar.hidden = false;
+
+    if (alunoNome) {
+      if (badge) badge.hidden = false;
+      if (badgeName) badgeName.textContent = alunoNome;
+      if (searchWrapper) searchWrapper.hidden = true;
+    } else {
+      if (badge) badge.hidden = true;
+      if (searchWrapper) searchWrapper.hidden = true;
+    }
+  },
+
+  hideAlunoContext() {
+    const bar = this.elements.alunoContextBar;
+    if (bar) bar.hidden = true;
+  },
+
+    showAlunoSearch() {
+        if (this.isAluno()) return;
+
+        const bar = this.elements.alunoContextBar;
+    const badge = this.elements.alunoBadge;
+    const searchWrapper = this.elements.alunoSearchWrapper;
+    const input = this.elements.alunoSearchInput;
+
+    if (bar) bar.hidden = false;
+    if (badge) badge.hidden = true;
+    if (searchWrapper) searchWrapper.hidden = false;
+    if (input) {
+      input.value = '';
+      input.focus();
+    }
+  },
+
+  hideAlunoSearch() {
+    const searchWrapper = this.elements.alunoSearchWrapper;
+    const badge = this.elements.alunoBadge;
+    const input = this.elements.alunoSearchInput;
+    if (input) input.value = '';
+    this.hideAlunoSearchResults();
+    if (searchWrapper) searchWrapper.hidden = true;
+    if (badge) badge.hidden = true;
+    const bar = this.elements.alunoContextBar;
+    if (bar) bar.hidden = true;
+  },
+
+  renderAlunoSearchResults(alunos) {
+    const container = this.elements.alunoSearchResults;
+    if (!container) return;
+
+    container.innerHTML = '';
+
+    if (!alunos || alunos.length === 0) {
+      container.hidden = false;
+      container.innerHTML = '<div class="aluno-search-empty">Nenhum aluno encontrado</div>';
+      return;
+    }
+
+    container.hidden = false;
+
+    alunos.forEach(aluno => {
+      const item = document.createElement('div');
+      item.className = 'aluno-search-item';
+      item.dataset.alunoId = aluno.id;
+      item.dataset.alunoNome = aluno.nome;
+
+      let detail = '';
+      if (aluno.matricula) detail += aluno.matricula;
+      if (aluno.diagnostico) detail += (detail ? ' · ' : '') + aluno.diagnostico;
+
+      item.innerHTML = `
+        <span class="aluno-search-item-nome">${this.escapeHtml(aluno.nome)}</span>
+        ${detail ? '<span class="aluno-search-item-detail">' + this.escapeHtml(detail) + '</span>' : ''}
+      `;
+
+      item.addEventListener('click', () => {
+        this.onAlunoSelected(aluno.id, aluno.nome);
+      });
+
+      container.appendChild(item);
+    });
+  },
+
+  hideAlunoSearchResults() {
+    const container = this.elements.alunoSearchResults;
+    if (container) {
+      container.innerHTML = '';
+      container.hidden = true;
+    }
+  },
+
+  onAlunoSelected(alunoId, alunoNome) {
   },
 
   /**
@@ -255,16 +426,85 @@ const ChatUI = {
       .toUpperCase();
   },
 
-  formatTime(isoString) {
-    const date = new Date(isoString);
-    return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-  },
+    formatTime(isoString) {
+        if (!isoString) return '';
+        const date = new Date(isoString);
+        if (isNaN(date.getTime())) return '';
+        return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    },
+
+    formatTimeAgo(isoString) {
+        if (!isoString) return '';
+        const date = new Date(isoString);
+        if (isNaN(date.getTime())) return '';
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+
+        if (diffMins < 1) return 'agora';
+        if (diffMins < 60) return `${diffMins}min`;
+        if (diffHours < 24) return `${diffHours}h`;
+        if (diffDays < 7) return `${diffDays}d`;
+        return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    },
+
+    showLoadingMessages() {
+        const wrapper = this.elements.messagesWrapper;
+        if (!wrapper) return;
+        const existingMessages = wrapper.querySelectorAll('.message');
+        existingMessages.forEach(msg => msg.remove());
+        const emptyState = this.elements.emptyState;
+        if (emptyState) emptyState.style.display = 'none';
+        const loadingDiv = document.createElement('div');
+        loadingDiv.className = 'message loading-message';
+        loadingDiv.id = 'loading-message';
+        loadingDiv.innerHTML = `
+            <div class="message-content" style="text-align: center; width: 100%;">
+                <div class="typing-dots" style="justify-content: center;">
+                    <span></span><span></span><span></span>
+                </div>
+            </div>
+        `;
+        wrapper.appendChild(loadingDiv);
+    },
+
+    removeLoadingMessage() {
+        const loading = document.getElementById('loading-message');
+        if (loading) loading.remove();
+    },
 
   escapeHtml(text) {
     if (!text) return '';
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+  },
+
+  renderMarkdown(text) {
+    if (!text) return '';
+    if (typeof marked !== 'undefined' && typeof DOMPurify !== 'undefined') {
+      try {
+        marked.setOptions({
+          breaks: true,
+          gfm: true,
+          smartLists: true,
+          smartypants: false,
+          headerIds: false,
+          mangle: false
+        });
+        var html = marked.parse(text);
+        return DOMPurify.sanitize(html, {
+          ADD_TAGS: ['input'],
+          ADD_ATTR: ['type', 'checked', 'disabled']
+        });
+      } catch (e) {
+        console.error('Erro ao renderizar Markdown:', e);
+        return this.escapeHtml(text);
+      }
+    }
+    return this.escapeHtml(text);
   },
 
     /**
@@ -277,10 +517,15 @@ const ChatUI = {
     const typingDiv = document.createElement('div');
     typingDiv.className = 'message typing-indicator';
     typingDiv.id = 'typing-indicator';
-    
+
     typingDiv.innerHTML = `
       <div class="message-avatar assistant">AI</div>
       <div class="message-content">
+        <div class="message-header">
+          <div class="message-author-info">
+            <span class="message-author">Acolhe+</span>
+          </div>
+        </div>
         <div class="typing-dots">
           <span></span>
           <span></span>
@@ -312,16 +557,77 @@ const ChatUI = {
 
     const errorDiv = document.createElement('div');
     errorDiv.className = 'message error-message';
-        errorDiv.innerHTML = `
-            <div class="message-content" style="width: 100%;">
-                <div class="message-text" style="color: var(--color-error);">
-                    ⚠️ ${this.escapeHtml(message)}
-                </div>
-            </div>
-        `;
+    errorDiv.innerHTML = `
+      <div class="message-content" style="width: 100%;">
+        <div class="message-text" style="color: var(--color-error);">
+          ⚠️ ${this.escapeHtml(message)}
+        </div>
+      </div>
+    `;
 
     wrapper.appendChild(errorDiv);
     this.scrollToBottom();
+  },
+
+  createStreamingMessage() {
+    const wrapper = this.elements.messagesWrapper;
+    const emptyState = this.elements.emptyState;
+
+    if (!wrapper) return null;
+
+    if (emptyState) emptyState.style.display = 'none';
+
+    const div = document.createElement('div');
+    div.className = 'message streaming';
+    div.id = 'streaming-message';
+
+    div.innerHTML = `
+      <div class="message-avatar assistant">AI</div>
+      <div class="message-content">
+        <div class="message-header">
+          <div class="message-author-info">
+            <span class="message-author">Acolhe+</span>
+          </div>
+          <span class="message-time"></span>
+        </div>
+        <div class="message-text"></div>
+      </div>
+    `;
+
+    wrapper.appendChild(div);
+    this.scrollToBottom();
+
+    return div.querySelector('.message-text');
+  },
+
+  appendChunk(textEl, chunk) {
+    if (!textEl) return;
+    textEl.textContent += chunk;
+    this.scrollToBottom();
+  },
+
+  finalizeStreamMessage(textEl, fullContent) {
+    if (!textEl) return;
+
+    var streamingMsg = document.getElementById('streaming-message');
+    if (streamingMsg) {
+      streamingMsg.removeAttribute('id');
+      streamingMsg.classList.remove('streaming');
+      var timeEl = streamingMsg.querySelector('.message-time');
+      if (timeEl) {
+        timeEl.textContent = this.formatTime(new Date().toISOString());
+      }
+    }
+
+    textEl.innerHTML = this.renderMarkdown(fullContent);
+    this.scrollToBottom();
+  },
+
+  removeStreamingMessage() {
+    var streamingMsg = document.getElementById('streaming-message');
+    if (streamingMsg) {
+      streamingMsg.remove();
+    }
   }
 
   

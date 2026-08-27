@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from sqlalchemy import exists, select
 from sqlalchemy.orm import Session
 
 from backend.models.diario_aluno import DiarioAluno
+from backend.models.disciplina import Disciplina
 from backend.repositories.base import BaseRepository
 
 
@@ -39,3 +41,15 @@ class DiarioAlunoRepository(BaseRepository[DiarioAluno]):
             .filter(DiarioAluno.disciplina_id == disciplina_id)
             .count()
         )
+
+    def verificar_professor_aluno(self, professor_id: int, aluno_id: int) -> bool:
+        stmt = (
+            select(exists())
+            .select_from(DiarioAluno)
+            .join(Disciplina, DiarioAluno.disciplina_id == Disciplina.id)
+            .where(
+                Disciplina.usuario_id == professor_id,
+                DiarioAluno.aluno_id == aluno_id,
+            )
+        )
+        return self.db.execute(stmt).scalar()

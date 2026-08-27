@@ -17,14 +17,9 @@ function acolheIsTokenExpired(token) {
 
 function acolheIsAuthenticated() {
  var token = localStorage.getItem('acolhe_access_token');
- var userId = localStorage.getItem('acolhe_user_id');
- if (!token || !userId) return false;
+ if (!token) return false;
  if (acolheIsTokenExpired(token)) {
   localStorage.removeItem('acolhe_access_token');
-  localStorage.removeItem('acolhe_user');
-  localStorage.removeItem('acolhe_user_id');
-  localStorage.removeItem('acolhe_tipo_perfil');
-  localStorage.removeItem('acolhe_senha_temporaria');
   return false;
  }
  return true;
@@ -32,10 +27,6 @@ function acolheIsAuthenticated() {
 
 function acolheLogout() {
  localStorage.removeItem('acolhe_access_token');
- localStorage.removeItem('acolhe_user');
- localStorage.removeItem('acolhe_user_id');
- localStorage.removeItem('acolhe_tipo_perfil');
- localStorage.removeItem('acolhe_senha_temporaria');
  var suap = window._suapClient;
   if (suap && suap.isAuthenticated && suap.isAuthenticated()) {
     suap.logout();
@@ -54,6 +45,12 @@ function acolheRequireAuth() {
     window.location.replace('/');
     return false;
   }
+  var token = acolheGetToken();
+  var payload = acolheDecodeJWTPayload(token);
+  if (payload && payload.senha_temporaria === true && window.location.pathname !== '/painel') {
+    window.location.replace('/painel');
+    return false;
+  }
   return true;
 }
 
@@ -61,13 +58,77 @@ function acolheGetToken() {
   return localStorage.getItem('acolhe_access_token') || '';
 }
 
+function acolheGetTipoPerfil() {
+  var token = acolheGetToken();
+  if (token) {
+    var payload = acolheDecodeJWTPayload(token);
+    if (payload && payload.tipo_perfil) return payload.tipo_perfil;
+  }
+  var stored = localStorage.getItem('acolhe_tipo_perfil');
+  if (stored) return stored;
+  return 'aluno';
+}
+
+function acolheGetRoleLabel() {
+  var labels = {
+    aluno: 'Aluno',
+    professor: 'Professor',
+    psicopedagogo: 'Psicopedagogo',
+    admin: 'Administrador',
+    servidor: 'Servidor'
+  };
+  return labels[acolheGetTipoPerfil()] || acolheGetTipoPerfil();
+}
+
+function acolheGetUserId() {
+  var token = acolheGetToken();
+  if (!token) return null;
+  var payload = acolheDecodeJWTPayload(token);
+  if (!payload || !payload.usuario_id) return null;
+  return payload.usuario_id;
+}
+
+function acolheGetUserName() {
+  var token = acolheGetToken();
+  if (token) {
+    var payload = acolheDecodeJWTPayload(token);
+    if (payload && payload.nome) return payload.nome;
+  }
+  var stored = localStorage.getItem('acolhe_user_nome');
+  if (stored) return stored;
+  try {
+    var user = JSON.parse(localStorage.getItem('acolhe_user') || '{}');
+    if (user && user.nome) return user.nome;
+  } catch(e) {}
+  return 'Usuário';
+}
+
+// Limpa dados sensíveis antigos do localStorage (migração de segurança)
+function acolheCleanupLegacyData() {
+  localStorage.removeItem('acolhe_user_id');
+  localStorage.removeItem('acolhe_senha_temporaria');
+}
+
+// Executa limpeza ao carregar
+acolheCleanupLegacyData();
+
+function acolheGetHomepage() {
+    var perfil = acolheGetTipoPerfil();
+    if (perfil === 'aluno' || perfil === 'professor') return '/disciplinas';
+    if (perfil === 'psicopedagogo' || perfil === 'admin' || perfil === 'servidor') return '/painel';
+    return '/disciplinas';
+}
+
+(function() {
+    var logo = document.getElementById('topbar-logo');
+    if (logo) logo.href = acolheGetHomepage();
+})();
+
 function acolheRequireRole(allowedRoles) {
  if (!acolheRequireAuth()) return false;
- var perfil = localStorage.getItem('acolhe_tipo_perfil') || 'aluno';
+ var perfil = acolheGetTipoPerfil();
  if (allowedRoles.indexOf(perfil) === -1) {
-  if (perfil === 'aluno') {
-   window.location.replace('/portal');
-  } else if (perfil === 'psicopedagogo' || perfil === 'admin' || perfil === 'servidor') {
+  if (perfil === 'psicopedagogo' || perfil === 'admin' || perfil === 'servidor') {
    window.location.replace('/painel');
   } else {
    window.location.replace('/disciplinas');
@@ -199,10 +260,9 @@ var SuapClient = function(authHost, clientID, redirectURI, scope) {
         .then(function(data) {
             callback(data);
         })
-        .catch(function(error) {
-            console.error('[SuapClient] Erro SUAP:', error);
-            alert('Falha na comunicação com o SUAP: ' + error.message);
-        });
+    .catch(function(error) {
+      alert('Falha na comunicacao com o SUAP: ' + error.message);
+    });
     };
 
     this.login = function() {

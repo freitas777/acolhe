@@ -1,0 +1,403 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<script>(function(){document.documentElement.removeAttribute("data-theme");document.documentElement.removeAttribute("data-contrast");localStorage.removeItem("acolhe-theme");localStorage.removeItem("acolhe-contrast");localStorage.removeItem("acolhe-font-size")})()</script>
+ <meta charset="UTF-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1.0">
+ <title>Acolhe+ | Notificacoes</title>
+ <link rel="stylesheet" href="/css/base.css">
+<link rel="stylesheet" href="/css/painel.css">
+ <link rel="stylesheet" href="/css/notificacoes.css">
+<link rel="stylesheet" href="/css/acessibilidade.css">
+ <link rel="stylesheet" href="/css/notificacoes-page.css">
+ <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<a href="#main-content" class="skip-link">Pular para o conteudo principal</a>
+<header class="topbar" role="banner">
+ <div class="topbar-left">
+  <a href="#" class="topbar-logo" id="topbar-logo" title="Pagina inicial">
+   <div class="logo-icon">A+</div>
+   <span class="logo-text">Acolhe+</span>
+  </a>
+ </div>
+ <div class="topbar-center">
+  <h1 class="page-title">Notificacoes</h1>
+ </div>
+ <div class="topbar-right">
+<div class="notificacao-bell-container"></div>
+<a href="/chat" class="btn-nav" title="Chat">
+<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+</svg>
+</a>
+<a href="/disciplinas" class="btn-nav btn-nav-aluno" title="Minhas Disciplinas" id="nav-disciplinas">
+<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
+<path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+</svg>
+</a>
+<a href="/portal" class="btn-nav btn-nav-aluno" title="Meu Perfil" id="nav-portal">
+<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+<circle cx="12" cy="7" r="4"/>
+</svg>
+</a>
+<a href="/painel" class="btn-nav btn-nav-napne" title="Painel NAPNE" id="nav-painel">
+<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+<rect x="3" y="3" width="7" height="7"/>
+<rect x="14" y="3" width="7" height="7"/>
+<rect x="14" y="14" width="7" height="7"/>
+<rect x="3" y="14" width="7" height="7"/>
+</svg>
+</a>
+<div class="user-pill" id="user-pill">
+   <div class="user-avatar" id="user-avatar">??</div>
+   <span class="user-name" id="user-name">Carregando...</span>
+  </div>
+  <button class="btn-logout" id="btn-logout" title="Sair">
+   <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+    <polyline points="16 17 21 12 16 7"/>
+    <line x1="21" y1="12" x2="9" y2="12"/>
+   </svg>
+  </button>
+ </div>
+</header>
+
+<main class="notificacoes-page" id="main-content" role="main">
+ <div class="notificacoes-page-header">
+  <div class="notificacoes-header-left">
+   <h2>Notificacoes</h2>
+   <span class="notificacoes-count-badge" id="nao-lidas-count" hidden>0</span>
+  </div>
+  <div class="notificacoes-header-actions">
+   <button class="btn-notificacao-action btn-marcar-todas" id="btn-marcar-todas-page" hidden>
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+     <polyline points="20 6 9 17 4 12"/>
+    </svg>
+    Marcar todas como lidas
+   </button>
+   
+  </div>
+ </div>
+
+ <div class="notificacoes-filters" id="notificacoes-filters">
+  <button class="filter-btn active" data-filter="todas">Todas</button>
+  <button class="filter-btn" data-filter="nao_lidas">Nao lidas</button>
+  <button class="filter-btn" data-filter="lidas">Lidas</button>
+ </div>
+
+ <div class="notificacoes-full-list" id="notificacoes-full-list">
+  <div class="notificacao-page-empty">
+<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="empty-icon">
+    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+    <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+   </svg>
+   <p>Carregando...</p>
+  </div>
+ </div>
+
+ <!-- <div class="notificacoes-load-more" id="notificacoes-load-more" hidden>
+  <button id="btn-load-more" class="btn-load-more">Carregar mais</button>
+ </div> -->
+</main>
+
+<div class="toast" id="toast" role="alert" hidden>
+ <span id="toast-icon"></span>
+ <span id="toast-message"></span>
+</div>
+
+<script src="/js/js.cookie.js"></script>
+<script src="/js/settings.js"></script>
+<script src="/js/client.js"></script>
+<script src="/js/notificacao.js"></script>
+<script src="/js/acessibilidade.js"></script>
+<script>
+(function() {
+ 'use strict';
+
+ if (!acolheRequireAuth()) return;
+
+ var skip = 0;
+ var limit = 20;
+ var loading = false;
+ var hasMore = true;
+ var currentFilter = 'todas';
+ var allNotificacoes = [];
+
+ function init() {
+  loadUserInfo();
+  loadNotificacoes();
+  setupEvents();
+  NotificacaoService.init();
+ }
+
+ function loadUserInfo() {
+  var savedUser = localStorage.getItem('acolhe_user');
+  if (savedUser) {
+   try {
+    var user = JSON.parse(savedUser);
+    var name = user.nome || user.nome_usual || 'Usuario';
+    var avatarEl = document.getElementById('user-avatar');
+    var nameEl = document.getElementById('user-name');
+    if (avatarEl) avatarEl.textContent = name.split(' ').map(function(n){ return n[0]; }).slice(0,2).join('').toUpperCase();
+    if (nameEl) nameEl.textContent = name;
+   } catch(e) {}
+  }
+
+var btnLogout = document.getElementById('btn-logout');
+if (btnLogout) {
+btnLogout.addEventListener('click', function() { acolheLogout(); });
+}
+
+var perfil = acolheGetTipoPerfil();
+var isNapne = perfil === 'psicopedagogo' || perfil === 'admin' || perfil === 'servidor';
+var alunoNavs = document.querySelectorAll('.btn-nav-aluno');
+var napneNavs = document.querySelectorAll('.btn-nav-napne');
+for (var i = 0; i < alunoNavs.length; i++) { alunoNavs[i].style.display = isNapne ? 'none' : ''; }
+for (var i = 0; i < napneNavs.length; i++) { napneNavs[i].style.display = isNapne ? '' : 'none'; }
+}
+
+ function loadNotificacoes() {
+  if (loading || !hasMore) return;
+  loading = true;
+  acolheFetch('/notificacoes/?skip=' + skip + '&limit=' + limit)
+   .then(function(r) { return r.json(); })
+   .then(function(data) {
+    for (var i = 0; i < data.length; i++) {
+     allNotificacoes.push(data[i]);
+    }
+    if (data.length < limit) hasMore = false;
+    skip += data.length;
+    loading = false;
+    renderFilteredList();
+    document.getElementById('notificacoes-load-more').hidden = !hasMore;
+    updateCountBadge();
+   })
+   .catch(function() { loading = false; });
+ }
+
+ function getFilteredList() {
+  if (currentFilter === 'nao_lidas') {
+   return allNotificacoes.filter(function(n) { return !n.lida; });
+  }
+  if (currentFilter === 'lidas') {
+   return allNotificacoes.filter(function(n) { return n.lida; });
+  }
+  return allNotificacoes;
+ }
+
+ function renderFilteredList() {
+  var list = getFilteredList();
+  var listEl = document.getElementById('notificacoes-full-list');
+
+  if (allNotificacoes.length === 0) {
+   listEl.innerHTML =
+    '<div class="notificacao-page-empty">' +
+    '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="empty-icon">' +
+    '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>' +
+    '<path d="M13.73 21a2 2 0 0 1-3.46 0"/>' +
+    '</svg>' +
+    '<p>Nenhuma notificacao encontrada</p>' +
+    '</div>';
+   return;
+  }
+
+  if (list.length === 0) {
+   var label = currentFilter === 'nao_lidas' ? 'Nenhuma notificacao nao lida' : 'Nenhuma notificacao lida';
+   listEl.innerHTML =
+    '<div class="notificacao-page-empty">' +
+    '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="empty-icon">' +
+    '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>' +
+    '<path d="M13.73 21a2 2 0 0 1-3.46 0"/>' +
+    '</svg>' +
+    '<p>' + label + '</p>' +
+    '</div>';
+   return;
+  }
+
+  var html = '';
+  for (var i = 0; i < list.length; i++) {
+   html += renderItem(list[i]);
+  }
+  listEl.innerHTML = html;
+ }
+
+ function renderItem(n) {
+  var lidaClass = n.lida ? 'notificacao-page-item-lida' : 'notificacao-page-item-nao-lida';
+  var iconSvg = getTypeIcon(n.tipo);
+  var alunoTag = n.aluno_nome ? '<span class="notificacao-aluno-tag">' + escapeHtml(n.aluno_nome) + '</span>' : '';
+  var markBtn = n.lida ? '' :
+   '<button class="btn-notificacao-marcar" data-id="' + n.id + '" title="Marcar como lida">' +
+   '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
+   '<polyline points="20 6 9 17 4 12"/>' +
+   '</svg>' +
+   '</button>';
+  var deleteBtn =
+   '<button class="btn-notificacao-excluir" data-id="' + n.id + '" title="Remover notificacao">' +
+   '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
+   '<polyline points="3 6 5 6 21 6"/>' +
+   '<path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>' +
+   '<path d="M10 11v6"/>' +
+   '<path d="M14 11v6"/>' +
+   '<path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>' +
+   '</svg>' +
+   '</button>';
+
+  return '<div class="notificacao-page-item ' + lidaClass + '" data-id="' + n.id + '">' +
+   '<div class="notificacao-page-item-icon">' + iconSvg + '</div>' +
+   '<div class="notificacao-page-item-content">' +
+   '<div class="notificacao-page-item-top">' +
+   '<span class="notificacao-page-item-titulo">' + escapeHtml(n.titulo) + '</span>' +
+   alunoTag +
+   '</div>' +
+   (n.mensagem ? '<div class="notificacao-page-item-mensagem">' + escapeHtml(n.mensagem) + '</div>' : '') +
+   '<div class="notificacao-page-item-data">' + formatTime(n.criada_em) + '</div>' +
+   '</div>' +
+   '<div class="notificacao-page-item-actions">' +
+   markBtn +
+   deleteBtn +
+   '</div>' +
+   '</div>';
+ }
+
+ function getTypeIcon(tipo) {
+  if (tipo === 'aluno_importado') {
+   return '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="type-icon type-icon-importado">' +
+    '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>' +
+    '<polyline points="7 10 12 15 17 10"/>' +
+    '<line x1="12" y1="15" x2="12" y2="3"/>' +
+    '</svg>';
+  }
+  if (tipo === 'assistido_na_turma') {
+   return '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="type-icon type-icon-assistido">' +
+    '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>' +
+    '<circle cx="9" cy="7" r="4"/>' +
+    '<path d="M23 21v-2a4 4 0 0 0-3-3.87"/>' +
+    '<path d="M16 3.13a4 4 0 0 1 0 7.75"/>' +
+    '</svg>';
+  }
+  return '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="type-icon type-icon-default">' +
+   '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>' +
+   '<path d="M13.73 21a2 2 0 0 1-3.46 0"/>' +
+   '</svg>';
+ }
+
+ function updateCountBadge() {
+  var count = allNotificacoes.filter(function(n) { return !n.lida; }).length;
+  var badge = document.getElementById('nao-lidas-count');
+  var btnAll = document.getElementById('btn-marcar-todas-page');
+  if (count > 0) {
+   badge.textContent = count;
+   badge.hidden = false;
+   btnAll.hidden = false;
+  } else {
+   badge.hidden = true;
+   btnAll.hidden = true;
+  }
+ }
+
+ function markAsRead(id) {
+  acolheFetch('/notificacoes/' + id + '/ler', { method: 'PUT' })
+   .then(function() {
+    for (var i = 0; i < allNotificacoes.length; i++) {
+     if (allNotificacoes[i].id === id) {
+      allNotificacoes[i].lida = true;
+      break;
+     }
+    }
+    renderFilteredList();
+    updateCountBadge();
+    NotificacaoService.fetchCount();
+   })
+   .catch(function() {});
+ }
+
+ function markAllRead() {
+  acolheFetch('/notificacoes/ler-todas', { method: 'PUT' })
+   .then(function() {
+    for (var i = 0; i < allNotificacoes.length; i++) {
+     allNotificacoes[i].lida = true;
+    }
+    renderFilteredList();
+    updateCountBadge();
+    NotificacaoService.fetchCount();
+   })
+   .catch(function() {});
+ }
+
+ function deleteNotificacao(id) {
+  acolheFetch('/notificacoes/' + id, { method: 'DELETE' })
+   .then(function() {
+    allNotificacoes = allNotificacoes.filter(function(n) { return n.id !== id; });
+    renderFilteredList();
+    updateCountBadge();
+    NotificacaoService.fetchCount();
+   })
+   .catch(function() {});
+ }
+
+ function setupEvents() {
+  document.getElementById('notificacoes-full-list').addEventListener('click', function(e) {
+   var markBtn = e.target.closest('.btn-notificacao-marcar');
+   if (markBtn) {
+    e.preventDefault();
+    e.stopPropagation();
+    var id = parseInt(markBtn.getAttribute('data-id'), 10);
+    if (!isNaN(id)) markAsRead(id);
+    return;
+   }
+   var deleteBtn = e.target.closest('.btn-notificacao-excluir');
+   if (deleteBtn) {
+    e.preventDefault();
+    e.stopPropagation();
+    var id = parseInt(deleteBtn.getAttribute('data-id'), 10);
+    if (!isNaN(id)) deleteNotificacao(id);
+    return;
+   }
+  });
+
+  document.getElementById('btn-load-more').addEventListener('click', function() {
+   loadNotificacoes();
+  });
+
+  document.getElementById('btn-marcar-todas-page').addEventListener('click', function() {
+   markAllRead();
+  });
+
+  document.getElementById('notificacoes-filters').addEventListener('click', function(e) {
+   var btn = e.target.closest('.filter-btn');
+   if (!btn) return;
+   var filter = btn.getAttribute('data-filter');
+   if (filter === currentFilter) return;
+   currentFilter = filter;
+   var btns = document.querySelectorAll('.filter-btn');
+   for (var i = 0; i < btns.length; i++) {
+    btns[i].classList.toggle('active', btns[i].getAttribute('data-filter') === filter);
+   }
+   renderFilteredList();
+  });
+ }
+
+ function escapeHtml(str) {
+  if (!str) return '';
+  var div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+ }
+
+ function formatTime(isoStr) {
+  if (!isoStr) return '';
+  try {
+   var d = new Date(isoStr);
+   if (isNaN(d.getTime())) return '';
+   return d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  } catch(e) { return ''; }
+ }
+
+ init();
+})();
+</script>
+</body>
+</html>

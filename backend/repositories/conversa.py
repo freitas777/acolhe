@@ -18,10 +18,15 @@ class ConversaRepository(BaseRepository[Conversa]):
         skip: int = 0,
         limit: int = 100,
     ) -> list[Conversa]:
-        stmt = select(Conversa).options(selectinload(Conversa.mensagens))
+        stmt = (
+            select(Conversa)
+            .options(selectinload(Conversa.mensagens))
+            .options(selectinload(Conversa.aluno))
+            .options(selectinload(Conversa.disciplina))
+        )
         if usuario_id is not None:
             stmt = stmt.where(Conversa.usuario_id == usuario_id)
-        stmt = stmt.order_by(Conversa.criada_em.desc()).offset(skip).limit(limit)
+        stmt = stmt.order_by(Conversa.atualizada_em.desc()).offset(skip).limit(limit)
         resultado = self.db.execute(stmt)
         return list(resultado.unique().scalars().all())
 
@@ -29,7 +34,28 @@ class ConversaRepository(BaseRepository[Conversa]):
         stmt = (
             select(Conversa)
             .options(selectinload(Conversa.mensagens))
+            .options(selectinload(Conversa.aluno))
+            .options(selectinload(Conversa.disciplina))
             .where(Conversa.id == conversa_id)
+        )
+        resultado = self.db.execute(stmt)
+        return resultado.unique().scalar_one_or_none()
+
+    def obter_por_usuario_e_disciplina(
+        self,
+        usuario_id: int,
+        disciplina_id: int,
+    ) -> Conversa | None:
+        stmt = (
+            select(Conversa)
+            .options(selectinload(Conversa.mensagens))
+            .options(selectinload(Conversa.disciplina))
+            .where(
+                Conversa.usuario_id == usuario_id,
+                Conversa.disciplina_id == disciplina_id,
+            )
+            .order_by(Conversa.atualizada_em.desc())
+            .limit(1)
         )
         resultado = self.db.execute(stmt)
         return resultado.unique().scalar_one_or_none()

@@ -1,11 +1,15 @@
 import secrets
 import string
 
-from fastapi import APIRouter, Depends, HTTPException, status
+import logging
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from urllib.parse import urlencode
 import httpx
+
+logger = logging.getLogger(__name__)
 
 from backend.config import settings
 from backend.database import get_db
@@ -16,6 +20,7 @@ from backend.repositories.conta_local import ContaLocalRepository
 from backend.repositories.usuario import UsuarioRepository
 from backend.security import hash_senha, verificar_senha, criar_jwt
 from backend.services.auth_service import AuthService
+from backend.services.audit_service import AuditService
 from backend.schemas.auth import (
     LoginRequest,
     LoginResponse,
@@ -26,9 +31,16 @@ from backend.schemas.auth import (
     UsuarioSUAPResponse,
     DisciplinaResponse,
     AlunoAssistidoResponse,
+    SolicitarApoioRequest,
+    ObservacaoRequest,
+    ObservacaoResponse,
+    PendenciaResponse,
 )
+from backend.schemas.perfil_aluno import PerfilAlunoResponse
+from backend.schemas.conteudo_gerado import ConteudoGeradoResponse
+from backend.repositories.acomodacao_observacao import AcomodacaoObservacaoRepository
 
-router = APIRouter(prefix="/auth", tags=["Autenticacao"])
+router = APIRouter(prefix="/auth", tags=["Auth"])
 
 
 @router.get("/login")
@@ -46,7 +58,8 @@ async def login():
 @router.post("/callback", response_model=LoginResponse)
 async def callback(request: LoginRequest, auth_service: AuthService = Depends()):
     try:
-        result = await auth_service.login_com_suap(request.access_token, request.semestre)
+        semestre = request.semestre or settings.semestre_vigente
+        result = await auth_service.login_com_suap(request.access_token, semestre)
         result["token"] = request.access_token
         return result
     except httpx.ConnectError:
@@ -67,17 +80,177 @@ async def callback(request: LoginRequest, auth_service: AuthService = Depends())
             )
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Erro ao comunicar com o SUAP (codigo {e.response.status_code}).",
+            detail=f"Erro ao comunicar com SUAP: {e.response.status_code}",
         )
     except Exception as e:
+        logger.error("Erro inesperado no callback SUAP: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro inesperado: {str(e)}",
+            detail="Erro interno ao processar login. Tente novamente.",
         )
+
+# --- Professor Dashboard endpoints ---
+
+# View full student profile (read‑only)
+@router.get("/disciplinas/alunos/{aluno_id}/perfil", response_model=PerfilAlunoResponse)
+async def aluno_perfil(
+    aluno_id: int,
+    request: Request,
+    auth_data: AuthData = Depends(get_current_usuario),
+    auth_service: AuthService = Depends(),
+    db: Session = Depends(get_db),
+):
+    try:
+        perfil = auth_service.obter_perfil_aluno(auth_data.usuario.id, aluno_id)
+        AuditService(db).registrar(
+            usuario_id=auth_data.usuario.id,
+            acao="leitura",
+            recurso_tipo="perfil_aluno",
+            recurso_id=perfil.id if perfil else 0,
+            aluno_id=aluno_id,
+            ip_origem=request.client.host if request.client else None,
+        )
+        return perfil
+    except HTTPException as e:
+        raise e
+
+# View adaptive content generated for a student
+@router.get("/disciplinas/alunos/{aluno_id}/conteudos", response_model=list[ConteudoGeradoResponse])
+async def aluno_conteudos(
+    aluno_id: int,
+    request: Request,
+    auth_data: AuthData = Depends(get_current_usuario),
+    auth_service: AuthService = Depends(),
+    db: Session = Depends(get_db),
+):
+    try:
+        conteudos = auth_service.obter_conteudos_aluno(auth_data.usuario.id, aluno_id)
+        AuditService(db).registrar(
+            usuario_id=auth_data.usuario.id,
+            acao="leitura",
+            recurso_tipo="conteudo_gerado",
+            recurso_id=0,
+            aluno_id=aluno_id,
+            detalhes=f"{len(conteudos)} conteudos listados",
+            ip_origem=request.client.host if request.client else None,
+        )
+        return conteudos
+    except HTTPException as e:
+        raise e
+
+# Request NAPNE support for a student (creates a pendência)
+@router.post("/disciplinas/alunos/{aluno_id}/solicitar-apoio", response_model=PendenciaResponse)
+async def solicitar_apoio(
+    aluno_id: int,
+    request: SolicitarApoioRequest,
+    req: Request,
+    auth_data: AuthData = Depends(get_current_usuario),
+    auth_service: AuthService = Depends(),
+    db: Session = Depends(get_db),
+):
+    try:
+        pend = auth_service.solicitar_apoio_napne(auth_data.usuario.id, aluno_id, request.motivo)
+        AuditService(db).registrar(
+            usuario_id=auth_data.usuario.id,
+            acao="criacao",
+            recurso_tipo="pendencia",
+            recurso_id=pend.id,
+            aluno_id=aluno_id,
+            detalhes=request.motivo,
+            ip_origem=req.client.host if req.client else None,
+        )
+        return pend
+    except HTTPException as e:
+        raise e
+
+# Create or update a professor's observation for a student in a discipline
+@router.post("/disciplinas/alunos/{aluno_id}/observacao", response_model=ObservacaoResponse)
+async def criar_observacao(
+    aluno_id: int,
+    request: ObservacaoRequest,
+    req: Request,
+    auth_data: AuthData = Depends(get_current_usuario),
+    auth_service: AuthService = Depends(),
+    db: Session = Depends(get_db),
+):
+    try:
+        obs = auth_service.criar_ou_atualizar_observacao(
+            auth_data.usuario.id, aluno_id, request.disciplina_id, request.texto
+        )
+        is_update = obs.criado_em != obs.atualizado_em if hasattr(obs, 'atualizado_em') else False
+        AuditService(db).registrar(
+            usuario_id=auth_data.usuario.id,
+            acao="atualizacao" if is_update else "criacao",
+            recurso_tipo="observacao_acomodacao",
+            recurso_id=obs.id,
+            aluno_id=aluno_id,
+            detalhes=f"disciplina_id={request.disciplina_id}",
+            ip_origem=req.client.host if req.client else None,
+        )
+        return obs
+    except HTTPException as e:
+        raise e
+
+# Retrieve an existing observation (if any) for a student in a discipline
+@router.get("/disciplinas/alunos/{aluno_id}/observacao", response_model=ObservacaoResponse)
+async def obter_observacao(
+    aluno_id: int,
+    disciplina_id: int,
+    request: Request,
+    auth_data: AuthData = Depends(get_current_usuario),
+    auth_service: AuthService = Depends(),
+    db: Session = Depends(get_db),
+):
+    obs = auth_service.obter_observacao(auth_data.usuario.id, aluno_id, disciplina_id)
+    AuditService(db).registrar(
+        usuario_id=auth_data.usuario.id,
+        acao="leitura",
+        recurso_tipo="observacao_acomodacao",
+        recurso_id=obs.id if obs else 0,
+        aluno_id=aluno_id,
+        detalhes=f"disciplina_id={disciplina_id}",
+        ip_origem=request.client.host if request.client else None,
+    )
+    return obs
+
+
+@router.post("/logout")
+async def logout(
+    request: Request,
+    auth_data: AuthData = Depends(get_current_usuario),
+    db: Session = Depends(get_db),
+):
+    from datetime import datetime, timezone
+    from backend.security import validar_jwt
+    from backend.repositories.token_revogado import TokenRevogadoRepository
+    from backend.services.audit_service import AuditService
+
+    auth_header = request.headers.get("authorization", "")
+    if auth_header.startswith("Bearer "):
+        token = auth_header.split(" ", 1)[1]
+        payload = validar_jwt(token)
+        if payload:
+            jti = payload.get("jti")
+            exp = payload.get("exp")
+            if jti and exp:
+                token_repo = TokenRevogadoRepository(db)
+                expira_em = datetime.fromtimestamp(exp, tz=timezone.utc)
+                token_repo.revogar_token(jti, auth_data.usuario.id, expira_em)
+
+                AuditService(db).registrar(
+                    usuario_id=auth_data.usuario.id,
+                    acao="logout",
+                    recurso_tipo="usuario",
+                    recurso_id=auth_data.usuario.id,
+                )
+
+    return {"detail": "Logout realizado com sucesso."}
 
 
 @router.post("/local-login", response_model=LoginResponse)
-async def local_login(request: LocalLoginRequest, db: Session = Depends(get_db)):
+async def local_login(request: LocalLoginRequest, req: Request, db: Session = Depends(get_db)):
+    from backend.services.audit_service import AuditService
+    from datetime import datetime, timezone, timedelta
     conta_repo = ContaLocalRepository(db)
     conta = conta_repo.get_by_email(request.email)
     if not conta:
@@ -90,11 +263,41 @@ async def local_login(request: LocalLoginRequest, db: Session = Depends(get_db))
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Conta desativada.",
         )
-    if not verificar_senha(request.senha, conta.senha_hash):
+    if conta.bloqueado_ate:
+        agora = datetime.now(timezone.utc)
+        bloqueado_ate = conta.bloqueado_ate if conta.bloqueado_ate.tzinfo else conta.bloqueado_ate.replace(tzinfo=timezone.utc)
+        if bloqueado_ate > agora:
+            minutos_restantes = int((bloqueado_ate - agora).total_seconds() / 60)
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Conta bloqueada. Tente novamente em {minutos_restantes} minutos.",
+            )
+    import asyncio
+    senha_valida = await asyncio.to_thread(verificar_senha, request.senha, conta.senha_hash)
+    if not senha_valida:
+        conta.tentativas_login += 1
+        if conta.tentativas_login >= 10:
+            conta.bloqueado_ate = datetime.now(timezone.utc) + timedelta(minutes=30)
+        db.commit()
+        AuditService(db).registrar(
+            usuario_id=conta.usuario_id,
+            acao="login_falha",
+            recurso_tipo="usuario",
+            recurso_id=conta.usuario_id,
+            ip_origem=req.client.host if req.client else None,
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Email ou senha invalidos.",
         )
+
+    if not (conta.senha_hash.startswith('$2b$') or conta.senha_hash.startswith('$2a$')):
+        conta.senha_hash = hash_senha(request.senha)
+        db.commit()
+
+    conta.tentativas_login = 0
+    conta.bloqueado_ate = None
+    db.commit()
 
     usuario_repo = UsuarioRepository(db)
     usuario = usuario_repo.get_by_id(conta.usuario_id)
@@ -104,7 +307,20 @@ async def local_login(request: LocalLoginRequest, db: Session = Depends(get_db))
             detail="Email ou senha invalidos.",
         )
 
-    jwt_token = criar_jwt({"usuario_id": usuario.id, "tipo_perfil": usuario.tipo_perfil})
+    AuditService(db).registrar(
+        usuario_id=usuario.id,
+        acao="login_sucesso",
+        recurso_tipo="usuario",
+        recurso_id=usuario.id,
+        ip_origem=req.client.host if req.client else None,
+    )
+
+    jwt_token = criar_jwt({
+        "usuario_id": usuario.id,
+        "tipo_perfil": usuario.tipo_perfil,
+        "nome": usuario.nome,
+        "senha_temporaria": conta.senha_temporaria,
+    })
 
     resp = LoginResponse(
         usuario=UsuarioSUAPResponse.model_validate(usuario),
@@ -159,6 +375,7 @@ async def criar_convite(
         "senha_hash": hash_senha(senha_temp),
         "usuario_id": novo_usuario.id,
         "ativo": True,
+        "senha_temporaria": request.tipo_perfil != "admin",
     })
 
     return ConviteResponse(
@@ -181,15 +398,23 @@ async def alterar_senha(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Usuario nao possui conta local.",
         )
-    if not verificar_senha(request.senha_atual, conta.senha_hash):
+    import asyncio
+    senha_valida = await asyncio.to_thread(verificar_senha, request.senha_atual, conta.senha_hash)
+    if not senha_valida:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Senha atual incorreta.",
         )
-    conta.senha_hash = hash_senha(request.nova_senha)
+    conta.senha_hash = await asyncio.to_thread(hash_senha, request.nova_senha)
     conta.senha_temporaria = False
     db.commit()
-    return {"detail": "Senha alterada com sucesso."}
+    new_token = criar_jwt({
+        "usuario_id": auth_data.usuario.id,
+        "tipo_perfil": auth_data.usuario.tipo_perfil,
+        "nome": auth_data.usuario.nome,
+        "senha_temporaria": False,
+    })
+    return {"detail": "Senha alterada com sucesso.", "token": new_token}
 
 
 @router.get("/me", response_model=UsuarioSUAPResponse)
@@ -223,7 +448,7 @@ async def disciplinas(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Nao foi possivel buscar as disciplinas: {str(e)}",
+            detail="Não foi possível buscar as disciplinas. Tente novamente.",
         )
 
 
@@ -238,5 +463,5 @@ async def alunos_assistidos(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro ao buscar alunos assistidos: {str(e)}",
+            detail="Erro ao buscar alunos assistidos. Tente novamente.",
         )

@@ -1,9 +1,12 @@
 (function() {
 'use strict';
 
- if (!acolheRequireRole(['psicopedagogo', 'servidor', 'admin'])) return;
+ var _token = acolheGetToken();
+ var _payload = _token ? acolheDecodeJWTPayload(_token) : null;
+ var _isTemp = _payload && _payload.senha_temporaria === true;
+ if (!_isTemp && !acolheRequireRole(['psicopedagogo', 'servidor', 'admin'])) return;
 
- var userId = localStorage.getItem('acolhe_user_id');
+ var userId = acolheGetUserId();
     var currentUser = null;
     var searchTimeout = null;
 
@@ -17,16 +20,17 @@ function init() {
 }
 
 function checkSenhaTemporaria() {
- if (localStorage.getItem('acolhe_senha_temporaria') === 'true') {
+ var token = acolheGetToken();
+ if (!token) return;
+ var payload = acolheDecodeJWTPayload(token);
+ if (payload && payload.senha_temporaria === true) {
   openSenhaModal(true);
  }
 }
 
     function loadUserInfo() {
-        var savedUser = localStorage.getItem('acolhe_user');
-        if (savedUser) {
-            try { currentUser = JSON.parse(savedUser); } catch(e) {}
-        }
+        var userName = acolheGetUserName();
+        currentUser = { nome: userName };
         updateUserInfoUI();
     }
 
@@ -123,9 +127,13 @@ function loadPendencias() {
             listEl.querySelectorAll('.btn-approve').forEach(function(btn) {
                 btn.addEventListener('click', function() { validarPendencia(parseInt(btn.dataset.id), 'validado'); });
             });
-            listEl.querySelectorAll('.btn-reject').forEach(function(btn) {
-                btn.addEventListener('click', function() { validarPendencia(parseInt(btn.dataset.id), 'rejeitado'); });
-            });
+listEl.querySelectorAll('.btn-reject').forEach(function(btn) {
+btn.addEventListener('click', function() {
+if (confirm('Deseja realmente rejeitar esta pendencia? O aluno sera excluido do acompanhamento.')) {
+validarPendencia(parseInt(btn.dataset.id), 'rejeitado');
+}
+});
+});
         })
         .catch(function(err) {
             listEl.innerHTML = '<div class="empty-col"><p>Erro ao carregar pendencias</p></div>';
@@ -170,9 +178,9 @@ function validarPendencia(pendenciaId, acao) {
     }
     listEl.innerHTML = '';
     alunos.forEach(function(a) {
-      var initials = a.nome.split(' ').map(function(n){ return n[0]; }).slice(0,2).join('').toUpperCase();
-      var item = document.createElement('div');
-      item.className = 'aluno-ativo-item';
+var initials = (a.nome || '?').split(' ').map(function(n){ return n[0]; }).slice(0,2).join('').toUpperCase();
+    var item = document.createElement('div');
+    item.className = 'aluno-ativo-item';
       item.setAttribute('data-aluno-id', a.id);
       item.setAttribute('data-aluno-nome', a.nome);
       item.innerHTML =
@@ -183,7 +191,7 @@ function validarPendencia(pendenciaId, acao) {
         (a.diagnostico ? '<div class="ativo-diagnostico">' + escapeHtml(a.diagnostico) + '</div>' : '') +
         '</div>' +
         '<button class="btn-profile" title="Editar perfil" data-aluno-id="' + a.id + '" data-aluno-nome="' + escapeHtml(a.nome) + '">' +
-        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>' +
+        '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>' +
         '</button>';
       listEl.appendChild(item);
     });
@@ -221,18 +229,25 @@ function validarPendencia(pendenciaId, acao) {
                 return;
             }
             resultsEl.innerHTML = '';
-            alunos.forEach(function(a) {
-                var initials = a.nome.split(' ').map(function(n){ return n[0]; }).slice(0,2).join('').toUpperCase();
-                var item = document.createElement('div');
-                item.className = 'search-result-item';
-                item.innerHTML =
-                    '<div class="result-avatar">' + escapeHtml(initials) + '</div>' +
-                    '<div class="result-info">' +
-                        '<div class="result-nome">' + escapeHtml(a.nome) + '</div>' +
-                        (a.matricula ? '<div class="result-matricula">' + escapeHtml(a.matricula) + '</div>' : '') +
-                        (a.diagnostico ? '<div class="result-diagnostico">' + escapeHtml(a.diagnostico) + '</div>' : '') +
-                    '</div>';
-                resultsEl.appendChild(item);
+alunos.forEach(function(a) {
+var initials = (a.nome || '?').split(' ').map(function(n){ return n[0]; }).slice(0,2).join('').toUpperCase();
+var item = document.createElement('div');
+item.className = 'search-result-item';
+item.setAttribute('data-aluno-id', a.id);
+item.setAttribute('data-aluno-nome', a.nome);
+item.innerHTML =
+'<div class="result-avatar">' + escapeHtml(initials) + '</div>' +
+'<div class="result-info">' +
+'<div class="result-nome">' + escapeHtml(a.nome) + '</div>' +
+(a.matricula ? '<div class="result-matricula">' + escapeHtml(a.matricula) + '</div>' : '') +
+(a.diagnostico ? '<div class="result-diagnostico">' + escapeHtml(a.diagnostico) + '</div>' : '') +
+'</div>';
+item.addEventListener('click', function() {
+openProfileModal(a.id, a.nome);
+resultsEl.hidden = true;
+document.getElementById('search-input').value = '';
+});
+resultsEl.appendChild(item);
             });
             resultsEl.hidden = false;
         })
@@ -263,43 +278,81 @@ function validarPendencia(pendenciaId, acao) {
         return div.innerHTML;
     }
 
-    function openProfileModal(alunoId, alunoNome) {
-  var modal = document.getElementById('profile-modal');
-  var nameEl = document.getElementById('modal-aluno-name');
-  var idEl = document.getElementById('profile-aluno-id');
-  if (!modal || !idEl) return;
+    var _trapHandler = null;
+var _trapLastFocus = null;
 
-  idEl.value = alunoId;
-  if (nameEl) nameEl.textContent = 'Perfil: ' + (alunoNome || 'Aluno');
+function _trapFocus(modalEl) {
+    _untrapFocus();
+    _trapLastFocus = document.activeElement;
+    var focusable = modalEl.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])');
+    if (!focusable.length) return;
+    var first = focusable[0];
+    var last = focusable[focusable.length - 1];
+    _trapHandler = function(e) {
+        if (e.key === 'Escape') {
+            var id = modalEl.id;
+            if (id === 'profile-modal') closeProfileModal();
+            else if (id === 'invite-modal') closeInviteModal();
+            else if (id === 'senha-modal') closeSenhaModal();
+            return;
+        }
+        if (e.key !== 'Tab') return;
+        if (e.shiftKey) {
+            if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+        } else {
+            if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+        }
+    };
+    document.addEventListener('keydown', _trapHandler);
+    setTimeout(function() { first.focus(); }, 50);
+}
 
-  document.getElementById('profile-nivel-atencao').value = '';
-  document.getElementById('profile-dificuldade-leitura').value = 'false';
-  document.getElementById('profile-preferencia').value = '';
-  document.getElementById('profile-interesses').value = '';
-  document.getElementById('profile-diagnostico').value = '';
+function _untrapFocus() {
+    if (_trapHandler) { document.removeEventListener('keydown', _trapHandler); _trapHandler = null; }
+    if (_trapLastFocus) { try { _trapLastFocus.focus(); } catch(e) {} _trapLastFocus = null; }
+}
 
-  modal.hidden = false;
+function openProfileModal(alunoId, alunoNome) {
+   var modal = document.getElementById('profile-modal');
+   var nameEl = document.getElementById('modal-aluno-name');
+   var idEl = document.getElementById('profile-aluno-id');
+   if (!modal || !idEl) return;
 
- acolheFetch('/equipe/alunos/' + alunoId + '/perfil')
-  .then(function(r) {
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    return r.json();
-  })
-  .then(function(perfil) {
-    if (perfil.nivel_atencao) document.getElementById('profile-nivel-atencao').value = perfil.nivel_atencao;
-    document.getElementById('profile-dificuldade-leitura').value = String(perfil.dificuldade_leitura || false);
-    if (perfil.preferencia) document.getElementById('profile-preferencia').value = perfil.preferencia;
-    if (perfil.interesses) document.getElementById('profile-interesses').value = perfil.interesses;
-    if (perfil.diagnostico) document.getElementById('profile-diagnostico').value = perfil.diagnostico;
-  })
-  .catch(function() {
-    showToast('Erro ao carregar perfil', 'error');
-  });
+   idEl.value = alunoId;
+   if (nameEl) nameEl.textContent = 'Perfil: ' + (alunoNome || 'Aluno');
+
+   document.getElementById('profile-nivel-atencao').value = '';
+   document.getElementById('profile-dificuldade-leitura').value = 'false';
+   document.getElementById('profile-preferencia').value = '';
+   document.getElementById('profile-interesses').value = '';
+   document.getElementById('profile-diagnostico').value = '';
+
+   modal.hidden = false;
+
+   acolheFetch('/equipe/alunos/' + alunoId + '/perfil')
+     .then(function(r) {
+       if (!r.ok) throw new Error('HTTP ' + r.status);
+       return r.json();
+     })
+     .then(function(perfil) {
+       if (perfil.nivel_atencao) document.getElementById('profile-nivel-atencao').value = perfil.nivel_atencao;
+       document.getElementById('profile-dificuldade-leitura').value = String(perfil.dificuldade_leitura || false);
+       if (perfil.preferencia) document.getElementById('profile-preferencia').value = perfil.preferencia;
+       if (perfil.interesses) document.getElementById('profile-interesses').value = perfil.interesses;
+           if (perfil.diagnostico) document.getElementById('profile-diagnostico').value = perfil.diagnostico;
+     })
+     .catch(function() {
+       showToast('Erro ao carregar perfil', 'error');
+     });
+   // Load professor observations for this aluno (NAPNE view)
+   loadProfessorObservacoes(alunoId);
+   _trapFocus(modal);
 }
 
 function closeProfileModal() {
-  var modal = document.getElementById('profile-modal');
-  if (modal) modal.hidden = true;
+    _untrapFocus();
+    var modal = document.getElementById('profile-modal');
+    if (modal) modal.hidden = true;
 }
 
 function saveProfile(e) {
@@ -345,13 +398,15 @@ function openInviteModal() {
   var actionsEl = document.getElementById('invite-actions');
   if (actionsEl) actionsEl.hidden = false;
   var submitBtn = document.getElementById('invite-submit');
-  if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Convidar'; }
-  modal.hidden = false;
+    if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Convidar'; }
+    modal.hidden = false;
+    _trapFocus(modal);
 }
 
 function closeInviteModal() {
-  var modal = document.getElementById('invite-modal');
-  if (modal) modal.hidden = true;
+    _untrapFocus();
+    var modal = document.getElementById('invite-modal');
+    if (modal) modal.hidden = true;
 }
 
 function handleInvite(e) {
@@ -405,18 +460,43 @@ function openSenhaModal(forceTemp) {
  var isTemp = !!forceTemp;
  if (noticeEl) noticeEl.hidden = !isTemp;
  var cancelBtn = document.getElementById('senha-cancel');
+ var closeBtn = document.getElementById('senha-modal-close');
  if (cancelBtn) cancelBtn.style.display = isTemp ? 'none' : '';
+ if (closeBtn) closeBtn.style.display = isTemp ? 'none' : '';
  var submitBtn = document.getElementById('senha-submit');
- if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Alterar Senha'; }
- modal.hidden = false;
+    if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Alterar Senha'; }
+    modal.hidden = false;
+    
+    // Se é senha temporária, bloquear fechamento do modal
+    if (isTemp) {
+        modal.setAttribute('data-force-open', 'true');
+        document.body.style.overflow = 'hidden';
+    }
+    
+    _trapFocus(modal);
 }
 
 function closeSenhaModal() {
- var modal = document.getElementById('senha-modal');
- if (modal) modal.hidden = true;
- if (localStorage.getItem('acolhe_senha_temporaria') === 'true') {
-  acolheLogout();
- }
+    var modal = document.getElementById('senha-modal');
+    if (modal && modal.getAttribute('data-force-open') === 'true') {
+        // Não permitir fechar se for senha temporária
+        return;
+    }
+    
+    _untrapFocus();
+    if (modal) {
+        modal.hidden = true;
+        modal.removeAttribute('data-force-open');
+    }
+    document.body.style.overflow = '';
+    
+    var token = acolheGetToken();
+    if (token) {
+        var payload = acolheDecodeJWTPayload(token);
+        if (payload && payload.senha_temporaria === true) {
+            acolheLogout();
+        }
+    }
 }
 
 function handleAlterarSenha(e) {
@@ -451,12 +531,21 @@ function handleAlterarSenha(e) {
   if (!r.ok) return r.json().then(function(d) { throw new Error(d.detail || 'HTTP ' + r.status); });
   return r.json();
  })
- .then(function() {
-  localStorage.setItem('acolhe_senha_temporaria', 'false');
-  showToast('Senha alterada com sucesso!', 'success');
-  closeSenhaModal();
-  loadEquipe();
- })
+  .then(function(data) {
+   // Atualizar token no localStorage
+   if (data && data.token) {
+       localStorage.setItem('acolhe_access_token', data.token);
+   }
+   showToast('Senha alterada com sucesso!', 'success');
+   
+   var modal = document.getElementById('senha-modal');
+   if (modal) {
+       modal.removeAttribute('data-force-open');
+   }
+   document.body.style.overflow = '';
+   closeSenhaModal();
+   loadEquipe();
+  })
  .catch(function(err) {
   showToast('Erro: ' + err.message, 'error');
   btn.disabled = false;
@@ -508,6 +597,9 @@ function setupEventListeners() {        var searchInput = document.getElementByI
   var profileForm = document.getElementById('profile-form');
   if (profileForm) profileForm.addEventListener('submit', saveProfile);
 
+  var btnGerarRelatorioPdf = document.getElementById('btn-gerar-relatorio-pdf');
+  if (btnGerarRelatorioPdf) btnGerarRelatorioPdf.addEventListener('click', gerarRelatorioPDF);
+
   var btnInvite = document.getElementById('btn-invite');
   if (btnInvite) btnInvite.addEventListener('click', openInviteModal);
 
@@ -543,5 +635,124 @@ function setupEventListeners() {        var searchInput = document.getElementByI
   if (senhaForm) senhaForm.addEventListener('submit', handleAlterarSenha);
  }
 
-    document.addEventListener('DOMContentLoaded', init);
+     document.addEventListener('DOMContentLoaded', init);
+
+// Load observations of professors for a given aluno (NAPNE view)
+function loadProfessorObservacoes(alunoId) {
+   var container = document.getElementById('profile-observacoes');
+   if (!container) return;
+   acolheFetch('/equipe/alunos/' + alunoId + '/observacoes')
+     .then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+     .then(function(obsList) {
+       if (!obsList || obsList.length === 0) {
+         container.innerHTML = '<p>Nenhuma observação registrada.</p>';
+         return;
+       }
+       var html = '';
+       obsList.forEach(function(obs) {
+         // obs is expected to have: id, aluno_id, disciplina_id, professor_id, disciplina_sigla, professor_nome, texto, criado_em
+         var date = new Date(obs.criado_em);
+         var dateStr = date.toLocaleString('pt-BR');
+         html += '<div class="observacao-item">' +
+                 '<div class="observacao-header">' +
+                 '<strong>Professor ' + escapeHtml(obs.professor_nome) + '</strong> ' +
+                 '<span class="disciplina-sigla">[' + escapeHtml(obs.disciplina_sigla) + ']</span> ' +
+                 '<span class="data">' + escapeHtml(dateStr) + '</span>' +
+                 '</div>' +
+                 '<div class="observacao-texto">' + escapeHtml(obs.texto) + '</div>' +
+                 '</div>';
+       });
+container.innerHTML = html;
+     })
+     .catch(function(err){
+       container.innerHTML = '<p>Erro ao carregar observações</p>';
+       console.error(err);
+     });
+}
+
+function loadDashboardMetrics() {
+ acolheFetch('/equipe/dashboard')
+   .then(function(r) { return r.json(); })
+   .then(function(data) {
+     document.getElementById('metric-alunos-ativos').textContent = data.alunos_ativos !== undefined ? data.alunos_ativos : '0';
+     document.getElementById('metric-pendencias').textContent = data.pendencias_pendentes !== undefined ? data.pendencias_pendentes : '0';
+     document.getElementById('metric-observacoes').textContent = data.observacoes_mes !== undefined ? data.observacoes_mes : '0';
+     document.getElementById('metric-conteudos').textContent = data.conteudos_gerados !== undefined ? data.conteudos_gerados : '0';
+   })
+   .catch(function(err) {
+     console.error('Erro ao carregar dashboard:', err);
+     // Fallback para 0 em caso de erro
+     document.getElementById('metric-alunos-ativos').textContent = '0';
+     document.getElementById('metric-pendencias').textContent = '0';
+     document.getElementById('metric-observacoes').textContent = '0';
+     document.getElementById('metric-conteudos').textContent = '0';
+    });
+}
+
+function gerarRelatorioPDF() {
+  var alunoId = document.getElementById('profile-aluno-id').value;
+  if (!alunoId) {
+    showToast('Selecione um aluno primeiro', 'warning');
+    return;
+  }
+
+  var btn = document.getElementById('btn-gerar-relatorio-pdf');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Gerando...';
+  }
+
+  var token = acolheGetToken();
+  var xhr = new XMLHttpRequest();
+  xhr.open('GET', '/api/relatorios/aluno/' + alunoId + '/pdf');
+  xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+  xhr.responseType = 'blob';
+
+  xhr.onload = function() {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Gerar Relatório PDF';
+    }
+
+    if (xhr.status === 200) {
+      var blob = xhr.response;
+      var url = window.URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'relatorio-aluno-' + alunoId + '-' + new Date().toISOString().split('T')[0] + '.pdf';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      showToast('Relatório PDF gerado com sucesso', 'success');
+    } else {
+      var msg = 'Erro ao gerar relatório PDF';
+      try {
+        var reader = new FileReader();
+        reader.onload = function() {
+          try {
+            var err = JSON.parse(reader.result);
+            showToast(err.detail || msg, 'error');
+          } catch(e) {
+            showToast(msg, 'error');
+          }
+        };
+        reader.readAsText(xhr.response);
+      } catch(e) {
+        showToast(msg, 'error');
+      }
+    }
+  };
+
+  xhr.onerror = function() {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Gerar Relatório PDF';
+    }
+    showToast('Erro de conexão ao gerar relatório', 'error');
+  };
+
+  xhr.send();
+}
+
 })();

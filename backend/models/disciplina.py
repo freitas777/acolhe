@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy import String, Integer, ForeignKey, DateTime, Text
@@ -21,7 +21,7 @@ class Disciplina(Base):
     semestre: Mapped[str] = mapped_column(String(10), nullable=False)
     usuario_id: Mapped[int] = mapped_column(Integer, ForeignKey("usuarios.id"), nullable=False)
     criada_em: Mapped[datetime] = mapped_column(
-        nullable=False, default=datetime.utcnow
+        nullable=False, default=lambda: datetime.now(timezone.utc)
     )
 
     usuario = relationship("Usuario", back_populates="disciplinas")

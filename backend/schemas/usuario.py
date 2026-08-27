@@ -3,7 +3,7 @@ from typing import Optional, Literal
 
 from pydantic import BaseModel
 
-TipoPerfilStr = Literal["aluno", "professor", "psicopedagogo", "admin"]
+TipoPerfilStr = Literal["aluno", "professor", "psicopedagogo", "servidor", "admin"]
 
 
 class UsuarioCreate(BaseModel):

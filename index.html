@@ -1,14 +1,21 @@
 ﻿<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
+<script>(function(){document.documentElement.removeAttribute("data-theme");document.documentElement.removeAttribute("data-contrast");localStorage.removeItem("acolhe-theme");localStorage.removeItem("acolhe-contrast");localStorage.removeItem("acolhe-font-size")})()</script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Acolhe+ | Login</title>
-  <link rel="stylesheet" href="/css/index.css">
+  <link rel="stylesheet" href="/css/base.css">
+<link rel="stylesheet" href="/css/index.css">
   <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    .login-container { visibility: hidden; }
+    .login-container.ready { visibility: visible; }
+  </style>
 </head>
 <body>
-  <div class="login-container">
+<a href="#main-content" class="skip-link">Pular para o conteudo principal</a>
+<div class="login-container" id="main-content" role="main">
     <div class="login-card">
       <div class="logo-container">
         <div class="logo">A+</div>
@@ -27,7 +34,7 @@
  </div>
  <div class="form-group">
  <button id="suap-login" class="suap-button" type="button">
- <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 1.25rem; height: 1.25rem;">
+ <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 1.25rem; height: 1.25rem;">
  <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
  <polyline points="10 17 15 12 10 7"/>
  <line x1="15" y1="12" x2="3" y2="12"/>
@@ -36,9 +43,6 @@
  </button>
  </div>
  <div class="help-links">
- <a href="https://suap.ifrn.edu.br/accounts/password/reset/" target="_blank" rel="noopener" class="help-link">
- Esqueceu sua senha?
- </a>
  </div>
  </div>
 
@@ -83,8 +87,6 @@ function isAlreadyAuthenticated() {
   var redirectUrl = '/disciplinas';
   if (savedPerfil === 'psicopedagogo' || savedPerfil === 'admin' || savedPerfil === 'servidor') {
     redirectUrl = '/painel';
-  } else if (savedPerfil === 'aluno') {
-    redirectUrl = '/portal';
   }
   window.location.replace(redirectUrl);
 }
@@ -96,7 +98,18 @@ Cookies.remove('suapScope');
 var suap = new SuapClient(SUAP_URL, CLIENT_ID, REDIRECT_URI, SCOPE);
 suap.init();
 
-if (suap.isAuthenticated() && window.location.hash && window.location.hash.includes('access_token')) {
+var hasCallback = window.location.hash && window.location.hash.includes('access_token');
+var hasError = window.location.search && window.location.search.includes('error=');
+var alreadyAuth = isAlreadyAuthenticated();
+
+if (hasCallback || hasError || alreadyAuth) {
+  // Manter tela invisível enquanto processa redirect
+} else {
+  // Mostrar formulário de login
+  document.querySelector('.login-container').classList.add('ready');
+}
+
+if (suap.isAuthenticated() && hasCallback) {
   var accessToken = suap.getToken().getValue();
 
   fetch('/auth/callback', {
@@ -116,6 +129,7 @@ if (suap.isAuthenticated() && window.location.hash && window.location.hash.inclu
   localStorage.setItem('acolhe_user_id', data.usuario.id);
   localStorage.setItem('acolhe_access_token', data.token || accessToken);
   localStorage.setItem('acolhe_tipo_perfil', data.tipo_perfil || data.usuario.tipo_perfil || 'aluno');
+  localStorage.setItem('acolhe_user_nome', data.usuario.nome || '');
   localStorage.setItem('acolhe_senha_temporaria', data.usuario.senha_temporaria ? 'true' : 'false');
   redirectByPerfil();
  })
@@ -194,6 +208,7 @@ document.getElementById('local-login-form').addEventListener('submit', function(
   localStorage.setItem('acolhe_user_id', data.usuario.id);
   localStorage.setItem('acolhe_access_token', data.token);
   localStorage.setItem('acolhe_tipo_perfil', data.tipo_perfil || data.usuario.tipo_perfil || 'aluno');
+  localStorage.setItem('acolhe_user_nome', data.usuario.nome || '');
   localStorage.setItem('acolhe_senha_temporaria', data.usuario.senha_temporaria ? 'true' : 'false');
   redirectByPerfil();
  })

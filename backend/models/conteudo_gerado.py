@@ -1,4 +1,5 @@
-from datetime import datetime
+from datetime import datetime, timezone
+from typing import Optional
 
 from sqlalchemy import ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -21,11 +22,21 @@ class ConteudoGerado(Base):
     conteudo: Mapped[str] = mapped_column(Text, nullable=False)
     modelo_ia: Mapped[str] = mapped_column(String(100), nullable=False)
     gerado_em: Mapped[datetime] = mapped_column(
-        nullable=False, default=datetime.utcnow
+        nullable=False, default=lambda: datetime.now(timezone.utc)
+    )
+    versao: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    conteudo_pai_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("conteudos_gerados.id", ondelete="SET NULL"), nullable=True
     )
 
+    # Auto-relacionamento (pai → filhos/iterações)
+    pai = relationship(
+        "ConteudoGerado",
+        remote_side="ConteudoGerado.id",
+        backref="iteracoes",
+    )
     aluno = relationship("Aluno", back_populates="conteudos")
     usuario = relationship("Usuario", back_populates="conteudos")
 
     def __repr__(self):
-        return f"<ConteudoGerado(id={self.id}, tema={self.tema})>"
+        return f"<ConteudoGerado(id={self.id}, tema={self.tema}, versao={self.versao})>"

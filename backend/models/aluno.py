@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy import DateTime, String, Text
@@ -25,7 +25,7 @@ class Aluno(Base):
     data_importacao: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     observacoes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     criado_em: Mapped[datetime] = mapped_column(
-        nullable=False, default=datetime.utcnow
+        nullable=False, default=lambda: datetime.now(timezone.utc)
     )
 
     perfil = relationship(

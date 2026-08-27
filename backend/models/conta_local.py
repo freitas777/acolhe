@@ -1,4 +1,5 @@
-from datetime import datetime
+from datetime import datetime, timezone
+from typing import Optional
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -14,7 +15,9 @@ class ContaLocal(Base):
     senha_hash: Mapped[str] = mapped_column(String(128), nullable=False)
     ativo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     senha_temporaria: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    criado_em: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+    tentativas_login: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    bloqueado_ate: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    criado_em: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
 
     usuario_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False, unique=True

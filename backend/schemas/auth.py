@@ -1,12 +1,12 @@
 from datetime import datetime
 from typing import Optional, List
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class LoginRequest(BaseModel):
     access_token: str
-    semestre: str = "2026.1"
+    semestre: str = ""
 
 
 class UsuarioSUAPResponse(BaseModel):
@@ -123,3 +123,24 @@ class ConviteResponse(BaseModel):
 class AlterarSenhaRequest(BaseModel):
     senha_atual: str
     nova_senha: str
+
+# --- New schemas for Professor Dashboard ---
+
+class SolicitarApoioRequest(BaseModel):
+    motivo: str = Field(..., min_length=5)
+
+class ObservacaoRequest(BaseModel):
+    disciplina_id: int
+    texto: str
+
+class ObservacaoResponse(BaseModel):
+    id: int
+    aluno_id: int
+    disciplina_id: int
+    professor_id: int
+    disciplina_sigla: str = ""
+    professor_nome: str = ""
+    texto: str
+    criado_em: datetime
+
+    model_config = {"from_attributes": True}

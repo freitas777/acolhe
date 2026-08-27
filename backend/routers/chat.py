@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from starlette.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
@@ -25,39 +26,142 @@ def _service(db: Session = Depends(get_db)) -> ChatService:
 @router.post(
     "/conversations",
     response_model=ConversaResposta,
+    response_model_by_alias=False,
     status_code=status.HTTP_201_CREATED,
 )
 async def criar_conversa(
- dados: ConversaCriar,
- auth_data: AuthData = Depends(get_current_usuario),
- service: ChatService = Depends(_service),
+	dados: ConversaCriar,
+	auth_data: AuthData = Depends(get_current_usuario),
+	service: ChatService = Depends(_service),
 ):
- return service.criar_conversa(dados, usuario_id=auth_data.usuario.id)
+    return await service.criar_conversa(dados, usuario_id=auth_data.usuario.id)
+
+
+@router.post(
+    "/conversations/disciplina/{disciplina_id}",
+    response_model=ConversaResposta,
+    response_model_by_alias=False,
+)
+async def obter_ou_criar_conversa_disciplina(
+    disciplina_id: int,
+    auth_data: AuthData = Depends(get_current_usuario),
+    service: ChatService = Depends(_service),
+):
+    return await service.obter_ou_criar_conversa_disciplina(
+        disciplina_id=disciplina_id,
+        usuario_id=auth_data.usuario.id,
+        tipo_perfil=auth_data.usuario.tipo_perfil,
+        suap_id=auth_data.usuario.suap_id,
+    )
 
 
 @router.get(
     "/conversations",
     response_model=list[ConversaResposta],
+    response_model_by_alias=False,
 )
 async def listar_conversas(
  auth_data: AuthData = Depends(get_current_usuario),
  service: ChatService = Depends(_service),
 ):
- return service.listar_conversas(usuario_id=auth_data.usuario.id)
+    return service.listar_conversas(
+        usuario_id=auth_data.usuario.id,
+        tipo_perfil=auth_data.usuario.tipo_perfil,
+    )
 
 
-@router.post("/send", response_model=ChatResposta)
-async def enviar_mensagem(
- dados: ChatRequisicao,
- auth_data: AuthData = Depends(get_current_usuario),
- service: ChatService = Depends(_service),
+@router.get(
+    "/conversations/{conversa_id}",
+    response_model=ConversaResposta,
+    response_model_by_alias=False,
+)
+async def obter_conversa(
+    conversa_id: str,
+    auth_data: AuthData = Depends(get_current_usuario),
+    service: ChatService = Depends(_service),
 ):
- return await service.enviar_mensagem(dados, usuario_id=auth_data.usuario.id)
+    return service.obter_conversa(
+        conversa_id,
+        usuario_id=auth_data.usuario.id,
+        tipo_perfil=auth_data.usuario.tipo_perfil,
+    )
+
+
+@router.put(
+    "/conversations/{conversa_id}/aluno/{aluno_id}",
+    response_model=ConversaResposta,
+    response_model_by_alias=False,
+)
+async def vincular_aluno_conversa(
+    conversa_id: str,
+    aluno_id: int,
+    auth_data: AuthData = Depends(get_current_usuario),
+    service: ChatService = Depends(_service),
+):
+    return await service.vincular_aluno(
+        conversa_id=conversa_id,
+        aluno_id=aluno_id,
+        usuario_id=auth_data.usuario.id,
+        tipo_perfil=auth_data.usuario.tipo_perfil,
+    )
+
+
+@router.delete(
+    "/conversations/{conversa_id}/aluno",
+    response_model=ConversaResposta,
+    response_model_by_alias=False,
+)
+async def desvincular_aluno_conversa(
+    conversa_id: str,
+    auth_data: AuthData = Depends(get_current_usuario),
+    service: ChatService = Depends(_service),
+):
+    return await service.desvincular_aluno(
+        conversa_id=conversa_id,
+        usuario_id=auth_data.usuario.id,
+        tipo_perfil=auth_data.usuario.tipo_perfil,
+    )
+
+
+@router.post("/send", response_model=ChatResposta, response_model_by_alias=False)
+async def enviar_mensagem(
+    dados: ChatRequisicao,
+    auth_data: AuthData = Depends(get_current_usuario),
+    service: ChatService = Depends(_service),
+):
+    return await service.enviar_mensagem(
+        dados,
+        usuario_id=auth_data.usuario.id,
+        tipo_perfil=auth_data.usuario.tipo_perfil,
+    )
+
+
+@router.post("/stream")
+async def enviar_mensagem_stream(
+    dados: ChatRequisicao,
+    auth_data: AuthData = Depends(get_current_usuario),
+    service: ChatService = Depends(_service),
+):
+    generator = service.enviar_mensagem_stream(
+        dados,
+        usuario_id=auth_data.usuario.id,
+        tipo_perfil=auth_data.usuario.tipo_perfil,
+    )
+    return StreamingResponse(
+        generator,
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @router.post(
     "/educational-content",
     response_model=ConteudoEducacionalResposta,
+    response_model_by_alias=False,
 )
 async def gerar_conteudo_educacional(
  dados: ConteudoEducacionalRequisicao,
@@ -72,14 +176,13 @@ async def gerar_conteudo_educacional(
     status_code=status.HTTP_204_NO_CONTENT,
 )
 async def deletar_conversa(
- conversa_id: str,
- auth_data: AuthData = Depends(get_current_usuario),
- service: ChatService = Depends(_service),
+    conversa_id: str,
+    auth_data: AuthData = Depends(get_current_usuario),
+    service: ChatService = Depends(_service),
 ):
- conversa = service.conversa_repo.get_by_id(conversa_id)
- if not conversa:
-  raise HTTPException(status_code=404, detail="Conversa nao encontrada")
- if conversa.usuario_id and conversa.usuario_id != auth_data.usuario.id:
-  if auth_data.usuario.tipo_perfil not in ("psicopedagogo", "admin"):
-   raise HTTPException(status_code=403, detail="Voce nao pode deletar esta conversa.")
- service.deletar_conversa(conversa_id)
+    await service.deletar_conversa(
+        conversa_id,
+        usuario_id=auth_data.usuario.id,
+        tipo_perfil=auth_data.usuario.tipo_perfil,
+    )
+    return None
