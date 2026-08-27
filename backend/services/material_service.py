@@ -5,7 +5,12 @@ import uuid
 from pathlib import Path
 from fastapi import HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
-import magic
+try:
+    import magic
+    _HAS_MAGIC = True
+except ImportError:
+    magic = None
+    _HAS_MAGIC = False
 from backend.config import settings
 from backend.models.disciplina import Disciplina
 from backend.models.material import Material
@@ -65,7 +70,7 @@ def _validate_file(filename: str, content_type: str, size: int, content: bytes) 
     
     # Validação de MIME type é apenas informativa, não bloqueante
     # Browsers podem enviar MIME types diferentes do detectado por magic
-    if content_type:
+    if content_type and _HAS_MAGIC:
         detected_mime = magic.from_buffer(content, mime=True)
         if detected_mime != content_type:
             logger.warning(
