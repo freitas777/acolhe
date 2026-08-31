@@ -102,15 +102,29 @@ var hasCallback = window.location.hash && window.location.hash.includes('access_
 var hasError = window.location.search && window.location.search.includes('error=');
 var alreadyAuth = isAlreadyAuthenticated();
 
-if (hasCallback || hasError || alreadyAuth) {
-  // Manter tela invisível enquanto processa redirect
-} else {
-  // Mostrar formulário de login
-  document.querySelector('.login-container').classList.add('ready');
+console.log('[INDEX] URL:', window.location.href);
+console.log('[INDEX] hash:', window.location.hash);
+console.log('[INDEX] search:', window.location.search);
+
+// Fallback: extrair token diretamente do hash se SuapClient falhou
+var manualToken = null;
+if (!suap.isAuthenticated() && window.location.hash) {
+  var match = window.location.hash.match(/access_token=([^&]+)/);
+  if (match) {
+    manualToken = match[1];
+    console.log('[INDEX] SuapClient não autenticou, mas hash tem token. Usando extração manual.');
+  }
 }
 
-if (suap.isAuthenticated() && hasCallback) {
-  var accessToken = suap.getToken().getValue();
+if (hasCallback || hasError || alreadyAuth || manualToken) {
+  // Processando redirect - form fica visível mas não interage
+} else {
+  // Formulário de login - já está visível por padrão
+}
+
+if ((suap.isAuthenticated() && hasCallback) || manualToken) {
+  var accessToken = manualToken || suap.getToken().getValue();
+  console.log('[INDEX] Calling /auth/callback with token (manual=' + !!manualToken + ')');
 
   fetch('/auth/callback', {
     method: 'POST',
@@ -121,25 +135,36 @@ if (suap.isAuthenticated() && hasCallback) {
     })
   })
   .then(function(response) {
+    console.log('[INDEX] Callback response status:', response.status);
     if (!response.ok) throw new Error('HTTP ' + response.status);
     return response.json();
   })
  .then(function(data) {
+  console.log('[INDEX] Callback success, saving to localStorage');
   localStorage.setItem('acolhe_user', JSON.stringify(data.usuario));
   localStorage.setItem('acolhe_user_id', data.usuario.id);
   localStorage.setItem('acolhe_access_token', data.token || accessToken);
   localStorage.setItem('acolhe_tipo_perfil', data.tipo_perfil || data.usuario.tipo_perfil || 'aluno');
   localStorage.setItem('acolhe_user_nome', data.usuario.nome || '');
   localStorage.setItem('acolhe_senha_temporaria', data.usuario.senha_temporaria ? 'true' : 'false');
+  console.log('[INDEX] Calling redirectByPerfil()');
   redirectByPerfil();
  })
   .catch(function(error) {
+    console.error('[INDEX] Callback failed:', error);
+    // Limpar hash inválido para não travar em refresh
+    if (window.location.hash) {
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
     var errorEl = document.getElementById('error-message');
     var errorText = document.getElementById('error-text');
     if (errorEl && errorText) {
-      errorText.textContent = 'Erro ao autenticar: ' + error.message;
+      errorText.textContent = 'Erro ao autenticar: ' + error.message + '. Tente novamente.';
       errorEl.hidden = false;
     }
+    // Reabilitar botão de login
+    var btn = document.getElementById('suap-login');
+    if (btn) btn.disabled = false;
   });
 } else if (window.location.search && window.location.search.includes('error=')) {
   var errorMatch = window.location.search.match(/error=([^&]+)/);
