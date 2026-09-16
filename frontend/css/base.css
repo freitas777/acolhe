@@ -279,6 +279,8 @@ body {
     display: flex;
     flex-direction: column;
     gap: 18px;
+    max-height: 70vh;
+    overflow-y: auto;
 }
 
 .portal-tabs {
@@ -345,6 +347,39 @@ body {
 }
 
 .btn-profile svg {
+    width: 16px;
+    height: 16px;
+}
+
+.ativo-actions {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.btn-chat-aluno {
+    background: #f0f0f0;
+    border: 1px solid #d0d0d0;
+    color: #555;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.btn-chat-aluno:hover {
+    background: var(--suap-green);
+    color: #fff;
+    border-color: var(--suap-green);
+}
+
+.btn-chat-aluno svg {
     width: 16px;
     height: 16px;
 }

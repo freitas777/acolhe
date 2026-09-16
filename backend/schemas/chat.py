@@ -10,6 +10,10 @@ class ConversaCriar(BaseModel):
     disciplina_id: Optional[int] = None
 
 
+class RenomearConversaRequest(BaseModel):
+    titulo: str = Field(..., min_length=1, max_length=255)
+
+
 class ConversaResposta(BaseModel):
     id: str
     title: str = Field(alias="titulo")

@@ -8,7 +8,7 @@ const ChatService = {
   /**
    * Envia mensagem e recebe resposta da IA
    */
-  async sendMessageStream(content, alunoId, callbacks) {
+  async sendMessageStream(content, alunoId, disciplinaId, callbacks) {
     if (!content || !content.trim()) {
       throw new Error('Mensagem não pode estar vazia');
     }
@@ -24,6 +24,7 @@ const ChatService = {
         conversation_id: ChatStore.state.activeConversationId
       };
       if (alunoId) body.aluno_id = alunoId;
+      if (disciplinaId) body.disciplina_id = disciplinaId;
 
       var response = await acolheFetch(this.API_BASE_URL + '/api/chat/stream', {
         method: 'POST',
@@ -201,6 +202,24 @@ throw error;
   },
 
   /**
+   * Lista disciplinas do usuário (para o seletor de disciplina do chat)
+   */
+  async listarDisciplinas() {
+    try {
+      var semestre = (typeof SEMESTRE_VIGENTE !== 'undefined' && SEMESTRE_VIGENTE) || '';
+      var url = `${this.API_BASE_URL}/auth/disciplinas`;
+      if (semestre) url += '?semestre=' + encodeURIComponent(semestre);
+      const response = await acolheFetch(url);
+      if (response.ok) {
+        return await response.json();
+      }
+    } catch (error) {
+      console.error('Erro ao listar disciplinas:', error);
+    }
+    return [];
+  },
+
+  /**
    * Obtém ou cria conversa vinculada a uma disciplina
    */
   async getOrCreateConversaByDisciplina(disciplinaId) {
@@ -213,6 +232,26 @@ throw error;
       }
     } catch (error) {
       ChatUI.showError('Erro ao abrir conversa da disciplina');
+    }
+    return null;
+  },
+
+  /**
+   * Envia o arquivo de ementa de uma disciplina
+   */
+  async salvarEmenta(disciplinaId, file) {
+    try {
+      var formData = new FormData();
+      formData.append('file', file);
+      const response = await acolheFetch(`${this.API_BASE_URL}/auth/disciplinas/${disciplinaId}/ementa`, {
+        method: 'PUT',
+        body: formData
+      });
+      if (response.ok) {
+        return await response.json();
+      }
+    } catch (error) {
+      console.error('Erro ao salvar ementa:', error);
     }
     return null;
   },
@@ -239,6 +278,25 @@ throw error;
       }
     } catch (error) {
       ChatUI.showError('Erro ao criar conversa');
+    }
+    return null;
+  },
+
+  /**
+   * Renomeia uma conversa
+   */
+  async renomearConversa(id, titulo) {
+    try {
+      const response = await acolheFetch(`${this.API_BASE_URL}/api/chat/conversations/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ titulo: titulo })
+      });
+      if (response.ok) {
+        return await response.json();
+      }
+    } catch (error) {
+      console.error('Erro ao renomear conversa:', error);
     }
     return null;
   },
@@ -291,7 +349,7 @@ throw error;
         return await response.json();
       }
     } catch (error) {
-      console.error('Erro ao carregar histÃ³rico da conversa:', error);
+      console.error('Erro ao carregar histórico da conversa:', error);
     }
     return null;
   },

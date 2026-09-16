@@ -4,7 +4,7 @@
 <script>(function(){document.documentElement.removeAttribute("data-theme");document.documentElement.removeAttribute("data-contrast");localStorage.removeItem("acolhe-theme");localStorage.removeItem("acolhe-contrast");localStorage.removeItem("acolhe-font-size")})()</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Acolhe+ | Importar Alunos do SUAP</title>
+    <title>Acolhe+ | Cadastrar Aluno</title>
     <link rel="stylesheet" href="/css/base.css">
 <link rel="stylesheet" href="/css/importacao.css">
     <link rel="stylesheet" href="/css/notificacoes.css">
@@ -21,7 +21,7 @@
 			</a>
 		</div>
 		<div class="topbar-center">
-			<h1 class="page-title">Importar Alunos do SUAP</h1>
+			<h1 class="page-title">Cadastrar Aluno</h1>
 		</div>
         <div class="topbar-right">
 <div class="notificacao-bell-container"></div>
@@ -53,104 +53,19 @@
 		<div class="importacao-header">
             <div class="importacao-desc">
                 <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="header-icon">
-                    <circle cx="11" cy="11" r="8"/>
-                    <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                    <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                    <circle cx="8.5" cy="7" r="4"/>
+                    <line x1="20" y1="8" x2="20" y2="14"/>
+                    <line x1="23" y1="11" x2="17" y2="11"/>
                 </svg>
                 <div>
-                    <h2>Pesquisar Alunos</h2>
-                    <p>Digite o <strong>n&uacute;mero da matr&iacute;cula</strong> para buscar no SUAP ou o <strong>nome</strong> para buscar na base local do Acolhe+.</p>
+                    <h2>Cadastro de Aluno</h2>
+                    <p>Cadastre um aluno diretamente informando os dados abaixo.</p>
                 </div>
             </div>
-        </div>
-
-        <div class="search-section">
-            <div class="search-card">
-                <div class="suap-alert" id="suap-alert" hidden>
-                    <svg aria-hidden="true" class="suap-alert-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                        <line x1="12" y1="9" x2="12" y2="13"/>
-                        <line x1="12" y1="17" x2="12.01" y2="17"/>
-                    </svg>
-                    <div class="suap-alert-content">
-                        <div class="suap-alert-title">Busca via SUAP temporariamente indisponivel</div>
-                        <div class="suap-alert-text">
-                            Para buscar por matricula, e necessario que o administrador do SUAP habilite o acesso ao modulo "ensino" para este cliente OAuth.
-                            Enquanto isso, voce pode buscar alunos ja importados pelo nome.
-                        </div>
-                    </div>
-                </div>
-                <div class="search-form">
-                    <div class="search-input-group">
-                        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="search-icon">
-                            <circle cx="11" cy="11" r="8"/>
-                            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                        </svg>
-                        <input
-                            type="text"
-                            id="search-input"
-                            class="search-input"
-                            placeholder="Digite a matr&iacute;cula (SUAP) ou nome (base local)..."
-                            autocomplete="off"
-                        >
-                        <button class="btn-clear-search" id="btn-clear-search" hidden title="Limpar busca">
-                            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <line x1="18" y1="6" x2="6" y2="18"/>
-                                <line x1="6" y1="6" x2="18" y2="18"/>
-                            </svg>
-                        </button>
-                    </div>
-                    <div class="search-filters">
-                        <label class="filter-toggle">
-                            <input type="checkbox" id="filter-meu-campus" checked>
-                            <span class="toggle-slider"></span>
-                            <span class="toggle-label">Priorizar meu campus</span>
-                        </label>
-                    </div>
-                </div>
-            </div>
-
-<div class="search-status" id="search-status" style="display:none">
-		<div class="status-loading" id="status-loading" style="display:none">
-			<div class="spinner"></div>
-		</div>
-		<div class="status-count" id="status-count" hidden>
-			<span id="count-text"></span>
-		</div>
-	</div>
-        </div>
-
-        <div class="results-section" id="results-section" hidden>
-            <div class="results-list" id="results-list"></div>
-        </div>
-
-        <div class="empty-state" id="empty-state" hidden>
-            <div class="empty-icon">
-<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                    <circle cx="9" cy="7" r="4"/>
-                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-                    <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-                </svg>
-            </div>
-            <h3 id="empty-title">Nenhum aluno encontrado</h3>
-            <p id="empty-text">Nenhum aluno encontrado na base local com este nome. Para buscar no SUAP, digite o n&uacute;mero da matr&iacute;cula.</p>
-        </div>
-
-        <div class="initial-state" id="initial-state">
-            <div class="initial-icon">
-<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-<circle cx="11" cy="11" r="8"/>
-                    <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                </svg>
-            </div>
-            <h3>Pesquise alunos</h3>
-            <p>Digite a matr&iacute;cula para buscar no SUAP ou o nome para buscar na base local.</p>
         </div>
 
         <div class="manual-section">
-            <div class="manual-divider">
-                <span>ou</span>
-            </div>
             <div class="manual-card">
                 <div class="manual-header">
                     <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="manual-icon">

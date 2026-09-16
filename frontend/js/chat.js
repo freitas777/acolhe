@@ -6,13 +6,16 @@
     var currentUser = null;
     var alunoSearchTimer = null;
     var isAluno = acolheGetTipoPerfil() === 'aluno';
+    var isProfessorChat = acolheGetTipoPerfil() === 'professor';
+    var disciplinasCache = [];
 
     if (isAluno) document.body.classList.add('role-aluno');
 
     var pendingDisciplina = null;
-    var pendingInitialMessage = null;
+    var pendingAluno = null;
+    var ementaPendente = null;
 
-    async function handlePendingDisciplina() {
+    async function handlePendingContext() {
       var raw = null;
       try { raw = sessionStorage.getItem('acolhe_open_conversa'); } catch (e) {}
       if (!raw) return false;
@@ -20,67 +23,60 @@
         var data = JSON.parse(raw);
         if (data && data.tipo === 'disciplina' && data.disciplina_id) {
           pendingDisciplina = data;
-          pendingInitialMessage = data.mensagem_inicial || null;
           try { sessionStorage.removeItem('acolhe_open_conversa'); } catch (e) {}
-          return true;
+          return 'disciplina';
+        }
+        if (data && data.tipo === 'aluno' && data.aluno_id) {
+          pendingAluno = data;
+          try { sessionStorage.removeItem('acolhe_open_conversa'); } catch (e) {}
+          return 'aluno';
         }
       } catch (e) {}
       try { sessionStorage.removeItem('acolhe_open_conversa'); } catch (e) {}
       return false;
     }
 
-    async function openDisciplinaConversa() {
-      var conversa = await ChatService.getOrCreateConversaByDisciplina(pendingDisciplina.disciplina_id);
-      if (!conversa || !conversa.id) {
-        ChatUI.showError('Não foi possível abrir a conversa da disciplina');
-        return;
+    function getDisciplinaFromCache(disciplinaId) {
+      for (var k = 0; k < disciplinasCache.length; k++) {
+        if (disciplinasCache[k].id === disciplinaId) return disciplinasCache[k];
+      }
+      return null;
+    }
+
+    async function openDisciplinaContext(disciplinaData) {
+      var disciplinaId = disciplinaData.disciplina_id;
+      var disciplinaDescricao = disciplinaData.disciplina_descricao;
+
+      if (isProfessorChat) {
+        var disc = getDisciplinaFromCache(disciplinaId);
+        if (disc && !disc.tem_ementa) {
+          ementaPendente = disciplinaData;
+          ChatUI.openEmentaModal(disciplinaDescricao || disc.descricao || '', '');
+          return;
+        }
       }
 
-      var localConv = {
-        id: conversa.id,
-        title: conversa.title || ('Conversa sobre ' + (pendingDisciplina.disciplina_descricao || '')),
-        messages: conversa.messages || [],
-        created_at: conversa.created_at || new Date().toISOString(),
-        aluno_id: conversa.aluno_id || null,
-        aluno_nome: conversa.aluno_nome || null,
-        disciplina_id: conversa.disciplina_id || pendingDisciplina.disciplina_id,
-        disciplina_descricao: conversa.disciplina_descricao || pendingDisciplina.disciplina_descricao,
-        disciplina_sigla: conversa.disciplina_sigla || null
-      };
+      var discInfo = getDisciplinaFromCache(disciplinaId);
+      var sigla = discInfo ? (discInfo.sigla || '') : '';
 
-      var exists = ChatStore.state.conversations.find(function(c) { return c.id === localConv.id; });
-      if (!exists) {
-        ChatStore.state.conversations.unshift(localConv);
-      } else {
-        Object.assign(exists, localConv);
-      }
-      ChatStore.state.activeConversationId = localConv.id;
-      ChatStore.save();
-
-      ChatUI.updateTitle(localConv.title);
-      ChatUI.renderMessages(localConv.messages);
-      ChatUI.renderConversations(ChatStore.getAllConversations(), localConv.id);
-      ChatUI.showDisciplinaBadge(localConv.disciplina_descricao, localConv.disciplina_sigla);
+      ChatStore.setDisciplinaContext(disciplinaId, disciplinaDescricao, sigla);
+      if (isProfessorChat) ChatUI.selectDisciplina(disciplinaId);
+      ChatUI.showDisciplinaBadge(disciplinaDescricao, sigla);
+      ChatUI.updateTitle('Nova Conversa');
+      ChatUI.renderMessages([]);
+      ChatUI.renderConversations(ChatStore.getAllConversations(), null);
       ChatUI.closeSidebar();
+      if (ChatUI.elements.messageInput) ChatUI.elements.messageInput.focus();
+    }
 
-      if (pendingInitialMessage && localConv.messages.length === 0) {
-        if (ChatUI.elements.messageInput) {
-          ChatUI.elements.messageInput.value = pendingInitialMessage;
-        }
-        pendingInitialMessage = null;
-        if (ChatUI.elements.btnSend && !ChatUI.elements.btnSend.disabled) {
-          handleSendMessage();
-        } else {
-          try { ChatUI.updateSendButton(); } catch (e) {}
-          setTimeout(function() {
-            if (ChatUI.elements.btnSend && !ChatUI.elements.btnSend.disabled) {
-              handleSendMessage();
-            }
-          }, 100);
-        }
-      } else if (localConv.disciplina_descricao) {
-        ChatUI.showDisciplinaBadge(localConv.disciplina_descricao, localConv.disciplina_sigla);
-      }
+    function openAlunoContext(alunoData) {
+      ChatStore.setAlunoContext(alunoData.aluno_id, alunoData.aluno_nome);
+      ChatUI.updateAlunoBadge(alunoData.aluno_nome);
+      ChatUI.updateTitle('Nova Conversa');
+      ChatUI.renderMessages([]);
+      ChatUI.renderConversations(ChatStore.getAllConversations(), null);
+      ChatUI.closeSidebar();
+      if (ChatUI.elements.messageInput) ChatUI.elements.messageInput.focus();
     }
 
   async function init() {
@@ -88,15 +84,79 @@
         ChatUI.init();
         applyRoleVisibility();
         await loadUserData();
+        if (isProfessorChat) {
+          ChatUI.showDisciplinaSelector();
+          await loadDisciplinas();
+        }
         setupEventListeners();
-        var hasDisciplina = await handlePendingDisciplina();
-        if (hasDisciplina && pendingDisciplina) {
+        var hasContext = await handlePendingContext();
+        if (hasContext === 'disciplina' && pendingDisciplina) {
           try { await ChatService.loadConversations(); } catch (e) {}
-          await openDisciplinaConversa();
+          await openDisciplinaContext(pendingDisciplina);
+        } else if (hasContext === 'aluno' && pendingAluno) {
+          try { await ChatService.loadConversations(); } catch (e) {}
+          openAlunoContext(pendingAluno);
         } else {
           await renderInitialState();
         }
     }
+
+async function loadDisciplinas() {
+  disciplinasCache = await ChatService.listarDisciplinas();
+  ChatUI.populateDisciplinas(disciplinasCache);
+}
+
+async function handleDisciplinaChange(e) {
+  var id = parseInt(e.target.value, 10);
+  if (!id) {
+    ChatStore.clearDisciplinaContext();
+    ChatUI.resetDisciplinaSelect();
+    return;
+  }
+  var descricao = '';
+  for (var i = 0; i < disciplinasCache.length; i++) {
+    if (disciplinasCache[i].id === id) {
+      descricao = disciplinasCache[i].descricao || '';
+      break;
+    }
+  }
+  await openDisciplinaContext({ disciplina_id: id, disciplina_descricao: descricao });
+}
+
+async function handleEmentaSave() {
+  var fileInput = ChatUI.elements.ementaFileInput;
+  var file = fileInput && fileInput.files && fileInput.files[0];
+  if (!file) {
+    ChatUI.showError('Selecione o arquivo da ementa.');
+    return;
+  }
+  if (!ementaPendente) {
+    ChatUI.closeEmentaModal();
+    return;
+  }
+  var id = ementaPendente.disciplina_id;
+  var resp = await ChatService.salvarEmenta(id, file);
+  if (!resp) {
+    ChatUI.showError('Erro ao enviar a ementa. Tente novamente.');
+    return;
+  }
+  for (var k = 0; k < disciplinasCache.length; k++) {
+    if (disciplinasCache[k].id === id) {
+      disciplinasCache[k].ementa = resp.ementa || file.name;
+      disciplinasCache[k].tem_ementa = true;
+      break;
+    }
+  }
+  ChatUI.closeEmentaModal();
+  var pendente = ementaPendente;
+  ementaPendente = null;
+  await openDisciplinaContext(pendente);
+}
+
+function handleEmentaCancel() {
+  ChatUI.closeEmentaModal();
+  ementaPendente = null;
+}
 
 function applyRoleVisibility() {
 if (isAluno) {
@@ -113,7 +173,7 @@ var navDisciplinas = document.getElementById('nav-disciplinas');
 
 if (navPainel) navPainel.style.display = isNapne ? '' : 'none';
 if (navNotificacoes) navNotificacoes.style.display = isNapne ? '' : 'none';
-if (navPortal) navPortal.style.display = isAluno || perfil === 'professor' ? '' : 'none';
+if (navPortal) navPortal.style.display = isAluno ? '' : 'none';
 if (navDisciplinas) navDisciplinas.style.display = isAluno || perfil === 'professor' ? '' : 'none';
 }
 
@@ -135,6 +195,26 @@ async function loadUserData() {
       ChatUI.elements.messageInput.addEventListener('input', handleInput);
       ChatUI.elements.messageInput.addEventListener('keydown', handleKeydown);
     }
+    if (ChatUI.elements.disciplinaSelect) {
+      ChatUI.elements.disciplinaSelect.addEventListener('change', handleDisciplinaChange);
+    }
+    if (ChatUI.elements.ementaSave) {
+      ChatUI.elements.ementaSave.addEventListener('click', handleEmentaSave);
+    }
+    if (ChatUI.elements.ementaFileInput) {
+      ChatUI.elements.ementaFileInput.addEventListener('change', function(e) {
+        var f = e.target.files && e.target.files[0];
+        if (ChatUI.elements.ementaFileName && f) {
+          ChatUI.elements.ementaFileName.textContent = f.name;
+        }
+      });
+    }
+    if (ChatUI.elements.ementaCancel) {
+      ChatUI.elements.ementaCancel.addEventListener('click', handleEmentaCancel);
+    }
+    if (ChatUI.elements.ementaClose) {
+      ChatUI.elements.ementaClose.addEventListener('click', handleEmentaCancel);
+    }
     if (ChatUI.elements.btnMenuMobile) {
       ChatUI.elements.btnMenuMobile.addEventListener('click', function() {
         ChatUI.openSidebar();
@@ -154,6 +234,18 @@ if (ChatUI.elements.btnLogout) {
     }
     ChatUI.onConversationSelect = handleConversationSelect;
     ChatUI.onConversationDelete = handleConversationDelete;
+    ChatUI.onConversationRename = handleConversationRename;
+
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('.conversation-menu') && !e.target.closest('.conversation-more-btn')) {
+        ChatUI.closeConversationMenus();
+      }
+    });
+    if (ChatUI.elements.conversationsList) {
+      ChatUI.elements.conversationsList.addEventListener('scroll', function() {
+        ChatUI.closeConversationMenus();
+      });
+    }
 
     if (!isAluno) {
         ChatUI.onAlunoSelected = handleAlunoSelected;
@@ -205,12 +297,14 @@ function handleNewConversation() {
   ChatStore.state.activeAlunoId = null;
   ChatStore.state.activeAlunoNome = null;
   ChatStore.save();
+  ChatStore.clearDisciplinaContext();
   ChatUI.updateTitle('Nova conversa');
   ChatUI.renderMessages([]);
   ChatUI.renderConversations(ChatStore.getAllConversations(), null);
   ChatUI.hideDisciplinaBadge();
   ChatUI.closeSidebar();
   syncAlunoBadge();
+  if (isProfessorChat) ChatUI.resetDisciplinaSelect();
   if (ChatUI.elements.messageInput) ChatUI.elements.messageInput.focus();
 }
 
@@ -219,6 +313,11 @@ function handleNewConversation() {
     if (!input) return;
     var content = input.value.trim();
     if (!content) return;
+
+    if (isProfessorChat && !ChatStore.state.activeDisciplinaId) {
+      ChatUI.showError('Selecione uma disciplina antes de enviar a mensagem.');
+      return;
+    }
 
     try {
       input.disabled = true;
@@ -230,7 +329,7 @@ function handleNewConversation() {
 
       var textEl = ChatUI.createStreamingMessage();
 
-      await ChatService.sendMessageStream(content, ChatStore.state.activeAlunoId, {
+      await ChatService.sendMessageStream(content, ChatStore.state.activeAlunoId, ChatStore.state.activeDisciplinaId, {
         onChunk: function(chunk, fullContent) {
           ChatUI.appendChunk(textEl, chunk);
         },
@@ -327,6 +426,9 @@ ChatUI.showLoadingMessages();
         ChatStore.state.activeAlunoId = null;
         ChatStore.state.activeAlunoNome = null;
       }
+      conversation.disciplina_id = fullConversa.disciplina_id || null;
+      conversation.disciplina_descricao = fullConversa.disciplina_descricao || null;
+      conversation.disciplina_sigla = fullConversa.disciplina_sigla || null;
       ChatStore.save();
       ChatUI.updateTitle(conversation.title);
       ChatUI.renderMessages(conversation.messages);
@@ -334,12 +436,13 @@ ChatUI.showLoadingMessages();
       ChatUI.renderMessages(conversation.messages);
     }
   } catch (e) {
-    console.error('Erro ao carregar histÃ³rico:', e);
+    console.error('Erro ao carregar histórico:', e);
     ChatUI.renderMessages(conversation.messages);
   }
   ChatUI.renderConversations(ChatService.getConversationsHistory(), conversation.id);
   ChatUI.closeSidebar();
   syncAlunoBadge();
+  syncDisciplinaFromConversation(conversation);
 if (conversation.disciplina_descricao) {
 ChatUI.showDisciplinaBadge(conversation.disciplina_descricao, conversation.disciplina_sigla);
 } else {
@@ -351,7 +454,11 @@ ChatUI.hideDisciplinaBadge();
     async function handleConversationDelete(id) {
         if (!confirm('Tem certeza que deseja excluir esta conversa?')) return;
 
-        await ChatService.deleteConversation(id);
+        var ok = await ChatService.deleteConversation(id);
+        if (!ok) {
+            ChatUI.showError('Nao foi possivel excluir a conversa. Tente novamente.');
+            return;
+        }
 
         ChatStore.state.conversations = ChatStore.state.conversations.filter(function(c) {
             return c.id !== id;
@@ -372,6 +479,30 @@ ChatUI.hideDisciplinaBadge();
             ChatUI.renderMessages([]);
         }
         ChatUI.renderConversations(ChatStore.getAllConversations(), activeConv ? activeConv.id : null);
+    }
+
+    async function handleConversationRename(id, currentTitle) {
+      var novo = prompt('Novo nome da conversa:', currentTitle || '');
+      if (novo === null) return;
+      novo = novo.trim();
+      if (!novo) {
+        ChatUI.showError('O nome da conversa nao pode ser vazio.');
+        return;
+      }
+      var resp = await ChatService.renomearConversa(id, novo);
+      if (!resp) {
+        ChatUI.showError('Nao foi possivel renomear a conversa. Tente novamente.');
+        return;
+      }
+      var conv = ChatStore.state.conversations.find(function(c) { return c.id === id; });
+      if (conv) {
+        conv.title = resp.title || novo;
+        ChatStore.save();
+      }
+      if (ChatStore.state.activeConversationId === id) {
+        ChatUI.updateTitle(conv ? conv.title : novo);
+      }
+      ChatUI.renderConversations(ChatStore.getAllConversations(), ChatStore.state.activeConversationId);
     }
 
 function handleLogout() {
@@ -459,20 +590,25 @@ ChatUI.hideAlunoContext();
 }
 }
 
+function syncDisciplinaFromConversation(conversation) {
+  if (conversation && conversation.disciplina_id) {
+    ChatStore.setDisciplinaContext(
+      conversation.disciplina_id,
+      conversation.disciplina_descricao || null,
+      conversation.disciplina_sigla || null
+    );
+    if (isProfessorChat) ChatUI.selectDisciplina(conversation.disciplina_id);
+  } else {
+    ChatStore.clearDisciplinaContext();
+    if (isProfessorChat) ChatUI.resetDisciplinaSelect();
+  }
+}
+
 async function renderInitialState() {
-var conversations = await ChatService.loadConversations();
-var activeConv = ChatService.getActiveConversation();
-if (activeConv) {
-ChatUI.updateTitle(activeConv.title);
-ChatUI.renderMessages(activeConv.messages);
-} else if (conversations && conversations.length > 0) {
-handleConversationSelect(conversations[0].id);
-return;
-} else {
+await ChatService.loadConversations();
 ChatUI.updateTitle('Nova Conversa');
 ChatUI.renderMessages([]);
-}
-ChatUI.renderConversations(conversations || [], activeConv ? activeConv.id : null);
+ChatUI.renderConversations(ChatStore.getAllConversations(), null);
 syncAlunoBadge();
 }
 

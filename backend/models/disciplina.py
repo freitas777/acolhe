@@ -18,6 +18,7 @@ class Disciplina(Base):
     codigo_turma: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     situacao: Mapped[str] = mapped_column(String(100), nullable=True)
     professor: Mapped[str] = mapped_column(String(200), nullable=True)
+    ementa: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     semestre: Mapped[str] = mapped_column(String(10), nullable=False)
     usuario_id: Mapped[int] = mapped_column(Integer, ForeignKey("usuarios.id"), nullable=False)
     criada_em: Mapped[datetime] = mapped_column(

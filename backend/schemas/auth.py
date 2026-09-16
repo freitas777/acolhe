@@ -35,12 +35,19 @@ class DisciplinaResponse(BaseModel):
     codigo_turma: Optional[str] = None
     situacao: Optional[str] = None
     professor: Optional[str] = None
+    ementa: Optional[str] = None
+    tem_ementa: bool = False
     semestre: str
     usuario_id: int
     criada_em: datetime
     qtd_alunos_assistidos: int = 0
+    origem: str = "suap"
 
     model_config = {"from_attributes": True}
+
+
+class EmentaRequest(BaseModel):
+    ementa: str
 
 
 class AlunoAssistidoResponse(BaseModel):

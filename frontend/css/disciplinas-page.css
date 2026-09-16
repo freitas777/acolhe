@@ -506,6 +506,36 @@ body {
     margin-bottom: 0.75rem;
 }
 
+.upload-categoria {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.upload-categoria label {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+}
+
+.upload-categoria select {
+    padding: 0.375rem 0.5rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    font-size: 0.8125rem;
+    color: var(--color-text-primary);
+    background: var(--color-surface);
+    cursor: pointer;
+    outline: none;
+    font-family: 'Open Sans', sans-serif;
+}
+
+.upload-categoria select:focus {
+    border-color: var(--suap-green);
+}
+
 .btn-upload {
     display: inline-flex;
     align-items: center;
@@ -751,4 +781,382 @@ body {
     color: var(--color-text-muted);
     text-transform: capitalize;
     margin-left: 0.5rem;
+}
+
+/* ============================================
+ Assistidos Badge (Professor cards)
+============================================ */
+.assistidos-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8125rem;
+    color: var(--color-text-secondary);
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--color-border-light);
+    margin-top: 0.25rem;
+}
+
+.assistidos-badge svg {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    color: var(--color-text-muted);
+}
+
+.assistidos-badge.has-assistidos svg {
+    color: var(--suap-green);
+}
+
+.assistidos-badge.has-assistidos {
+    color: var(--suap-green);
+    font-weight: 600;
+}
+
+/* ============================================
+ Turma local Badge (Student cards)
+============================================ */
+.disciplina-local-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--suap-green);
+    background: rgba(10, 127, 112, 0.08);
+    border: 1px solid rgba(10, 127, 112, 0.25);
+    border-radius: 999px;
+    padding: 0.25rem 0.625rem;
+    margin-top: 0.375rem;
+    width: fit-content;
+}
+
+.disciplina-local-badge svg {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+}
+
+/* ============================================
+ Alunos Assistidos List (Professor view)
+============================================ */
+.alunos-assistidos-container {
+    grid-column: 1 / -1;
+}
+
+.alunos-header {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+    margin-bottom: 1.75rem;
+    padding-bottom: 1.25rem;
+    border-bottom: 1px solid var(--color-border-light);
+}
+
+.alunos-header .btn-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.5rem 0.875rem;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    color: var(--color-text-secondary);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    text-decoration: none;
+}
+
+.alunos-header .btn-back:hover {
+    background: var(--suap-green);
+    border-color: var(--suap-green);
+    color: white;
+    transform: translateX(-2px);
+}
+
+.alunos-header .btn-back svg {
+    width: 16px;
+    height: 16px;
+}
+
+.alunos-header-text {
+    width: 100%;
+}
+
+.alunos-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--color-text-primary);
+    margin: 0 0 0.25rem 0;
+    line-height: 1.2;
+}
+
+.alunos-subtitle {
+    font-size: 0.9375rem;
+    color: var(--color-text-muted);
+    margin: 0;
+    font-weight: 500;
+}
+
+.alunos-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1rem;
+}
+
+.aluno-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-light);
+    border-radius: var(--radius-md);
+    transition: all var(--transition-fast);
+    cursor: pointer;
+}
+
+.aluno-item:hover {
+    border-color: var(--suap-green);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+}
+
+.aluno-avatar {
+    width: 52px;
+    height: 52px;
+    background: linear-gradient(135deg, var(--suap-green) 0%, var(--suap-green-dark) 100%);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 1rem;
+    flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(10, 127, 112, 0.25);
+    text-transform: uppercase;
+}
+
+.aluno-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.aluno-nome {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--color-text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.4;
+}
+
+.aluno-matricula {
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+    font-weight: 500;
+}
+
+.aluno-item .btn-profile {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--color-border);
+    background: var(--color-surface-secondary);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    flex-shrink: 0;
+}
+
+.aluno-item .btn-profile:hover {
+    background: var(--suap-green);
+    border-color: var(--suap-green);
+    color: white;
+    transform: scale(1.05);
+}
+
+.aluno-item .btn-profile svg {
+    width: 18px;
+    height: 18px;
+}
+
+/* ============================================
+ Solicitar Apoio (Professor view modal)
+============================================ */
+.apoio-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    padding: 0.5rem 0;
+}
+
+.apoio-info {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 1rem;
+    background: rgba(10, 127, 112, 0.06);
+    border: 1px solid rgba(10, 127, 112, 0.18);
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    color: var(--color-text-primary);
+    line-height: 1.5;
+}
+
+.apoio-info strong {
+    color: var(--suap-green-dark, #086659);
+    font-weight: 600;
+}
+
+.apoio-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.apoio-form-group label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-text-primary);
+}
+
+.apoio-textarea {
+    width: 100%;
+    min-height: 120px;
+    padding: 0.75rem 0.875rem;
+    font-family: inherit;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    color: var(--color-text-primary);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    resize: vertical;
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+    box-sizing: border-box;
+}
+
+.apoio-textarea:focus {
+    outline: none;
+    border-color: var(--suap-green);
+    box-shadow: 0 0 0 3px rgba(10, 127, 112, 0.12);
+}
+
+.apoio-textarea::placeholder {
+    color: var(--color-text-muted);
+}
+
+.apoio-hint {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    font-style: italic;
+}
+
+.apoio-actions {
+    display: flex;
+    justify-content: flex-end;
+    padding-top: 0.25rem;
+}
+
+.apoio-submit-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1.25rem;
+    background: var(--suap-green);
+    color: white;
+    border: none;
+    border-radius: var(--radius-md);
+    font-family: inherit;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    box-shadow: var(--shadow-sm);
+}
+
+.apoio-submit-btn:hover:not(:disabled) {
+    background: var(--suap-green-dark, #086659);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+}
+
+.apoio-submit-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Perfil do aluno no modal */
+.perfil-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-light);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+}
+
+.perfil-card-header {
+    padding: 1.25rem 1.5rem;
+    background: linear-gradient(135deg, rgba(10, 127, 112, 0.1) 0%, rgba(10, 127, 112, 0.03) 100%);
+    border-bottom: 1px solid var(--color-border-light);
+}
+
+.perfil-nome {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--color-text-primary);
+}
+
+.perfil-card-body {
+    padding: 1.5rem;
+}
+
+.perfil-info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 1rem;
+}
+
+.perfil-info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    padding: 0.875rem;
+    background: var(--color-surface-secondary);
+    border-radius: var(--radius-sm);
+    border-left: 3px solid var(--suap-green);
+}
+
+.perfil-info-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.perfil-info-value {
+    font-size: 0.9375rem;
+    font-weight: 500;
+    color: var(--color-text-primary);
+    line-height: 1.4;
+    word-break: break-word;
+}
+
+@media (max-width: 768px) {
+    .alunos-list { grid-template-columns: 1fr; }
+    .alunos-title { font-size: 1.125rem; }
+    .perfil-info-grid { grid-template-columns: 1fr; }
 }

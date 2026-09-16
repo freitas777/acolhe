@@ -20,6 +20,7 @@ from backend.repositories.material import MaterialRepository
 from backend.repositories.usuario import UsuarioRepository
 from backend.schemas.material import MaterialResponse
 from backend.services.notificacao_service import NotificacaoService
+from backend.services.text_extractor import extrair_texto
 
 logger = logging.getLogger(__name__)
 
@@ -131,6 +132,8 @@ class MaterialService:
         with open(file_path, "wb") as f:
             f.write(content)
 
+        conteudo_texto = extrair_texto(ext, content)
+
         try:
             material = self.repo.create({
                 "disciplina_id": disciplina_id,
@@ -140,6 +143,7 @@ class MaterialService:
                 "tipo_arquivo": file.content_type or "application/octet-stream",
                 "tamanho": size,
                 "descricao": descricao,
+                "conteudo_texto": conteudo_texto,
                 "categoria": cat,
             })
             logger.info(
@@ -195,6 +199,49 @@ class MaterialService:
         self.repo.delete(material_id)
         logger.info("Material deletado: id=%s", material_id)
         return True
+
+    async def upload_ementa(
+        self,
+        disciplina_id: int,
+        usuario_id: int,
+        file: UploadFile,
+    ) -> Material:
+        content = await file.read()
+        size = len(content)
+        _validate_file(file.filename or "", file.content_type or "", size, content)
+
+        ext = _get_extension(file.filename or "")
+        nome_arquivo = f"{uuid.uuid4().hex}.{ext}"
+
+        upload_dir = _get_upload_dir()
+        file_path = upload_dir / nome_arquivo
+        with open(file_path, "wb") as f:
+            f.write(content)
+
+        conteudo_texto = extrair_texto(ext, content)
+
+        try:
+            material = self.repo.create({
+                "disciplina_id": disciplina_id,
+                "usuario_id": usuario_id,
+                "nome_original": file.filename or "ementa",
+                "nome_arquivo": nome_arquivo,
+                "tipo_arquivo": file.content_type or "application/octet-stream",
+                "tamanho": size,
+                "descricao": "Ementa da disciplina",
+                "conteudo_texto": conteudo_texto,
+                "categoria": "ementa",
+            })
+            logger.info(
+                "Ementa enviada: id=%s, disciplina_id=%s, arquivo=%s",
+                material.id, disciplina_id, nome_arquivo,
+            )
+        except Exception:
+            if file_path.exists():
+                file_path.unlink()
+            raise
+
+        return material
 
     def _notificar_alunos(self, material: Material, disciplina_id: int, professor_usuario_id: int):
         disciplina = self.db.query(Disciplina).filter(Disciplina.id == disciplina_id).first()

@@ -8,10 +8,6 @@
   <link rel="stylesheet" href="/css/base.css">
 <link rel="stylesheet" href="/css/index.css">
   <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
-  <style>
-    .login-container { visibility: hidden; }
-    .login-container.ready { visibility: visible; }
-  </style>
 </head>
 <body>
 <a href="#main-content" class="skip-link">Pular para o conteudo principal</a>
@@ -25,7 +21,7 @@
 
   <div class="login-tabs">
  <button class="login-tab active" id="tab-suap" data-tab="suap">SUAP</button>
- <button class="login-tab" id="tab-napne" data-tab="napne">Equipe NAPNE</button>
+ <button class="login-tab" id="tab-napne" data-tab="napne">NAPNE / Professor</button>
  </div>
 
  <div class="login-panel" id="panel-suap">
@@ -46,15 +42,36 @@
  </div>
  </div>
 
- <div class="login-panel" id="panel-napne" hidden>
- <form id="local-login-form" class="local-login-form">
+  <div class="login-panel" id="panel-napne" hidden>
+  <div class="form-info napne-info-box">
+  <div class="napne-info-icon">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+  </div>
+  <div class="napne-info-text">
+  <strong>Acesso exclusivo para Professores e equipe NAPNE</strong>
+  <p>Utilize suas credenciais internas do sistema. Alunos devem fazer login através da aba SUAP.</p>
+  </div>
+  </div>
+  <form id="local-login-form" class="local-login-form">
  <div class="form-group">
  <label for="local-email">Email</label>
  <input type="email" id="local-email" placeholder="seu@email.com" required autocomplete="email">
  </div>
  <div class="form-group">
  <label for="local-senha">Senha</label>
- <input type="password" id="local-senha" placeholder="Senha" required autocomplete="current-password">
+ <div class="senha-wrapper">
+  <input type="password" id="local-senha" placeholder="Senha" required autocomplete="current-password">
+  <button type="button" class="btn-ver-senha" id="btn-ver-senha" title="Mostrar senha" aria-label="Mostrar senha">
+   <svg class="icone-olho icone-olho-aberto" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+    <circle cx="12" cy="12" r="3"/>
+   </svg>
+   <svg class="icone-olho icone-olho-fechado" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none">
+    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+    <line x1="1" y1="1" x2="23" y2="23"/>
+   </svg>
+  </button>
+ </div>
  </div>
  <div class="form-group">
  <button type="submit" class="suap-button local-login-btn" id="local-login-btn">Entrar</button>
@@ -197,6 +214,25 @@ document.querySelectorAll('.login-tab').forEach(function(tab) {
     var panel = document.getElementById('panel-' + target);
     if (panel) panel.hidden = false;
   });
+});
+
+document.getElementById('btn-ver-senha').addEventListener('click', function() {
+  var input = document.getElementById('local-senha');
+  var aberto = document.querySelector('.icone-olho-aberto');
+  var fechado = document.querySelector('.icone-olho-fechado');
+  if (input.type === 'password') {
+    input.type = 'text';
+    aberto.style.display = 'none';
+    fechado.style.display = '';
+    this.setAttribute('title', 'Ocultar senha');
+    this.setAttribute('aria-label', 'Ocultar senha');
+  } else {
+    input.type = 'password';
+    aberto.style.display = '';
+    fechado.style.display = 'none';
+    this.setAttribute('title', 'Mostrar senha');
+    this.setAttribute('aria-label', 'Mostrar senha');
+  }
 });
 
 document.getElementById('local-login-form').addEventListener('submit', function(e) {

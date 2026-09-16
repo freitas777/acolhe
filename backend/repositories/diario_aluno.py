@@ -42,14 +42,31 @@ class DiarioAlunoRepository(BaseRepository[DiarioAluno]):
             .count()
         )
 
+    def listar_disciplinas_por_aluno(
+        self, aluno_id: int, semestre: str | None = None, excluir_usuario_id: int | None = None
+    ) -> list[Disciplina]:
+        query = (
+            self.db.query(Disciplina)
+            .join(DiarioAluno, DiarioAluno.disciplina_id == Disciplina.id)
+            .filter(DiarioAluno.aluno_id == aluno_id)
+            .order_by(Disciplina.id.asc())
+        )
+        if semestre:
+            query = query.filter(Disciplina.semestre == semestre)
+        if excluir_usuario_id is not None:
+            query = query.filter(Disciplina.usuario_id != excluir_usuario_id)
+        return query.all()
+
     def verificar_professor_aluno(self, professor_id: int, aluno_id: int) -> bool:
         stmt = (
-            select(exists())
-            .select_from(DiarioAluno)
-            .join(Disciplina, DiarioAluno.disciplina_id == Disciplina.id)
-            .where(
-                Disciplina.usuario_id == professor_id,
-                DiarioAluno.aluno_id == aluno_id,
-            )
+            select(exists(
+                select(1)
+                .select_from(DiarioAluno)
+                .join(Disciplina, DiarioAluno.disciplina_id == Disciplina.id)
+                .where(
+                    Disciplina.usuario_id == professor_id,
+                    DiarioAluno.aluno_id == aluno_id,
+                )
+            ))
         )
         return self.db.execute(stmt).scalar()

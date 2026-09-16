@@ -9,6 +9,7 @@ if (!acolheRequireAuth()) return;
   var currentView = 'grid';
 
   function init() {
+    updateUserInfoUI();
     if (!userId && acolheGetToken()) {
       syncWithBackend(function() {
         loadUserInfo();
@@ -18,9 +19,9 @@ if (!acolheRequireAuth()) return;
       loadUserInfo();
       loadDisciplinas();
     }
-setupEventListeners();
-applyNavVisibility();
-var semestreEl = document.getElementById('semestre-text');
+ setupEventListeners();
+ applyNavVisibility();
+ var semestreEl = document.getElementById('semestre-text');
     if (semestreEl) semestreEl.textContent = SEMESTRE_VIGENTE;
   }
 
@@ -55,14 +56,25 @@ var semestreEl = document.getElementById('semestre-text');
   }
 
   function updateUserInfoUI() {
-    if (!currentUser) return;
-    var name = currentUser.nome || currentUser.nome_usual || 'Usuario';
-    var avatarEl = document.getElementById('user-avatar');
-    var nameEl = document.getElementById('user-name');
-    if (avatarEl) {
-      avatarEl.textContent = name.split(' ').map(function(n) { return n[0]; }).slice(0, 2).join('').toUpperCase();
+    var name = (currentUser && (currentUser.nome || currentUser.nome_usual)) || acolheGetUserName() || 'Usuario';
+    if (name === 'Usuário' || name === 'Usuario') {
+      try {
+        var storedUser = JSON.parse(localStorage.getItem('acolhe_user') || '{}');
+        if (storedUser && storedUser.nome) name = storedUser.nome;
+      } catch(e) {}
     }
-    if (nameEl) nameEl.textContent = name;
+    // Hide user pill for professor/servidor, show only for aluno
+    var userPill = document.getElementById('user-pill');
+    if (userPill && (tipoPerfil === 'professor' || tipoPerfil === 'servidor')) {
+      userPill.style.display = 'none';
+    } else if (userPill) {
+      var avatarEl = document.getElementById('user-avatar');
+      var nameEl = document.getElementById('user-name');
+      if (avatarEl) {
+        avatarEl.textContent = name.split(' ').filter(function(n){ return n.length > 0; }).map(function(n) { return n[0]; }).slice(0, 2).join('').toUpperCase() || '??';
+      }
+      if (nameEl) nameEl.textContent = name;
+    }
     var titleEl = document.querySelector('.page-title');
     if (titleEl) {
         if (tipoPerfil === 'professor') {
@@ -168,10 +180,9 @@ var semestreEl = document.getElementById('semestre-text');
     grid.innerHTML = '';
 
     var isProfessor = tipoPerfil === 'professor' || tipoPerfil === 'servidor';
-    var colors = ['#0A7F70', '#1565C0', '#6A1B9A', '#C62828', '#E65100', '#2E7D32', '#00838F', '#4527A0', '#AD1457', '#00695C'];
+    var cardColor = '#0A7F70';
 
     disciplinas.forEach(function(disc, index) {
-      var color = colors[index % colors.length];
       var sigla = disc.sigla || (disc.descricao || '').substring(0, 6).toUpperCase();
       var situacaoClass = 'situacao-' + (disc.situacao || '').toLowerCase().replace(/\s+/g, '-');
 
@@ -191,6 +202,13 @@ var semestreEl = document.getElementById('semestre-text');
           '<span>' + count + ' assistido' + (count !== 1 ? 's' : '') + '</span></div>';
       }
 
+      var localBadge = '';
+      if (!isProfessor && disc.origem === 'local') {
+        localBadge = '<div class="disciplina-local-badge">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>' +
+          '<span>Turma local' + (disc.professor ? ' · ' + escapeHtml(disc.professor) : '') + '</span></div>';
+      }
+
       var conversaBtn = '';
       if (isProfessor) {
         conversaBtn = '<button class="disciplina-chat-btn" title="Conversa com a IA sobre esta disciplina" data-disciplina-id="' + disc.id + '">' +
@@ -203,7 +221,7 @@ var semestreEl = document.getElementById('semestre-text');
         '</button>';
 
       card.innerHTML =
-        '<div class="disciplina-header" style="background:' + color + '">' +
+        '<div class="disciplina-header" style="background:' + cardColor + '">' +
         '<div class="disciplina-sigla">' + escapeHtml(sigla) + '</div>' +
         '<div class="disciplina-descricao">' + escapeHtml(disc.descricao) + '</div>' +
         '<div class="disciplina-card-actions">' + materiaisBtn + conversaBtn + '</div>' +
@@ -219,6 +237,7 @@ var semestreEl = document.getElementById('semestre-text');
           ? '<div class="disciplina-info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg><span class="situacao-badge ' + situacaoClass + '">' + escapeHtml(disc.situacao) + '</span></div>'
           : '') +
         '<div class="disciplina-info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><span>' + escapeHtml(disc.semestre) + '</span></div>' +
+        localBadge +
         assistidosBadge +
         '</div>';
 
@@ -257,8 +276,7 @@ var semestreEl = document.getElementById('semestre-text');
       sessionStorage.setItem('acolhe_open_conversa', JSON.stringify({
         tipo: 'disciplina',
         disciplina_id: disciplinaId,
-        disciplina_descricao: disciplinaDescricao,
-        mensagem_inicial: 'Olá, sou ' + (currentUser ? (currentUser.nome || currentUser.nome_usual || 'aluno') : 'aluno') + ' e estou pronto para aprender ' + disciplinaDescricao
+        disciplina_descricao: disciplinaDescricao
       }));
     } catch (e) {}
     window.location.href = '/chat';
@@ -277,8 +295,11 @@ var semestreEl = document.getElementById('semestre-text');
         '<div class="alunos-header">' +
         '<button class="btn-back" id="btn-back">' +
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>' +
-        '<span>Voltar</span></button>' +
+        '<span>Voltar para disciplinas</span></button>' +
+        '<div class="alunos-header-text">' +
         '<h2 class="alunos-title">' + escapeHtml(disciplinaNome) + '</h2>' +
+        '<p class="alunos-subtitle" id="alunos-count">Carregando alunos...</p>' +
+        '</div>' +
         '</div>' +
         '<div class="alunos-list" id="alunos-list">' +
         '<div class="spinner"></div>' +
@@ -298,9 +319,11 @@ var semestreEl = document.getElementById('semestre-text');
     })
     .then(function(alunos) {
       var listEl = document.getElementById('alunos-list');
+      var countEl = document.getElementById('alunos-count');
       if (!listEl) return;
 
       if (!alunos || alunos.length === 0) {
+        if (countEl) countEl.textContent = '0 alunos assistidos';
         listEl.innerHTML =
           '<div class="disciplinas-empty">' +
           '<div class="empty-state-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></div>' +
@@ -310,35 +333,49 @@ var semestreEl = document.getElementById('semestre-text');
         return;
       }
 
+      if (countEl) countEl.textContent = alunos.length + ' aluno' + (alunos.length !== 1 ? 's' : '') + ' assistido' + (alunos.length !== 1 ? 's' : '');
       listEl.innerHTML = '';
       alunos.forEach(function(aluno) {
         var initials = (aluno.aluno_nome || '?').split(' ').map(function(n) { return n[0]; }).slice(0, 2).join('').toUpperCase();
         var item = document.createElement('div');
         item.className = 'aluno-item';
+        item.setAttribute('data-aluno-id', aluno.aluno_id);
+        item.setAttribute('data-aluno-nome', aluno.aluno_nome);
+        item.setAttribute('data-disciplina-id', disciplinaId);
         item.innerHTML =
           '<div class="aluno-avatar">' + initials + '</div>' +
           '<div class="aluno-info">' +
           '<span class="aluno-nome">' + escapeHtml(aluno.aluno_nome) + '</span>' +
           (aluno.aluno_matricula ? '<span class="aluno-matricula">' + escapeHtml(aluno.aluno_matricula) + '</span>' : '') +
           '</div>' +
-          '<button class="btn-profile" title="Detalhes" data-aluno-id="' + aluno.id + '" data-aluno-nome="' + escapeHtml(aluno.aluno_nome) + '" data-disciplina-id="' + disciplinaId + '">' +
+          '<button class="btn-profile" title="Ver detalhes" data-aluno-id="' + aluno.aluno_id + '" data-aluno-nome="' + escapeHtml(aluno.aluno_nome) + '" data-disciplina-id="' + disciplinaId + '">' +
           '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>' +
           '</button>';
         listEl.appendChild(item);
-          var btn = item.querySelector('.btn-profile');
-          if (btn) {
-            btn.addEventListener('click', function(e) {
-              e.stopPropagation();
-              var alId = parseInt(this.dataset.alunoId);
-              var discId = parseInt(this.dataset.disciplinaId);
-              var alNome = this.dataset.alunoNome;
-              openStudentModal(alId, discId, alNome);
-            });
-          }
+        item.style.cursor = 'pointer';
+        item.addEventListener('click', function(e) {
+          if (e.target.closest('.btn-profile')) return;
+          var alId = parseInt(this.dataset.alunoId);
+          var discId = parseInt(this.dataset.disciplinaId);
+          var alNome = this.dataset.alunoNome;
+          openStudentModal(alId, discId, alNome);
+        });
+        var btn = item.querySelector('.btn-profile');
+        if (btn) {
+          btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            var alId = parseInt(this.dataset.alunoId);
+            var discId = parseInt(this.dataset.disciplinaId);
+            var alNome = this.dataset.alunoNome;
+            openStudentModal(alId, discId, alNome);
+          });
+        }
       });
     })
     .catch(function(error) {
       var listEl = document.getElementById('alunos-list');
+      var countEl = document.getElementById('alunos-count');
+      if (countEl) countEl.textContent = 'Erro ao carregar';
       if (listEl) {
         listEl.innerHTML =
           '<div class="disciplinas-empty"><h3>Erro ao carregar</h3><p>' + escapeHtml(error.message) + '</p></div>';
@@ -463,9 +500,7 @@ function switchStudentTab(tabName) {
     tab.classList.toggle('active', name === tabName);
   });
   document.getElementById('modal-perfil').hidden = tabName !== 'perfil';
-  document.getElementById('modal-conteudos').hidden = tabName !== 'conteudos';
   document.getElementById('modal-apoio').hidden = tabName !== 'apoio';
-  document.getElementById('modal-observacao').hidden = tabName !== 'observacao';
 }
 
 // Open student modal and load sections
@@ -473,25 +508,17 @@ function openStudentModal(alunoId, disciplinaId, alunoNome) {
   var modal = document.getElementById('student-modal');
   if (!modal) return;
   var titleEl = document.getElementById('modal-student-title');
-  if (titleEl) titleEl.textContent = 'Aluno: ' + (alunoNome || '');
+  if (titleEl) titleEl.textContent = alunoNome || 'Aluno';
   // Store ids for later use
   modal.dataset.alunoId = alunoId;
   modal.dataset.disciplinaId = disciplinaId;
   // Reset tabs to perfil
   switchStudentTab('perfil');
-  // Show loading spinners in each section
   document.getElementById('modal-perfil').innerHTML = '<div class="spinner"></div>';
-  document.getElementById('modal-conteudos').innerHTML = '<div class="spinner"></div>';
-  document.getElementById('modal-apoio').innerHTML = '<div class="spinner"></div>';
-  document.getElementById('modal-observacao').innerHTML = '<div class="spinner"></div>';
-
+  document.getElementById('modal-apoio').innerHTML = '';
   modal.hidden = false;
   _trapFocus(modal);
-
-  // Load data asynchronously
   loadStudentProfile(alunoId, alunoNome);
-  loadStudentConteudos(alunoId);
-  loadStudentObservacao(alunoId, disciplinaId);
 }
 
 function closeStudentModal() {
@@ -507,104 +534,87 @@ function loadStudentProfile(alunoId, alunoNome) {
     .then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
     .then(function(perfil) {
       var html = '<div class="perfil-card">' +
-        '<div class="perfil-card-header"><h3 class="perfil-nome">' + escapeHtml(alunoNome) + '</h3></div>' +
+        '<div class="perfil-card-header"><h3 class="perfil-nome">Perfil do Aluno</h3></div>' +
         '<div class="perfil-card-body"><div class="perfil-info-grid">';
-      html += '<div class="perfil-info-item"><span class="perfil-info-label">Nível de Atenção</span><span class="perfil-info-value">' + (perfil.nivel_atencao ? escapeHtml(perfil.nivel_atencao) : '-') + '</span></div>';
-      html += '<div class="perfil-info-item"><span class="perfil-info-label">Dificuldade de Leitura</span><span class="perfil-info-value">' + (perfil.dificuldade_leitura ? 'Sim' : 'Não') + '</span></div>';
-      html += '<div class="perfil-info-item"><span class="perfil-info-label">Preferência</span><span class="perfil-info-value">' + (perfil.preferencia ? escapeHtml(perfil.preferencia) : '-') + '</span></div>';
-      html += '<div class="perfil-info-item"><span class="perfil-info-label">Interesses</span><span class="perfil-info-value">' + (perfil.interesses ? escapeHtml(perfil.interesses) : '-') + '</span></div>';
-      html += '<div class="perfil-info-item"><span class="perfil-info-label">Diagnóstico</span><span class="perfil-info-value">' + (perfil.diagnostico ? escapeHtml(perfil.diagnostico) : '-') + '</span></div>';
+      html += '<div class="perfil-info-item"><span class="perfil-info-label">Nome</span><span class="perfil-info-value">' + escapeHtml(alunoNome) + '</span></div>';
+      html += '<div class="perfil-info-item"><span class="perfil-info-label">N\u00edvel de Aten\u00e7\u00e3o</span><span class="perfil-info-value">' + (perfil.nivel_atencao ? escapeHtml(perfil.nivel_atencao) : 'N\u00e3o definido') + '</span></div>';
+      html += '<div class="perfil-info-item"><span class="perfil-info-label">Dificuldade de Leitura</span><span class="perfil-info-value">' + (perfil.dificuldade_leitura ? 'Sim' : 'N\u00e3o') + '</span></div>';
+      html += '<div class="perfil-info-item"><span class="perfil-info-label">Prefer\u00eancia de Aprendizagem</span><span class="perfil-info-value">' + (perfil.preferencia ? escapeHtml(perfil.preferencia) : 'N\u00e3o definida') + '</span></div>';
+      html += '<div class="perfil-info-item"><span class="perfil-info-label">Interesses</span><span class="perfil-info-value">' + (perfil.interesses ? escapeHtml(perfil.interesses) : 'N\u00e3o informado') + '</span></div>';
+      html += '<div class="perfil-info-item"><span class="perfil-info-label">Diagn\u00f3stico</span><span class="perfil-info-value">' + (perfil.diagnostico ? escapeHtml(perfil.diagnostico) : 'N\u00e3o informado') + '</span></div>';
       html += '</div></div></div>';
       container.innerHTML = html;
     })
     .catch(function(err){ container.innerHTML = '<p>Erro ao carregar perfil</p>'; showToast('Erro ao carregar perfil', 'error'); });
 }
 
-// Load adaptive content for student
-function loadStudentConteudos(alunoId) {
-  var container = document.getElementById('modal-conteudos');
-  acolheFetch('/auth/disciplinas/alunos/' + alunoId + '/conteudos')
-    .then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-    .then(function(conteudos) {
-      if (!conteudos || conteudos.length === 0) {
-        container.innerHTML = '<p>Nenhum conteúdo encontrado.</p>';
-        return;
-      }
-      container.innerHTML = '';
-      conteudos.forEach(function(c){
-        var card = document.createElement('div');
-        card.className = 'conteudo-card';
-        var dateStr = new Date(c.gerado_em).toLocaleString('pt-BR');
-        card.innerHTML = '<div class="conteudo-card-header"><div class="conteudo-tema">' + escapeHtml(c.tema) + '</div><div class="conteudo-meta"><span class="conteudo-modelo">' + escapeHtml(c.modelo_ia) + '</span><span class="conteudo-data">' + escapeHtml(dateStr) + '</span></div></div>' +
-          '<div class="conteudo-card-body"><div class="conteudo-texto">' + renderMarkdown(c.conteudo) + '</div></div>';
-        container.appendChild(card);
-      });
-    })
-    .catch(function(err){ container.innerHTML = '<p>Erro ao carregar conteúdo</p>'; showToast('Erro ao carregar conteúdo', 'error'); });
-}
-
-// Load observation (if any) and setup save on change
-function loadStudentObservacao(alunoId, disciplinaId) {
-  var container = document.getElementById('modal-observacao');
-  acolheFetch('/auth/disciplinas/alunos/' + alunoId + '/observacao?disciplina_id=' + disciplinaId)
-    .then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-    .then(function(obs) {
-      renderObservationForm(container, obs.texto);
-    })
-    .catch(function(err){
-      // If 404, no observation yet
-      if (err.message && err.message.includes('404')) {
-        renderObservationForm(container, '');
-      } else {
-        container.innerHTML = '<p>Erro ao carregar observação</p>';
-        showToast('Erro ao carregar observação', 'error');
-      }
-    });
-  function renderObservationForm(parent, text) {
-    var html = '<div class="form-group"><label for="observacao-textarea">Observação</label><textarea id="observacao-textarea" rows="4" class="campo-textarea" placeholder="Escreva sua observação...">' + escapeHtml(text) + '</textarea></div>';
-    parent.innerHTML = html;
-    var textarea = document.getElementById('observacao-textarea');
-    if (textarea) {
-      textarea.addEventListener('input', debounce(function(){
-        saveObservation(alunoId, disciplinaId, textarea.value);
-      }, 800));
-    }
-  }
-}
-
-function saveObservation(alunoId, disciplinaId, texto) {
-  var payload = { disciplina_id: disciplinaId, texto: texto };
-  acolheFetch('/auth/disciplinas/alunos/' + alunoId + '/observacao', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  })
-  .then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-  .then(function(){ showToast('Observação salva com sucesso', 'success'); })
-  .catch(function(){ showToast('Erro ao salvar observação', 'error'); });
-}
-
 // Load support request UI and handle submit
-function loadStudentApoio(alunoId) {
+function loadStudentApoio(alunoId, alunoNome) {
   var container = document.getElementById('modal-apoio');
-  var html = '<div class="form-group"><label for="apoio-motivo">Motivo</label><textarea id="apoio-motivo" rows="4" class="campo-textarea" placeholder="Descreva o motivo da solicitação..."></textarea></div>' +
-    '<button class="btn-modal-save" id="apoio-submit">Solicitar Apoio</button>';
+  var nomeAluno = alunoNome || 'o aluno';
+  var html =
+    '<div class="apoio-wrapper">' +
+      '<div class="apoio-info">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;flex-shrink:0;color:var(--suap-green)"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>' +
+        '<span>Esta solicitação será enviada à <strong>equipe NAPNE</strong> com o título <strong>"Solicitação de Apoio para ' + escapeHtml(nomeAluno) + '"</strong> contendo o motivo informado abaixo.</span>' +
+      '</div>' +
+      '<div class="apoio-form-group">' +
+        '<label for="apoio-motivo">Motivo da solicitação</label>' +
+        '<textarea id="apoio-motivo" class="apoio-textarea" placeholder="Descreva detalhadamente o motivo da solicitação de apoio para a equipe NAPNE..."></textarea>' +
+        '<span class="apoio-hint">Seja específico sobre as dificuldades observadas e o contexto da disciplina.</span>' +
+      '</div>' +
+      '<div class="apoio-actions">' +
+        '<button class="apoio-submit-btn" id="apoio-submit">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>' +
+          '<span>Enviar solicitação ao NAPNE</span>' +
+        '</button>' +
+      '</div>' +
+    '</div>';
   container.innerHTML = html;
   var btn = document.getElementById('apoio-submit');
-  if (btn) {
+  var textarea = document.getElementById('apoio-motivo');
+  if (btn && textarea) {
     btn.addEventListener('click', function(){
-      var motivo = document.getElementById('apoio-motivo').value.trim();
-      if (!motivo) { showToast('Informe o motivo', 'warning'); return; }
-      btn.disabled = true; btn.textContent = 'Enviando...';
+      var motivo = textarea.value.trim();
+      if (!motivo) {
+        showToast('Informe o motivo da solicitação', 'warning');
+        textarea.focus();
+        return;
+      }
+      if (motivo.length < 5) {
+        showToast('O motivo deve ter pelo menos 5 caracteres', 'warning');
+        textarea.focus();
+        return;
+      }
+      btn.disabled = true;
+      btn.querySelector('span').textContent = 'Enviando...';
       acolheFetch('/auth/disciplinas/alunos/' + alunoId + '/solicitar-apoio', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ motivo: motivo })
       })
-      .then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-      .then(function(){ showToast('Solicitação de apoio enviada', 'success'); closeStudentModal(); })
-      .catch(function(){ showToast('Erro ao solicitar apoio', 'error'); })
-      .finally(function(){ btn.disabled = false; btn.textContent = 'Solicitar Apoio'; });
+      .then(function(r){
+        if (!r.ok) {
+          return r.json().then(function(d){ throw new Error(d.detail || 'HTTP ' + r.status); }).catch(function(){ throw new Error('HTTP ' + r.status); });
+        }
+        return r.json();
+      })
+      .then(function(){
+        showToast('Solicitação de apoio enviada ao NAPNE', 'success');
+        closeStudentModal();
+      })
+      .catch(function(err){
+        var msg = err.message || '';
+        if (msg.indexOf('pendência pendente') !== -1 || msg.indexOf('409') !== -1) {
+          showToast('Já existe uma solicitação pendente para este aluno.', 'warning');
+        } else {
+          showToast('Erro ao solicitar apoio: ' + msg, 'error');
+        }
+      })
+      .finally(function(){
+        btn.disabled = false;
+        btn.querySelector('span').textContent = 'Enviar solicitação ao NAPNE';
+      });
     });
   }
 }
@@ -616,8 +626,12 @@ function initStudentModal() {
     tab.addEventListener('click', function(){
       var name = this.getAttribute('data-tab');
       switchStudentTab(name);
-      // Load respective section if needed
-      if (name === 'apoio') { var alId = parseInt(document.getElementById('student-modal').dataset.alunoId); loadStudentApoio(alId); }
+      if (name === 'apoio') {
+        var modal = document.getElementById('student-modal');
+        var alId = parseInt(modal.dataset.alunoId);
+        var alNome = modal.querySelector('#modal-student-title') ? modal.querySelector('#modal-student-title').textContent.replace(/^Aluno:\s*/, '') : '';
+        loadStudentApoio(alId, alNome);
+      }
     });
   });
   var closeBtn = document.getElementById('student-modal-close');
@@ -669,6 +683,13 @@ function initMateriaisModal() {
   var uploadArea = document.getElementById('upload-area');
   var fileInput = document.getElementById('file-input');
   var btnSelectFile = document.getElementById('btn-select-file');
+  var uploadCategoriaSelect = document.getElementById('upload-categoria-select');
+
+  if (uploadCategoriaSelect && uploadArea) {
+    uploadCategoriaSelect.addEventListener('click', function(e) {
+      e.stopPropagation();
+    });
+  }
 
   if (btnSelectFile && fileInput) {
     btnSelectFile.addEventListener('click', function(e) {
@@ -730,9 +751,6 @@ function openMateriaisModal(disciplinaId, disciplinaDesc) {
 
   var progressEl = document.getElementById('upload-progress');
   if (progressEl) progressEl.hidden = true;
-
-  var categoriaSelect = document.getElementById('upload-categoria');
-  if (categoriaSelect) categoriaSelect.value = 'outro';
 
   var filtrosChips = document.querySelectorAll('.filtro-chip');
   filtrosChips.forEach(function(chip) {
@@ -838,7 +856,7 @@ function renderMateriaisList(materiais) {
   });
 }
 
-function handleFileUpload(file) {
+  function handleFileUpload(file) {
   if (!_materiaisDisciplinaId) return;
 
   var maxSize = 10 * 1024 * 1024;
@@ -866,10 +884,9 @@ function handleFileUpload(file) {
 
   var formData = new FormData();
   formData.append('file', file);
-
-  var categoriaSelect = document.getElementById('upload-categoria');
-  var categoria = categoriaSelect ? categoriaSelect.value : 'outro';
-  formData.append('categoria', categoria);
+  var categoriaEl = document.getElementById('upload-categoria-select');
+  var categoria = categoriaEl ? categoriaEl.value : 'outro';
+  formData.append('categoria', categoria || 'outro');
 
   var token = acolheGetToken();
   var xhr = new XMLHttpRequest();
@@ -890,8 +907,6 @@ function handleFileUpload(file) {
 
     if (xhr.status >= 200 && xhr.status < 300) {
       showToast('Material enviado com sucesso', 'success');
-      var categoriaSelect = document.getElementById('upload-categoria');
-      if (categoriaSelect) categoriaSelect.value = 'outro';
       loadMateriais(_materiaisDisciplinaId, _materiaisCategoriaFiltro);
     } else {
       var detail = 'Erro ao enviar arquivo';
@@ -974,11 +989,13 @@ function formatFileSize(bytes) {
   return (bytes / Math.pow(1024, i)).toFixed(1) + ' ' + units[i];
 }
 
-function applyNavVisibility() {
-var isAluno = tipoPerfil === 'aluno';
-var navPortal = document.getElementById('nav-portal');
-if (navPortal) navPortal.style.display = isAluno ? '' : 'none';
-}
+  function applyNavVisibility() {
+ var isAluno = tipoPerfil === 'aluno';
+ var navPortal = document.getElementById('nav-portal');
+ if (navPortal) navPortal.style.display = isAluno ? '' : 'none';
+ var btnSync = document.getElementById('btn-sync');
+ if (btnSync && !isAluno) btnSync.style.display = 'none';
+ }
 
   function handleLogout() {
   if (confirm('Deseja realmente sair?')) {

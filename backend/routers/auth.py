@@ -3,7 +3,7 @@ import string
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from urllib.parse import urlencode
@@ -21,6 +21,7 @@ from backend.repositories.usuario import UsuarioRepository
 from backend.security import hash_senha, verificar_senha, criar_jwt
 from backend.services.auth_service import AuthService
 from backend.services.audit_service import AuditService
+from backend.services.material_service import MaterialService
 from backend.schemas.auth import (
     LoginRequest,
     LoginResponse,
@@ -41,6 +42,10 @@ from backend.schemas.conteudo_gerado import ConteudoGeradoResponse
 from backend.repositories.acomodacao_observacao import AcomodacaoObservacaoRepository
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
+
+
+def _material_service(db: Session = Depends(get_db)) -> MaterialService:
+    return MaterialService(db)
 
 
 @router.get("/login")
@@ -435,7 +440,10 @@ async def disciplinas(
 ):
     try:
         usuario = auth_data.usuario
-        disciplinas_db = auth_service.obter_disciplinas(usuario.id, semestre)
+        if usuario.tipo_perfil == "aluno":
+            disciplinas_db = auth_service.obter_disciplinas_aluno(usuario, semestre)
+        else:
+            disciplinas_db = auth_service.obter_disciplinas(usuario.id, semestre)
         result = []
         for d in disciplinas_db:
             qtd = auth_service.diario_aluno_repo.contar_por_disciplina(d.id)
@@ -443,6 +451,7 @@ async def disciplinas(
                 continue
             disc_resp = DisciplinaResponse.model_validate(d)
             disc_resp.qtd_alunos_assistidos = qtd
+            disc_resp.tem_ementa = auth_service.disciplina_tem_ementa(d.id)
             result.append(disc_resp)
         return result
     except Exception as e:
@@ -465,3 +474,18 @@ async def alunos_assistidos(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Erro ao buscar alunos assistidos. Tente novamente.",
         )
+
+
+@router.put("/disciplinas/{disciplina_id}/ementa", response_model=DisciplinaResponse)
+async def atualizar_ementa(
+    disciplina_id: int,
+    file: UploadFile = File(...),
+    auth_data: AuthData = Depends(get_current_usuario),
+    auth_service: AuthService = Depends(),
+    material_service: MaterialService = Depends(_material_service),
+):
+    disciplina = auth_service.obter_disciplina_valida(disciplina_id, auth_data.usuario)
+    material = await material_service.upload_ementa(disciplina_id, auth_data.usuario.id, file)
+    texto = (material.conteudo_texto or "").strip() or material.nome_original
+    disciplina = auth_service.atualizar_ementa(disciplina_id, auth_data.usuario, texto)
+    return DisciplinaResponse.model_validate(disciplina)

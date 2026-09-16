@@ -13,7 +13,10 @@ const ChatStore = {
     conversations: [],
     activeConversationId: null,
     activeAlunoId: null,
-    activeAlunoNome: null
+    activeAlunoNome: null,
+    activeDisciplinaId: null,
+    activeDisciplinaDescricao: null,
+    activeDisciplinaSigla: null
   },
 
   /**
@@ -184,6 +187,20 @@ const ChatStore = {
       conversation.aluno_id = null;
       conversation.aluno_nome = null;
     }
+    this.save();
+  },
+
+  setDisciplinaContext(disciplinaId, descricao, sigla) {
+    this.state.activeDisciplinaId = disciplinaId || null;
+    this.state.activeDisciplinaDescricao = descricao || null;
+    this.state.activeDisciplinaSigla = sigla || null;
+    this.save();
+  },
+
+  clearDisciplinaContext() {
+    this.state.activeDisciplinaId = null;
+    this.state.activeDisciplinaDescricao = null;
+    this.state.activeDisciplinaSigla = null;
     this.save();
   }
 };

@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import logging
-import os
 import threading
 import time
 import typing
@@ -24,15 +23,18 @@ INSTRUCAO_SISTEMA = (
 )
 
 MAX_SESSOES = 100
-MAX_MODELOS = 50
+
+# Compactação de histórico (conversas longas)
+MENSAGENS_RECENTES = 8
+MAX_MENSAGENS_SESSAO = 16
+MAX_RESUMO_CHARS = 2000
 
 
 class AIService:
     def __init__(self):
         self._model: Optional[genai.GenerativeModel] = None
-        self._modelos_por_contexto: OrderedDict[str, genai.GenerativeModel] = OrderedDict()
         self._sessoes: OrderedDict[str, genai.ChatSession] = OrderedDict()
-        self._sessao_contexto: dict[str, str] = {}
+        self._system_instructions: dict[str, str] = {}
         self._cache: OrderedDict[str, tuple[str, float]] = OrderedDict()
         self._lock = asyncio.Lock()
         self._inicializar()
@@ -57,109 +59,11 @@ class AIService:
             raise RuntimeError("Modelo Gemini não foi inicializado. Verifique GEMINI_API_KEY.")
         return self._model
 
-    def _obter_modelo_com_contexto(self, contexto_aluno: str) -> genai.GenerativeModel:
-        chave = hashlib.sha256(contexto_aluno.encode()).hexdigest()
-        if chave in self._modelos_por_contexto:
-            self._modelos_por_contexto.move_to_end(chave)
-            return self._modelos_por_contexto[chave]
-
-        model_name = settings.gemini_model
-        modelo = genai.GenerativeModel(model_name)
-        self._modelos_por_contexto[chave] = modelo
-
-        if len(self._modelos_por_contexto) > MAX_MODELOS:
-            chave_mais_antiga = next(iter(self._modelos_por_contexto))
-            del self._modelos_por_contexto[chave_mais_antiga]
-            logger.info("Modelo com contexto removido por LRU: %s", chave_mais_antiga)
-
-        logger.info("Modelo com contexto de aluno criado: %s", chave)
-        return modelo
-
-    def construir_contexto_aluno(self, aluno: object, perfil: object) -> str:
-        nome = getattr(aluno, "nome", "Não informado")
-        observacoes = getattr(aluno, "observacoes", None) or ""
-
-        nivel = getattr(perfil, "nivel_atencao", None)
-        nivel_str = nivel.value if nivel else "não informado"
-
-        dificuldade = getattr(perfil, "dificuldade_leitura", False)
-        dificuldade_str = "Sim" if dificuldade else "Não"
-
-        preferencia = getattr(perfil, "preferencia", None)
-        preferencia_str = preferencia.value if preferencia else "não informada"
-
-        interesses = getattr(perfil, "interesses", None) or "não informados"
-        diagnostico = getattr(perfil, "diagnostico", None) or "não informado"
-
-        contexto = (
-            f"**CONTEXTO: Você está conversando sobre um aluno específico.**\n\n"
-            f"**DADOS DO ALUNO:**\n"
-            f"- Nome: {nome}\n"
-            f"- Nível de atenção: {nivel_str}\n"
-            f"- Dificuldade de leitura: {dificuldade_str}\n"
-            f"- Preferência de aprendizado: {preferencia_str}\n"
-            f"- Interesses: {interesses}\n"
-            f"- Diagnóstico: {diagnostico}\n"
-        )
-
-        if observacoes:
-            contexto += f"- Observações: {observacoes}\n"
-
-        contexto += (
-            "\n**DIRETRIZES PARA ESTA CONVERSA:**\n"
-            "1. Responda sempre considerando o perfil e necessidades deste aluno\n"
-            "2. Adapte sugestões e estratégias ao nível de atenção e preferência de aprendizado\n"
-            "3. Considere o diagnóstico ao recomendar abordagens pedagógicas\n"
-            "4. Use os interesses do aluno como ponte para engajamento\n"
-            "5. Quando pertinente, sugira adaptações específicas para as dificuldades relatadas\n"
-        )
-
-        return contexto
-
-    def construir_contexto_disciplina(self, disciplina: object) -> str:
-        descricao = getattr(disciplina, "descricao", None) or "não informada"
-        sigla = getattr(disciplina, "sigla", None) or ""
-        professor = getattr(disciplina, "professor", None) or "não informado"
-        semestre = getattr(disciplina, "semestre", None) or "não informado"
-        codigo_turma = getattr(disciplina, "codigo_turma", None) or ""
-
-        contexto = (
-            f"**CONTEXTO: Você está conversando sobre uma disciplina específica.**\n\n"
-            f"**DADOS DA DISCIPLINA:**\n"
-            f"- Nome: {descricao}\n"
-        )
-        if sigla:
-            contexto += f"- Sigla: {sigla}\n"
-        contexto += f"- Professor: {professor}\n"
-        contexto += f"- Semestre: {semestre}\n"
-        if codigo_turma:
-            contexto += f"- Código da turma: {codigo_turma}\n"
-
-        contexto += (
-            "\n**DIRETRIZES PARA ESTA CONVERSA:**\n"
-            "1. Responda dúvidas relacionadas ao conteúdo desta disciplina\n"
-            "2. Use exemplos e contextos pertinentes à área de conhecimento\n"
-            "3. Adapte a explicação ao nível do estudante\n"
-            "4. Seja claro, paciente e encorajador\n"
-            "5. Quando adequado, sugira materiais complementares e estratégias de estudo\n"
-        )
-
-        return contexto
-
     def _construir_historico_base(
         self,
-        contexto_aluno: Optional[str] = None,
-        contexto_disciplina: Optional[str] = None,
         system_instruction: Optional[str] = None,
     ) -> list[dict]:
-        if system_instruction:
-            instrucao = system_instruction
-        else:
-            instrucao = INSTRUCAO_SISTEMA
-            if contexto_aluno:
-                instrucao += "\n" + contexto_aluno
-            if contexto_disciplina:
-                instrucao += "\n" + contexto_disciplina
+        instrucao = system_instruction or INSTRUCAO_SISTEMA
         return [
             {"role": "user", "parts": [instrucao]},
             {"role": "model", "parts": ["Entendido. Sou o Acolhe+, pronto para ajudar."]},
@@ -168,86 +72,99 @@ class AIService:
     def _criar_sessao(
         self,
         conversa_id: str,
-        contexto_aluno: Optional[str] = None,
-        contexto_disciplina: Optional[str] = None,
         system_instruction: Optional[str] = None,
     ) -> None:
-        if contexto_aluno or contexto_disciplina:
-            chave_contexto = (contexto_aluno or "") + "|" + (contexto_disciplina or "")
-            modelo = self._obter_modelo_com_contexto(chave_contexto)
-            self._sessao_contexto[conversa_id] = chave_contexto
-        else:
-            modelo = self._obter_modelo()
-            self._sessao_contexto.pop(conversa_id, None)
+        instrucao = system_instruction or INSTRUCAO_SISTEMA
+        self._system_instructions[conversa_id] = instrucao
 
-        historico = self._construir_historico_base(contexto_aluno, contexto_disciplina, system_instruction)
-        sessao = modelo.start_chat(history=historico)
+        historico = self._construir_historico_base(instrucao)
+        sessao = self._obter_modelo().start_chat(history=historico)
         self._sessoes[conversa_id] = sessao
 
-        if len(self._sessoes) > MAX_SESSOES:
-            chave_mais_antiga = next(iter(self._sessoes))
-            del self._sessoes[chave_mais_antiga]
-            self._sessao_contexto.pop(chave_mais_antiga, None)
-            logger.info("Sessão removida por LRU: %s", chave_mais_antiga)
+        self._evict_se_necessario()
 
         logger.info(
-            "Sessão de chat iniciada: %s (contexto_aluno=%s, contexto_disciplina=%s)",
+            "Sessão de chat iniciada: %s (com system_instruction=%s)",
             conversa_id,
-            bool(contexto_aluno),
-            bool(contexto_disciplina),
+            bool(system_instruction),
         )
 
-    def _reconstruir_sessao(
+    def _resumir_antigas(self, mensagens: list) -> str:
+        if not mensagens:
+            return ""
+        trechos = []
+        for msg in mensagens:
+            conteudo = (getattr(msg, "conteudo", "") or "").strip()
+            if not conteudo:
+                continue
+            trechos.append(conteudo[:120])
+        resumo = "\n".join(trechos)
+        if len(resumo) > MAX_RESUMO_CHARS:
+            resumo = resumo[:MAX_RESUMO_CHARS] + "\n...[resumo truncado]"
+        return resumo
+
+    def _recriar_sessao(
         self,
         conversa_id: str,
-        contexto_aluno: Optional[str] = None,
-        contexto_disciplina: Optional[str] = None,
-        mensagens: Optional[list] = None,
         system_instruction: Optional[str] = None,
+        mensagens: Optional[list] = None,
     ) -> None:
-        if contexto_aluno or contexto_disciplina:
-            chave_contexto = (contexto_aluno or "") + "|" + (contexto_disciplina or "")
-            modelo = self._obter_modelo_com_contexto(chave_contexto)
-            self._sessao_contexto[conversa_id] = chave_contexto
-        else:
-            modelo = self._obter_modelo()
-            self._sessao_contexto.pop(conversa_id, None)
+        instrucao = system_instruction
+        if instrucao is None:
+            instrucao = self._system_instructions.get(conversa_id) or INSTRUCAO_SISTEMA
+        self._system_instructions[conversa_id] = instrucao
 
-        historico = self._construir_historico_base(contexto_aluno, contexto_disciplina, system_instruction)
+        historico = self._construir_historico_base(instrucao)
 
+        recentes = []
+        resumo = ""
         if mensagens:
-            for msg in mensagens:
-                papel = getattr(msg, "papel", None) or ""
-                conteudo = getattr(msg, "conteudo", None) or ""
-                role = "user" if papel == "usuario" else "model"
-                historico.append({"role": role, "parts": [conteudo]})
+            if len(mensagens) > MENSAGENS_RECENTES:
+                resumo = self._resumir_antigas(mensagens[:-MENSAGENS_RECENTES])
+            recentes = mensagens[-MENSAGENS_RECENTES:]
 
-        sessao = modelo.start_chat(history=historico)
+        if resumo:
+            historico.append({
+                "role": "user",
+                "parts": ["## RESUMO DAS MENSAGENS ANTERIORES\n" + resumo],
+            })
+            historico.append({
+                "role": "model",
+                "parts": ["Entendido. Continuarei considerando este contexto."],
+            })
+
+        for msg in recentes:
+            papel = getattr(msg, "papel", "") or ""
+            conteudo = getattr(msg, "conteudo", "") or ""
+            role = "user" if papel == "usuario" else "model"
+            historico.append({"role": role, "parts": [conteudo]})
+
+        sessao = self._obter_modelo().start_chat(history=historico)
         self._sessoes[conversa_id] = sessao
 
-        if len(self._sessoes) > MAX_SESSOES:
-            chave_mais_antiga = next(iter(self._sessoes))
-            del self._sessoes[chave_mais_antiga]
-            self._sessao_contexto.pop(chave_mais_antiga, None)
-            logger.info("Sessão removida por LRU: %s", chave_mais_antiga)
+        self._evict_se_necessario()
 
         logger.info(
-            "Sessão reconstruída: %s (contexto_aluno=%s, contexto_disciplina=%s, mensagens=%d)",
+            "Sessão recriada: %s (mensagens=%d, resumo=%d chars)",
             conversa_id,
-            bool(contexto_aluno),
-            bool(contexto_disciplina),
             len(mensagens) if mensagens else 0,
+            len(resumo),
         )
+
+    def _evict_se_necessario(self) -> None:
+        while len(self._sessoes) > MAX_SESSOES:
+            chave_mais_antiga = next(iter(self._sessoes))
+            del self._sessoes[chave_mais_antiga]
+            self._system_instructions.pop(chave_mais_antiga, None)
+            logger.info("Sessão removida por LRU: %s", chave_mais_antiga)
 
     async def iniciar_sessao(
         self,
         conversa_id: str,
-        contexto_aluno: Optional[str] = None,
-        contexto_disciplina: Optional[str] = None,
         system_instruction: Optional[str] = None,
     ) -> None:
         async with self._lock:
-            self._criar_sessao(conversa_id, contexto_aluno, contexto_disciplina, system_instruction)
+            self._criar_sessao(conversa_id, system_instruction=system_instruction)
 
     async def obter_sessao(
         self,
@@ -256,66 +173,40 @@ class AIService:
     ) -> genai.ChatSession:
         async with self._lock:
             if conversa_id not in self._sessoes:
-                contexto_combinado = self._sessao_contexto.get(conversa_id, "")
-                contexto_aluno, contexto_disciplina = self._separar_contextos(contexto_combinado)
                 if mensagens:
-                    self._reconstruir_sessao(
-                        conversa_id,
-                        contexto_aluno=contexto_aluno,
-                        contexto_disciplina=contexto_disciplina,
-                        mensagens=mensagens,
-                    )
+                    self._recriar_sessao(conversa_id, mensagens=mensagens)
                 else:
-                    self._criar_sessao(
-                        conversa_id,
-                        contexto_aluno=contexto_aluno,
-                        contexto_disciplina=contexto_disciplina,
-                    )
+                    self._criar_sessao(conversa_id)
+            elif mensagens and len(mensagens) > MAX_MENSAGENS_SESSAO:
+                self._recriar_sessao(conversa_id, mensagens=mensagens)
             sessao = self._sessoes.pop(conversa_id)
             self._sessoes[conversa_id] = sessao
             return sessao
 
-    @staticmethod
-    def _separar_contextos(chave_combinada: str) -> tuple[str | None, str | None]:
-        if not chave_combinada:
-            return None, None
-        partes = chave_combinada.split("|", 1)
-        ctx_aluno = partes[0] or None
-        ctx_disciplina = partes[1] if len(partes) > 1 else None
-        ctx_disciplina = ctx_disciplina or None
-        return ctx_aluno, ctx_disciplina
-
     async def garantir_sessao_com_contexto(
         self,
         conversa_id: str,
-        contexto_aluno: Optional[str] = None,
-        contexto_disciplina: Optional[str] = None,
         mensagens: Optional[list] = None,
         system_instruction: Optional[str] = None,
     ) -> None:
         async with self._lock:
             if conversa_id not in self._sessoes:
                 if mensagens:
-                    self._reconstruir_sessao(
+                    self._recriar_sessao(
                         conversa_id,
-                        contexto_aluno=contexto_aluno,
-                        contexto_disciplina=contexto_disciplina,
-                        mensagens=mensagens,
                         system_instruction=system_instruction,
+                        mensagens=mensagens,
                     )
                 else:
-                    self._criar_sessao(
-                        conversa_id,
-                        contexto_aluno=contexto_aluno,
-                        contexto_disciplina=contexto_disciplina,
-                        system_instruction=system_instruction,
-                    )
+                    self._criar_sessao(conversa_id, system_instruction=system_instruction)
+            elif system_instruction:
+                self._system_instructions[conversa_id] = system_instruction
 
     async def encerrar_sessao(self, conversa_id: str) -> None:
         async with self._lock:
             if conversa_id in self._sessoes:
                 del self._sessoes[conversa_id]
-                self._sessao_contexto.pop(conversa_id, None)
+                self._system_instructions.pop(conversa_id, None)
                 logger.info("Sessão encerrada: %s", conversa_id)
 
     async def gerar_resposta(
@@ -362,15 +253,21 @@ class AIService:
         _STREAM_ERROR = object()
 
         def _consume_stream(s, m, q, loop):
-            try:
-                resposta = s.send_message(m, stream=True)
-                for chunk in resposta:
-                    texto = getattr(chunk, "text", None)
-                    if texto:
-                        loop.call_soon_threadsafe(q.put_nowait, texto)
-                loop.call_soon_threadsafe(q.put_nowait, _STREAM_SENTINEL)
-            except Exception as exc:
-                loop.call_soon_threadsafe(q.put_nowait, (_STREAM_ERROR, exc))
+            last_exc = None
+            for tentativa in range(1, 4):
+                try:
+                    resposta = s.send_message(m, stream=True)
+                    for chunk in resposta:
+                        texto = getattr(chunk, "text", None)
+                        if texto:
+                            loop.call_soon_threadsafe(q.put_nowait, texto)
+                    loop.call_soon_threadsafe(q.put_nowait, _STREAM_SENTINEL)
+                    return
+                except Exception as exc:
+                    last_exc = exc
+                    if tentativa < 3:
+                        time.sleep(tentativa)
+            loop.call_soon_threadsafe(q.put_nowait, (_STREAM_ERROR, last_exc))
 
         loop = asyncio.get_running_loop()
         thread = threading.Thread(

@@ -27,6 +27,10 @@ Thumbs.db
 # Cache
 .claude/
 .cache/
+.kilo/
+
+# Uploads de usuarios (arquivos enviados em runtime)
+uploads/
 
 # Logs
 *.log

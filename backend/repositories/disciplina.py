@@ -11,7 +11,11 @@ class DisciplinaRepository(BaseRepository[Disciplina]):
         super().__init__(Disciplina, db)
 
     def listar_por_usuario(self, usuario_id: int, semestre: str | None = None) -> list[Disciplina]:
-        query = self.db.query(Disciplina).filter(Disciplina.usuario_id == usuario_id)
+        query = (
+            self.db.query(Disciplina)
+            .filter(Disciplina.usuario_id == usuario_id)
+            .order_by(Disciplina.id.asc())
+        )
         if semestre:
             query = query.filter(Disciplina.semestre == semestre)
         return query.all()

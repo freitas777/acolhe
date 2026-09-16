@@ -132,8 +132,20 @@ class AuthService:
                     "campus": campus or None,
                     "status_acompanhamento": "ativo",
                 }
-                self.aluno_repo.create(aluno_data)
+                novo_aluno = self.aluno_repo.create(aluno_data)
                 logger.info("[LOGIN SUAP] Aluno criado automaticamente para suap_id=%s", suap_id)
+                # Notificar NAPNE sobre novo aluno via SUAP
+                try:
+                    notif_service = NotificacaoService(self.db)
+                    notif_service.criar_notificacao(
+                        tipo="aluno_cadastrado_suap",
+                        titulo=f"Novo aluno cadastrado: {nome}",
+                        mensagem=f"O aluno {nome} ({matricula or 'sem matrícula'}) fez login via SUAP e foi cadastrado automaticamente no sistema.",
+                        aluno_id=novo_aluno.id,
+                        destino_tipo="napne",
+                    )
+                except Exception as notif_err:
+                    logger.warning("[LOGIN SUAP] Falha ao criar notifica\u00e7\u00e3o NAPNE: %s", notif_err)
             else:
                 updated = False
                 if aluno_existente.nome != nome:
@@ -314,17 +326,86 @@ class AuthService:
     def obter_disciplinas(self, usuario_id: int, semestre: str | None = None) -> list[Disciplina]:
         return self.disciplina_repo.listar_por_usuario(usuario_id, semestre)
 
+    def obter_disciplinas_aluno(self, usuario: Usuario, semestre: str | None = None) -> list[Disciplina]:
+        instrucoes = [("suap", d) for d in self.disciplina_repo.listar_por_usuario(usuario.id, semestre)]
+
+        aluno = self.aluno_repo.get_by_suap_id(usuario.suap_id) or (
+            self.aluno_repo.get_by_matricula(usuario.matricula) if usuario.matricula else None
+        )
+
+        if aluno:
+            locais = self.diario_aluno_repo.listar_disciplinas_por_aluno(
+                aluno.id, semestre=semestre, excluir_usuario_id=usuario.id
+            )
+            instrucoes.extend(("local", d) for d in locais)
+
+        disciplinas: list[Disciplina] = []
+        seen: set[int] = set()
+        for origem, d in instrucoes:
+            if d.id in seen:
+                continue
+            seen.add(d.id)
+            setattr(d, "origem", origem)
+            disciplinas.append(d)
+
+        return disciplinas
+
     def obter_alunos_assistidos(self, disciplina_id: int) -> list[DiarioAluno]:
         return self.diario_aluno_repo.listar_por_disciplina(disciplina_id)
 
+    def atualizar_ementa(self, disciplina_id: int, usuario: Usuario, ementa: str) -> Disciplina:
+        disciplina = self.disciplina_repo.get_by_id(disciplina_id)
+        if not disciplina:
+            raise HTTPException(status_code=404, detail="Disciplina não encontrada")
+        if disciplina.usuario_id != usuario.id and usuario.tipo_perfil != "admin":
+            raise HTTPException(status_code=403, detail="Acesso negado a esta disciplina.")
+        disciplina.ementa = (ementa or "").strip() or None
+        self.db.commit()
+        self.db.refresh(disciplina)
+        return disciplina
+
+    def obter_disciplina_valida(self, disciplina_id: int, usuario: Usuario) -> Disciplina:
+        disciplina = self.disciplina_repo.get_by_id(disciplina_id)
+        if not disciplina:
+            raise HTTPException(status_code=404, detail="Disciplina não encontrada")
+        if disciplina.usuario_id != usuario.id and usuario.tipo_perfil != "admin":
+            raise HTTPException(status_code=403, detail="Acesso negado a esta disciplina.")
+        return disciplina
+
+    def disciplina_tem_ementa(self, disciplina_id: int) -> bool:
+        from backend.models.material import Material
+        return (
+            self.db.query(Material)
+            .filter(Material.disciplina_id == disciplina_id, Material.categoria == "ementa")
+            .first()
+            is not None
+        )
+
     # --- New methods for Professor Dashboard ---
     def obter_perfil_aluno(self, professor_id: int, aluno_id: int):
+        logger.info(f"[PERFIL] Professor {professor_id} solicitando perfil do aluno {aluno_id}")
         # Verify professor has this aluno in any of their disciplinas
-        if not self.diario_aluno_repo.verificar_professor_aluno(professor_id, aluno_id):
+        has_access = self.diario_aluno_repo.verificar_professor_aluno(professor_id, aluno_id)
+        logger.info(f"[PERFIL] verificar_professor_aluno result: {has_access}")
+        if not has_access:
+            logger.warning(f"[PERFIL] Acesso negado: professor {professor_id} não tem vínculo com aluno {aluno_id}")
             raise HTTPException(status_code=403, detail="Acesso negado ao perfil do aluno.")
         perfil = self.perfil_aluno_repo.get_by_aluno_id(aluno_id)
         if not perfil:
-            raise HTTPException(status_code=404, detail="Perfil do aluno não encontrado.")
+            # Return a default/empty perfil object so the frontend can render
+            # without 404, instead of failing the modal entirely.
+            from types import SimpleNamespace
+            logger.info(f"[PERFIL] Perfil não encontrado para aluno {aluno_id}, retornando perfil vazio")
+            return SimpleNamespace(
+                id=0,
+                aluno_id=aluno_id,
+                nivel_atencao=None,
+                dificuldade_leitura=False,
+                preferencia=None,
+                interesses=None,
+                diagnostico=None,
+            )
+        logger.info(f"[PERFIL] Perfil encontrado para aluno {aluno_id}")
         return perfil
 
     def obter_conteudos_aluno(self, professor_id: int, aluno_id: int):
@@ -337,29 +418,43 @@ class AuthService:
         return repo.list_by_aluno(aluno_id)
 
     def solicitar_apoio_napne(self, professor_id: int, aluno_id: int, motivo: str):
+        logger.info(f"[APOIO] Professor {professor_id} solicitando apoio para aluno {aluno_id}")
         # Verify association
-        if not self.diario_aluno_repo.verificar_professor_aluno(professor_id, aluno_id):
+        has_access = self.diario_aluno_repo.verificar_professor_aluno(professor_id, aluno_id)
+        logger.info(f"[APOIO] verificar_professor_aluno result: {has_access}")
+        if not has_access:
+            logger.warning(f"[APOIO] Acesso negado: professor {professor_id} não tem vínculo com aluno {aluno_id}")
             raise HTTPException(status_code=403, detail="Acesso negado ao aluno.")
         # Check for existing pending pendencia
         existing = self.pendencia_repo.get_pendente_por_aluno(aluno_id)
         if existing:
+            logger.warning(f"[APOIO] Já existe pendência pendente para aluno {aluno_id}: id={existing.id}")
             raise HTTPException(status_code=409, detail="Já existe pendência pendente para este aluno.")
         # Create pendencia (reuse existing logic)
+        logger.info(f"[APOIO] Criando pendência para aluno {aluno_id}")
         pend = self.pendencia_repo.create({
             "aluno_id": aluno_id,
             "indicado_por_id": professor_id,
             "motivo": motivo,
             "status": StatusPendencia.pendente,
         })
-        # Notify NAPNE
+        logger.info(f"[APOIO] Pendência criada: id={pend.id}, status={pend.status}")
+        # Notify ALL NAPNE members with aluno name in the title
+        aluno = self.aluno_repo.get_by_id(aluno_id)
+        aluno_nome = aluno.nome if aluno else f"aluno #{aluno_id}"
+        professor = self.usuario_repo.get_by_id(professor_id)
+        professor_nome = professor.nome if professor else f"professor #{professor_id}"
+        
         notif_service = NotificacaoService(self.db)
-        notif_service.criar_notificacao(
+        notificacao = notif_service.criar_notificacao(
             tipo="solicitacao_apoio",
-            titulo="Solicitação de apoio do NAPNE",
-            mensagem=motivo,
+            titulo=f"Solicitação de Apoio para {aluno_nome}",
+            mensagem=f"Professor {professor_nome} solicita apoio.\nAluno: {aluno_nome}\nMotivo: {motivo}",
+            remetente_id=professor_id,
             aluno_id=aluno_id,
             destino_tipo="napne",
         )
+        logger.info(f"[APOIO] Notificação criada: id={notificacao.id}, destino_tipo={notificacao.destino_tipo}")
         return pend
 
     def criar_ou_atualizar_observacao(self, professor_id: int, aluno_id: int, disciplina_id: int, texto: str):

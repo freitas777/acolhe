@@ -13,6 +13,7 @@ from backend.schemas.chat import (
     ConversaResposta,
     ConteudoEducacionalRequisicao,
     ConteudoEducacionalResposta,
+    RenomearConversaRequest,
 )
 from backend.services.chat_service import ChatService
 
@@ -84,6 +85,25 @@ async def obter_conversa(
         conversa_id,
         usuario_id=auth_data.usuario.id,
         tipo_perfil=auth_data.usuario.tipo_perfil,
+    )
+
+
+@router.patch(
+    "/conversations/{conversa_id}",
+    response_model=ConversaResposta,
+    response_model_by_alias=False,
+)
+async def renomear_conversa(
+    conversa_id: str,
+    dados: RenomearConversaRequest,
+    auth_data: AuthData = Depends(get_current_usuario),
+    service: ChatService = Depends(_service),
+):
+    return service.renomear_conversa(
+        conversa_id,
+        usuario_id=auth_data.usuario.id,
+        tipo_perfil=auth_data.usuario.tipo_perfil,
+        titulo=dados.titulo,
     )
 
 

@@ -38,7 +38,16 @@ const ChatUI = {
       btnCloseAlunoSearch: document.getElementById('btn-close-aluno-search'),
       disciplinaContextBar: document.getElementById('disciplina-context-bar'),
       disciplinaBadgeName: document.getElementById('disciplina-badge-name'),
-      disciplinaBadgeSigla: document.getElementById('disciplina-badge-sigla')
+      disciplinaBadgeSigla: document.getElementById('disciplina-badge-sigla'),
+      disciplinaSelector: document.getElementById('disciplina-selector'),
+      disciplinaSelect: document.getElementById('disciplina-select'),
+      ementaModal: document.getElementById('ementa-modal'),
+      ementaTitle: document.getElementById('ementa-modal-title'),
+      ementaFileInput: document.getElementById('ementa-file-input'),
+      ementaFileName: document.getElementById('ementa-file-name'),
+      ementaSave: document.getElementById('ementa-save'),
+      ementaCancel: document.getElementById('ementa-cancel'),
+      ementaClose: document.getElementById('ementa-modal-close')
    };
 
   },
@@ -59,6 +68,58 @@ const ChatUI = {
   hideDisciplinaBadge() {
     const bar = this.elements.disciplinaContextBar;
     if (bar) bar.hidden = true;
+  },
+
+  populateDisciplinas(disciplinas) {
+    const select = this.elements.disciplinaSelect;
+    if (!select) return;
+    const current = select.value;
+    select.innerHTML = '<option value="">Selecione uma disciplina...</option>';
+    (disciplinas || []).forEach(function(d) {
+      const opt = document.createElement('option');
+      opt.value = d.id;
+      opt.textContent = (d.sigla ? d.sigla + ' - ' : '') + (d.descricao || d.id);
+      select.appendChild(opt);
+    });
+    if (current) select.value = current;
+  },
+
+  selectDisciplina(id) {
+    if (this.elements.disciplinaSelect) {
+      this.elements.disciplinaSelect.value = id ? String(id) : '';
+    }
+  },
+
+  resetDisciplinaSelect() {
+    this.selectDisciplina('');
+  },
+
+  showDisciplinaSelector() {
+    if (this.elements.disciplinaSelector) this.elements.disciplinaSelector.hidden = false;
+  },
+
+  hideDisciplinaSelector() {
+    if (this.elements.disciplinaSelector) this.elements.disciplinaSelector.hidden = true;
+  },
+
+  openEmentaModal(descricao, ementa) {
+    const modal = this.elements.ementaModal;
+    if (!modal) return;
+    if (this.elements.ementaTitle) {
+      this.elements.ementaTitle.textContent = descricao ? 'Ementa - ' + descricao : 'Ementa da Disciplina';
+    }
+    if (this.elements.ementaFileInput) {
+      this.elements.ementaFileInput.value = '';
+    }
+    if (this.elements.ementaFileName) {
+      this.elements.ementaFileName.textContent = 'Selecionar arquivo da ementa...';
+    }
+    modal.hidden = false;
+  },
+
+  closeEmentaModal() {
+    const modal = this.elements.ementaModal;
+    if (modal) modal.hidden = true;
   },
 
   /**
@@ -102,25 +163,54 @@ const ChatUI = {
           <span class="conversation-item-time">${timeAgo}</span>
         </div>
         ${(!this.isAluno() && conv.aluno_id) ? '<svg class="aluno-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>' : ''}
-        <button class="delete-btn" title="Excluir conversa">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="3 6 5 6 21 6"/>
-            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+        <button class="conversation-more-btn" title="Mais opções" aria-label="Mais opções">
+          <svg viewBox="0 0 24 24" fill="currentColor" stroke="none">
+            <circle cx="12" cy="5" r="1.6"/>
+            <circle cx="12" cy="12" r="1.6"/>
+            <circle cx="12" cy="19" r="1.6"/>
           </svg>
         </button>
+        <div class="conversation-menu" hidden>
+          <button type="button" class="conversation-menu-item" data-action="rename">Editar nome</button>
+          <button type="button" class="conversation-menu-item conversation-menu-danger" data-action="delete">Excluir conversa</button>
+        </div>
       `;
 
-      item.addEventListener('click', (e) => {
-        if (e.target.closest('.delete-btn')) {
-          e.stopPropagation();
-          this.onConversationDelete(conv.id);
-          return;
+      const moreBtn = item.querySelector('.conversation-more-btn');
+      const menu = item.querySelector('.conversation-menu');
+
+      moreBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isHidden = menu.hidden;
+        this.closeConversationMenus();
+        if (isHidden) {
+          const rect = moreBtn.getBoundingClientRect();
+          const menuWidth = 160;
+          menu.style.left = Math.max(8, rect.right - menuWidth) + 'px';
+          menu.style.top = (rect.bottom + 4) + 'px';
+          menu.hidden = false;
         }
+      });
+
+      menu.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const action = e.target.closest('.conversation-menu-item')?.dataset.action;
+        this.closeConversationMenus();
+        if (action === 'delete') this.onConversationDelete(conv.id);
+        else if (action === 'rename') this.onConversationRename(conv.id, conv.title || '');
+      });
+
+      item.addEventListener('click', (e) => {
+        if (e.target.closest('.conversation-more-btn') || e.target.closest('.conversation-menu')) return;
         this.onConversationSelect(conv.id);
       });
 
       list.appendChild(item);
     });
+  },
+
+  closeConversationMenus() {
+    document.querySelectorAll('.conversation-menu').forEach(m => { m.hidden = true; });
   },
 
   /**
@@ -307,6 +397,9 @@ const ChatUI = {
   },
 
   onConversationDelete(id) {
+  },
+
+  onConversationRename(id, currentTitle) {
   },
 
     updateAlunoBadge(alunoNome) {
@@ -590,7 +683,7 @@ const ChatUI = {
           </div>
           <span class="message-time"></span>
         </div>
-        <div class="message-text"></div>
+        <div class="message-text"><div class="ai-thinking"><span class="ai-thinking-spinner"></span><span>Pensando...</span></div></div>
       </div>
     `;
 
@@ -602,6 +695,8 @@ const ChatUI = {
 
   appendChunk(textEl, chunk) {
     if (!textEl) return;
+    var spinner = textEl.querySelector('.ai-thinking');
+    if (spinner) spinner.remove();
     textEl.textContent += chunk;
     this.scrollToBottom();
   },

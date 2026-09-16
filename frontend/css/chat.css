@@ -117,6 +117,7 @@ body {
   cursor: pointer;
   transition: all var(--transition-fast);
   margin-bottom: var(--spacing-xs);
+  position: relative;
 }
 
 .conversation-item:hover {
@@ -164,7 +165,7 @@ body {
   font-size: 0.875rem;
 }
 
-.conversation-item .delete-btn {
+.conversation-item .conversation-more-btn {
   opacity: 0;
   padding: var(--spacing-xs);
   background: transparent;
@@ -172,19 +173,66 @@ body {
   cursor: pointer;
   color: var(--color-text-muted);
   transition: all var(--transition-fast);
+  border-radius: var(--radius-sm);
 }
 
-.conversation-item:hover .delete-btn {
+.conversation-item:hover .conversation-more-btn {
   opacity: 1;
 }
 
-.conversation-item .delete-btn:hover {
+.conversation-item .conversation-more-btn:hover {
+  color: var(--color-text-primary);
+  background: var(--color-border-light);
+}
+
+.conversation-item .conversation-more-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.conversation-menu[hidden] {
+  display: none;
+}
+
+.conversation-menu:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+}
+
+.conversation-menu {
+  position: fixed;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  z-index: 400;
+  min-width: 160px;
+  padding: 4px;
+}
+
+.conversation-menu-item {
+  text-align: left;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
+  font-family: 'Open Sans', sans-serif;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.conversation-menu-item:hover {
+  background: var(--color-surface-secondary);
+}
+
+.conversation-menu-danger {
   color: var(--color-error);
 }
 
-.conversation-item .delete-btn svg {
-  width: 16px;
-  height: 16px;
+.conversation-menu-danger:hover {
+  background: rgba(220, 53, 69, 0.08);
 }
 
 /* Sidebar Footer */
@@ -890,6 +938,158 @@ color: var(--suap-green);
   }
 }
 
+/* AI Thinking Spinner */
+.ai-thinking {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+  padding: 0.125rem 0;
+}
+
+.ai-thinking-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--suap-green);
+  border-radius: 50%;
+  animation: ai-spin 0.8s linear infinite;
+}
+
+@keyframes ai-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ============================================
+Disciplina Selector (chat header)
+============================================ */
+.disciplina-selector {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.disciplina-selector[hidden] {
+  display: none;
+}
+
+.disciplina-selector label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.disciplina-selector select {
+  padding: 0.375rem 0.5rem;
+  font-size: 0.85rem;
+  font-family: 'Open Sans', sans-serif;
+  color: var(--color-text-primary);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  max-width: 240px;
+  cursor: pointer;
+  outline: none;
+  transition: border-color var(--transition-fast);
+}
+
+.disciplina-selector select:focus {
+  border-color: var(--suap-green);
+  box-shadow: 0 0 0 3px rgba(10, 127, 112, 0.1);
+}
+
+/* ============================================
+Ementa Modal
+============================================ */
+#ementa-textarea {
+  width: 100%;
+  min-height: 160px;
+  padding: 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-family: 'Open Sans', sans-serif;
+  font-size: 0.9rem;
+  resize: vertical;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.ementa-upload-area {
+  display: flex;
+  flex-direction: column;
+}
+
+.ementa-upload-area input[type="file"] {
+  display: none;
+}
+
+.ementa-file-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1.25rem 1rem;
+  border: 2px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all var(--transition-fast);
+}
+
+.ementa-file-label:hover {
+  border-color: var(--suap-green);
+  color: var(--suap-green);
+  background: rgba(10, 127, 112, 0.04);
+}
+
+.ementa-file-label svg {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+#ementa-textarea:focus {
+  border-color: var(--suap-green);
+  box-shadow: 0 0 0 3px rgba(10, 127, 112, 0.1);
+}
+
+.ementa-info {
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.ementa-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.btn-ementa-cancel,
+.btn-ementa-save {
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  font-size: 0.875rem;
+  cursor: pointer;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-family: 'Open Sans', sans-serif;
+}
+
+.btn-ementa-save {
+  background: var(--suap-green);
+  color: white;
+  border-color: var(--suap-green);
+}
+
 .error-message .message-content {
   background: #ffebee;
   border: 1px solid #ffcdd2;
@@ -909,6 +1109,20 @@ Aluno Context Bar
     align-items: center;
     gap: var(--spacing-sm);
     flex-shrink: 0;
+}
+
+.disciplina-context-bar {
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+    padding: var(--spacing-sm) var(--spacing-lg);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    flex-shrink: 0;
+}
+
+.disciplina-context-bar[hidden] {
+    display: none;
 }
 
 body.role-aluno .aluno-context-bar,

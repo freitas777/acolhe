@@ -94,14 +94,10 @@
       <div class="modal-body">
         <div class="portal-tabs" id="student-modal-tabs">
           <button class="portal-tab active" data-tab="perfil">Perfil</button>
-          <button class="portal-tab" data-tab="conteudos">Conteúdos</button>
           <button class="portal-tab" data-tab="apoio">Solicitar Apoio</button>
-          <button class="portal-tab" data-tab="observacao">Observação</button>
         </div>
         <section class="modal-section" id="modal-perfil"></section>
-        <section class="modal-section" id="modal-conteudos" hidden></section>
         <section class="modal-section" id="modal-apoio" hidden></section>
-        <section class="modal-section" id="modal-observacao" hidden></section>
       </div>
     </div>
   </div>
@@ -122,9 +118,10 @@
             </svg>
             <p class="upload-text">Arraste arquivos aqui ou clique para selecionar</p>
             <p class="upload-hint">PDF, DOC, DOCX, PPT, PPTX, PNG, JPG, TXT (máx. 10MB)</p>
-            <div class="upload-categoria-select">
-              <label for="upload-categoria">Categoria:</label>
-              <select id="upload-categoria" class="categoria-select">
+            <div class="upload-categoria">
+              <label for="upload-categoria-select">Classificar conteúdo:</label>
+              <select id="upload-categoria-select">
+                <option value="outro" selected>Outro</option>
                 <option value="prova">Prova</option>
                 <option value="exercicio">Exercício</option>
                 <option value="slides">Slides</option>
@@ -132,7 +129,6 @@
                 <option value="video">Vídeo</option>
                 <option value="atividade">Atividade</option>
                 <option value="resumo">Resumo</option>
-                <option value="outro" selected>Outro</option>
               </select>
             </div>
             <input type="file" id="file-input" hidden accept=".pdf,.doc,.docx,.ppt,.pptx,.png,.jpg,.jpeg,.txt">
@@ -156,6 +152,7 @@
             <button class="filtro-chip" data-categoria="video">Vídeo</button>
             <button class="filtro-chip" data-categoria="atividade">Atividade</button>
             <button class="filtro-chip" data-categoria="resumo">Resumo</button>
+            <button class="filtro-chip" data-categoria="ementa">Ementa</button>
             <button class="filtro-chip" data-categoria="outro">Outro</button>
           </div>
         </div>

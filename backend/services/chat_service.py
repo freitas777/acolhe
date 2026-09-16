@@ -16,6 +16,7 @@ from backend.repositories.acomodacao_observacao import AcomodacaoObservacaoRepos
 from backend.repositories.aluno import AlunoRepository
 from backend.repositories.conversa import ConversaRepository
 from backend.repositories.disciplina import DisciplinaRepository
+from backend.repositories.material import MaterialRepository
 from backend.repositories.mensagem import MensagemRepository
 from backend.schemas.chat import (
     ChatRequisicao,
@@ -74,6 +75,7 @@ class ChatService:
         self.aluno_repo = AlunoRepository(db)
         self.disciplina_repo = DisciplinaRepository(db)
         self.acomodacao_repo = AcomodacaoObservacaoRepository(db)
+        self.material_repo = MaterialRepository(db)
         self.db = db
 
     def _construir_system_instruction(
@@ -81,6 +83,8 @@ class ChatService:
         aluno_id: int | None = None,
         disciplina_id: int | None = None,
         mensagens: list[Mensagem] | None = None,
+        usuario_id: int | None = None,
+        excluir_conversa_id: str | None = None,
     ) -> str:
         aluno = None
         perfil = None
@@ -97,13 +101,51 @@ class ChatService:
         if aluno_id:
             observacoes = self.acomodacao_repo.listar_por_aluno(aluno_id)
 
+        materiais = []
+        if disciplina_id:
+            materiais = [
+                m for m in self.material_repo.listar_por_disciplina(disciplina_id)
+                if m.categoria != "ementa"
+            ]
+
+        conversas_anteriores = self._resumo_conversas_anteriores(
+            usuario_id, excluir_conversa_id=excluir_conversa_id
+        )
+
         return prompt_builder.build_session_instruction(
             aluno=aluno,
             perfil=perfil,
             disciplina=disciplina,
             observacoes=observacoes,
             mensagens=mensagens,
+            materiais=materiais,
+            conversas_anteriores=conversas_anteriores,
         )
+
+    def _resumo_conversas_anteriores(
+        self,
+        usuario_id: int | None,
+        excluir_conversa_id: str | None = None,
+    ) -> list[dict]:
+        if usuario_id is None:
+            return []
+
+        conversas = self.conversa_repo.listar_com_mensagens(usuario_id=usuario_id)
+        resumo: list[dict] = []
+        for conv in conversas:
+            if excluir_conversa_id and conv.id == excluir_conversa_id:
+                continue
+            if not conv.mensagens:
+                continue
+            ultima = conv.mensagens[-1]
+            trecho = (getattr(ultima, "conteudo", "") or "").strip()[:200]
+            resumo.append({
+                "titulo": conv.titulo or "Conversa",
+                "trecho": trecho,
+            })
+            if len(resumo) >= 5:
+                break
+        return resumo
 
     async def _criar_conversa_com_contexto(
         self,
@@ -133,6 +175,7 @@ class ChatService:
         system_instruction = self._construir_system_instruction(
             aluno_id=aluno_id,
             disciplina_id=disciplina_id,
+            usuario_id=usuario_id,
         )
 
         await ai_service.iniciar_sessao(
@@ -166,25 +209,6 @@ class ChatService:
         tipo_perfil: str = "aluno",
         suap_id: str | None = None,
     ) -> ConversaResposta:
-        conversa_existente = self.conversa_repo.obter_por_usuario_e_disciplina(
-            usuario_id, disciplina_id,
-        )
-
-        if conversa_existente:
-            self._verificar_propriedade(conversa_existente, usuario_id, tipo_perfil)
-            mensagens_existentes = self.mensagem_repo.listar_por_conversa(conversa_existente.id)
-            system_instruction = self._construir_system_instruction(
-                aluno_id=conversa_existente.aluno_id,
-                disciplina_id=disciplina_id,
-                mensagens=mensagens_existentes,
-            )
-            await ai_service.garantir_sessao_com_contexto(
-                conversa_id=conversa_existente.id,
-                system_instruction=system_instruction,
-                mensagens=mensagens_existentes,
-            )
-            return _para_conversa_resposta(conversa_existente)
-
         disciplina = self.disciplina_repo.get_by_id(disciplina_id)
         if not disciplina:
             raise HTTPException(
@@ -213,6 +237,7 @@ class ChatService:
         system_instruction = self._construir_system_instruction(
             aluno_id=aluno_id,
             disciplina_id=disciplina_id,
+            usuario_id=usuario_id,
         )
 
         await ai_service.iniciar_sessao(
@@ -230,23 +255,17 @@ class ChatService:
         self, conversa: Conversa, usuario_id: int, tipo_perfil: str,
     ) -> None:
         if conversa.usuario_id != usuario_id:
-            if tipo_perfil not in ("psicopedagogo", "admin"):
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Você não tem permissão para acessar esta conversa.",
-                )
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Você não tem permissão para acessar esta conversa.",
+            )
 
     def listar_conversas(
         self,
         usuario_id: int,
         tipo_perfil: str = "aluno",
     ) -> list[ConversaResposta]:
-        if tipo_perfil in ("psicopedagogo", "admin"):
-            conversas = self.conversa_repo.listar_com_mensagens()
-        else:
-            conversas = self.conversa_repo.listar_com_mensagens(
-                usuario_id=usuario_id,
-            )
+        conversas = self.conversa_repo.listar_com_mensagens(usuario_id=usuario_id)
         return [_para_conversa_resposta(c) for c in conversas]
 
     def obter_conversa(
@@ -263,6 +282,31 @@ class ChatService:
             )
         self._verificar_propriedade(conversa, usuario_id, tipo_perfil)
         return _para_conversa_resposta(conversa)
+
+    def renomear_conversa(
+        self,
+        conversa_id: str,
+        usuario_id: int,
+        tipo_perfil: str,
+        titulo: str,
+    ) -> ConversaResposta:
+        conversa = self.conversa_repo.obter_com_mensagens(conversa_id)
+        if not conversa:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Conversa não encontrada",
+            )
+        self._verificar_propriedade(conversa, usuario_id, tipo_perfil)
+        titulo_limpo = (titulo or "").strip()
+        if not titulo_limpo:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="O título da conversa não pode ser vazio.",
+            )
+        self.conversa_repo.update(conversa_id, {"titulo": titulo_limpo[:255]})
+        conversa_atualizada = self.conversa_repo.obter_com_mensagens(conversa_id)
+        logger.info("Conversa renomeada: id=%s", conversa_id)
+        return _para_conversa_resposta(conversa_atualizada)
 
     async def _preparar_envio(
         self,
@@ -288,6 +332,8 @@ class ChatService:
                 system_instruction = self._construir_system_instruction(
                     aluno_id=aluno_id,
                     disciplina_id=conversa.disciplina_id,
+                    usuario_id=usuario_id,
+                    excluir_conversa_id=conversa_id,
                 )
                 if system_instruction:
                     self.conversa_repo.update(conversa_id, {"aluno_id": aluno_id})
@@ -303,6 +349,8 @@ class ChatService:
                     aluno_id=conversa.aluno_id,
                     disciplina_id=conversa.disciplina_id,
                     mensagens=mensagens_existentes,
+                    usuario_id=usuario_id,
+                    excluir_conversa_id=conversa_id,
                 )
                 await ai_service.garantir_sessao_com_contexto(
                     conversa_id, system_instruction=system_instruction, mensagens=mensagens_existentes,
@@ -414,7 +462,7 @@ class ChatService:
                 conteudo_completo.append(chunk)
                 yield f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n"
         except Exception as exc:
-            logger.error("Erro no streaming da IA: %s", exc)
+            logger.error("Erro no streaming da IA (%s): %s", type(exc).__name__, exc)
             if not conteudo_completo:
                 fallback = "Desculpe, estou com dificuldades para responder no momento. Tente novamente."
                 yield f"data: {json.dumps({'type': 'error', 'content': fallback})}\n\n"
@@ -479,6 +527,8 @@ class ChatService:
             aluno_id=aluno_id,
             disciplina_id=conversa.disciplina_id,
             mensagens=mensagens_existentes,
+            usuario_id=usuario_id,
+            excluir_conversa_id=conversa_id,
         )
         await ai_service.encerrar_sessao(conversa_id)
         await ai_service.iniciar_sessao(
@@ -511,6 +561,8 @@ class ChatService:
             aluno_id=None,
             disciplina_id=conversa.disciplina_id,
             mensagens=mensagens_existentes,
+            usuario_id=usuario_id,
+            excluir_conversa_id=conversa_id,
         )
         await ai_service.encerrar_sessao(conversa_id)
         await ai_service.iniciar_sessao(

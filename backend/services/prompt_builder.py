@@ -53,6 +53,10 @@ SYSTEM_PROMPT_BASE = (
 MAX_HISTORY_MESSAGES = 20
 MAX_HISTORY_CHARS = 4000
 MAX_OBSERVATIONS_CHARS = 1500
+MAX_MATERIAIS = 20
+MAX_EXCERTO_MATERIAL = 1500
+MAX_TOTAL_MATERIAIS_CHARS = 8000
+MAX_EMENTA_CHARS = 3000
 
 
 @dataclass
@@ -63,6 +67,8 @@ class PromptContext:
     history_summary: str = ""
     current_task: str = ""
     discipline_context: str = ""
+    materiais_context: str = ""
+    conversas_anteriores_context: str = ""
     metadata: dict = field(default_factory=dict)
 
 
@@ -197,12 +203,82 @@ class PromptBuilder:
         if codigo_turma:
             secoes.append(f"**Código da Turma:** {codigo_turma}")
 
+        ementa = (getattr(disciplina, "ementa", None) or "").strip()
+        if ementa:
+            if len(ementa) > MAX_EMENTA_CHARS:
+                ementa = ementa[:MAX_EMENTA_CHARS] + "\n...[ementa truncada]"
+            secoes.append("")
+            secoes.append("### EMENTA DA DISCIPLINA:")
+            secoes.append(ementa)
+
         secoes.append("")
         secoes.append("### DIRETRIZES ESPECÍFICAS DA DISCIPLINA:")
         secoes.append("- Responda dúvidas relacionadas ao conteúdo desta disciplina")
         secoes.append("- Use exemplos e contextos pertinentes à área de conhecimento")
         secoes.append("- Adapte a explicação ao nível do estudante")
         secoes.append("- Sugira materiais complementares quando apropriado")
+
+        return "\n".join(secoes)
+
+    def build_materiais_context(
+        self,
+        materiais: list,
+    ) -> str:
+        if not materiais:
+            return ""
+
+        secoes = [
+            "## MATERIAIS DA DISCIPLINA",
+            "",
+            "Materiais disponibilizados para esta disciplina:",
+        ]
+
+        total = 0
+        for m in materiais[:MAX_MATERIAIS]:
+            nome = getattr(m, "nome_original", "") or "Sem nome"
+            categoria = getattr(m, "categoria", "") or "outro"
+            descricao = getattr(m, "descricao", None)
+
+            secoes.append(f"- [{categoria}] {nome}")
+            if descricao:
+                secoes.append(f"  Descrição: {descricao[:300]}")
+
+            conteudo = (getattr(m, "conteudo_texto", None) or "").strip()
+            if conteudo:
+                trecho = conteudo[:MAX_EXCERTO_MATERIAL]
+                if total + len(trecho) > MAX_TOTAL_MATERIAIS_CHARS:
+                    disponivel = max(0, MAX_TOTAL_MATERIAIS_CHARS - total)
+                    trecho = trecho[:disponivel] + "\n...[conteúdo truncado]"
+                secoes.append(f"  Conteúdo: {trecho}")
+                total += len(trecho)
+            else:
+                secoes.append("  Conteúdo: (sem texto extraído)")
+
+        secoes.append("")
+        secoes.append("### DIRETRIZES PARA OS MATERIAIS:")
+        secoes.append("- Mencione os materiais listados quando relevantes para a resposta")
+        secoes.append("- Use o conteúdo interno dos materiais para responder dúvidas específicas")
+        secoes.append("- Relacione a dúvida do usuário ao material disponível quando apropriado")
+
+        return "\n".join(secoes)
+
+    def build_conversas_anteriores(
+        self,
+        resumo: list,
+    ) -> str:
+        if not resumo:
+            return ""
+
+        secoes = [
+            "## CONTEXTO DE CONVERSAS ANTERIORES",
+            "",
+            "O usuário já teve as seguintes conversas (use para manter consistência e não repetir o que já foi discutido):",
+        ]
+
+        for r in resumo:
+            titulo = r.get("titulo", "") or "Conversa"
+            trecho = r.get("trecho", "") or ""
+            secoes.append(f"- **{titulo}**: {trecho}")
 
         return "\n".join(secoes)
 
@@ -233,6 +309,8 @@ class PromptBuilder:
         disciplina: Optional[Disciplina] = None,
         observacoes: Optional[list[AcomodacaoObservacao]] = None,
         mensagens: Optional[list[Mensagem]] = None,
+        materiais: Optional[list] = None,
+        conversas_anteriores: Optional[list] = None,
         mensagem_usuario: str = "",
     ) -> PromptContext:
         context = PromptContext()
@@ -252,6 +330,14 @@ class PromptBuilder:
 
         if disciplina:
             context.discipline_context = self.build_discipline_context(disciplina)
+
+        if materiais:
+            context.materiais_context = self.build_materiais_context(materiais)
+
+        if conversas_anteriores:
+            context.conversas_anteriores_context = self.build_conversas_anteriores(
+                conversas_anteriores
+            )
 
         if mensagem_usuario:
             context.current_task = self.build_current_task(mensagem_usuario)
@@ -275,12 +361,20 @@ class PromptBuilder:
             secoes.append(context.discipline_context)
             secoes.append("")
 
+        if context.materiais_context:
+            secoes.append(context.materiais_context)
+            secoes.append("")
+
         if context.teacher_observations:
             secoes.append(context.teacher_observations)
             secoes.append("")
 
         if context.history_summary:
             secoes.append(context.history_summary)
+            secoes.append("")
+
+        if context.conversas_anteriores_context:
+            secoes.append(context.conversas_anteriores_context)
             secoes.append("")
 
         if context.current_task:
@@ -290,12 +384,15 @@ class PromptBuilder:
 
         logger.info(
             "Prompt montado: system=%d chars, profile=%d chars, observations=%d chars, "
-            "history=%d chars, discipline=%d chars, task=%d chars, total=%d chars",
+            "history=%d chars, discipline=%d chars, materiais=%d chars, "
+            "conversas_anteriores=%d chars, task=%d chars, total=%d chars",
             len(context.system_prompt),
             len(context.student_profile),
             len(context.teacher_observations),
             len(context.history_summary),
             len(context.discipline_context),
+            len(context.materiais_context),
+            len(context.conversas_anteriores_context),
             len(context.current_task),
             len(prompt_final),
         )
@@ -309,6 +406,8 @@ class PromptBuilder:
         disciplina: Optional[Disciplina] = None,
         observacoes: Optional[list[AcomodacaoObservacao]] = None,
         mensagens: Optional[list[Mensagem]] = None,
+        materiais: Optional[list] = None,
+        conversas_anteriores: Optional[list] = None,
         mensagem_usuario: str = "",
     ) -> str:
         context = self.assemble_prompt(
@@ -317,6 +416,8 @@ class PromptBuilder:
             disciplina=disciplina,
             observacoes=observacoes,
             mensagens=mensagens,
+            materiais=materiais,
+            conversas_anteriores=conversas_anteriores,
             mensagem_usuario=mensagem_usuario,
         )
         return self.format_final_prompt(context)
@@ -328,6 +429,8 @@ class PromptBuilder:
         disciplina: Optional[Disciplina] = None,
         observacoes: Optional[list[AcomodacaoObservacao]] = None,
         mensagens: Optional[list[Mensagem]] = None,
+        materiais: Optional[list] = None,
+        conversas_anteriores: Optional[list] = None,
     ) -> str:
         context = self.assemble_prompt(
             aluno=aluno,
@@ -335,6 +438,8 @@ class PromptBuilder:
             disciplina=disciplina,
             observacoes=observacoes,
             mensagens=mensagens,
+            materiais=materiais,
+            conversas_anteriores=conversas_anteriores,
             mensagem_usuario="",
         )
         return self.format_final_prompt(context)

@@ -105,12 +105,9 @@ function acolheGetUserName() {
 
 // Limpa dados sensíveis antigos do localStorage (migração de segurança)
 function acolheCleanupLegacyData() {
-  localStorage.removeItem('acolhe_user_id');
-  localStorage.removeItem('acolhe_senha_temporaria');
+// Legacy fields removed - now using JWT payload
+// Keep acolhe_user_id for backward compatibility during transition
 }
-
-// Executa limpeza ao carregar
-acolheCleanupLegacyData();
 
 function acolheGetHomepage() {
     var perfil = acolheGetTipoPerfil();
