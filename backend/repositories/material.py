@@ -24,3 +24,14 @@ class MaterialRepository(BaseRepository[Material]):
             .filter(Material.id == material_id)
             .first()
         )
+
+    def obter_ementa_por_disciplina(self, disciplina_id: int) -> Material | None:
+        return (
+            self.db.query(Material)
+            .filter(
+                Material.disciplina_id == disciplina_id,
+                Material.categoria == "ementa",
+            )
+            .order_by(Material.criado_em.desc())
+            .first()
+        )

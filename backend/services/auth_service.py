@@ -57,12 +57,19 @@ class AuthService:
         try:
             vinculos = await self.suap_service.get_meus_vinculos(token, scope=scope)
             if vinculos:
-                primeiro = vinculos[0]
-                matricula = primeiro.get("identificador", "") or primeiro.get("matricula", "")
-                tipo_vinculo = primeiro.get("tipo", "") or primeiro.get("tipo_vinculo", "")
+                vinculo_aluno = None
+                for v in vinculos:
+                    tipo_v = (v.get("tipo", "") or v.get("tipo_vinculo", "") or "").lower()
+                    if tipo_v in ("aluno", "estudante"):
+                        vinculo_aluno = v
+                        break
+
+                escolhido = vinculo_aluno or vinculos[0]
+                matricula = escolhido.get("identificador", "") or escolhido.get("matricula", "")
+                tipo_vinculo = escolhido.get("tipo", "") or escolhido.get("tipo_vinculo", "")
                 if not campus:
-                    campus = primeiro.get("campus", "") or ""
-                detalhe = primeiro.get("detalhamento") or {}
+                    campus = escolhido.get("campus", "") or ""
+                detalhe = escolhido.get("detalhamento") or {}
                 setor = detalhe.get("cargo", "") or detalhe.get("modalidade", "") or ""
                 logger.info("[LOGIN SUAP] Vinculo: matricula=%s, tipo=%s, campus=%s", matricula, tipo_vinculo, campus)
         except Exception as e:
@@ -71,7 +78,7 @@ class AuthService:
         tipo_perfil = "aluno"
         if tipo_vinculo and tipo_vinculo.lower() not in ("aluno", "estudante"):
             tipo_perfil = "servidor"
-        
+
         logger.info("[LOGIN SUAP] Tipo vinculo: '%s', Tipo perfil determinado: '%s'", tipo_vinculo, tipo_perfil)
 
         usuario = self.usuario_repo.get_by_suap_id(suap_id)
@@ -89,6 +96,8 @@ class AuthService:
             }
             if tipo_perfil in ("psicopedagogo", "servidor"):
                 update_data["tipo_perfil"] = tipo_perfil
+            elif tipo_perfil == "aluno" and usuario.tipo_perfil == "servidor":
+                update_data["tipo_perfil"] = "aluno"
             for key, value in update_data.items():
                 setattr(usuario, key, value)
             self.db.commit()

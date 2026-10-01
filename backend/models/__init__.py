@@ -6,6 +6,7 @@ from backend.models.disciplina import Disciplina
 from backend.models.diario_aluno import DiarioAluno
 from backend.models.pendencia_validacao import PendenciaValidacao
 from backend.models.conversa import Conversa
+from backend.models.anexo_conversa import AnexoConversa
 from backend.models.mensagem import Mensagem
 from backend.models.conteudo_gerado import ConteudoGerado
 from backend.models.acomodacao_observacao import AcomodacaoObservacao
@@ -24,6 +25,7 @@ __all__ = [
     "DiarioAluno",
     "PendenciaValidacao",
     "Conversa",
+    "AnexoConversa",
     "Mensagem",
     "ConteudoGerado",
     "AcomodacaoObservacao",

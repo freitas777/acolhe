@@ -714,25 +714,6 @@ container.innerHTML = html;
      });
 }
 
-function loadDashboardMetrics() {
- acolheFetch('/equipe/dashboard')
-   .then(function(r) { return r.json(); })
-   .then(function(data) {
-     document.getElementById('metric-alunos-ativos').textContent = data.alunos_ativos !== undefined ? data.alunos_ativos : '0';
-     document.getElementById('metric-pendencias').textContent = data.pendencias_pendentes !== undefined ? data.pendencias_pendentes : '0';
-     document.getElementById('metric-observacoes').textContent = data.observacoes_mes !== undefined ? data.observacoes_mes : '0';
-     document.getElementById('metric-conteudos').textContent = data.conteudos_gerados !== undefined ? data.conteudos_gerados : '0';
-   })
-   .catch(function(err) {
-     console.error('Erro ao carregar dashboard:', err);
-     // Fallback para 0 em caso de erro
-     document.getElementById('metric-alunos-ativos').textContent = '0';
-     document.getElementById('metric-pendencias').textContent = '0';
-     document.getElementById('metric-observacoes').textContent = '0';
-     document.getElementById('metric-conteudos').textContent = '0';
-    });
-}
-
 function gerarRelatorioPDF() {
   var alunoId = document.getElementById('profile-aluno-id').value;
   if (!alunoId) {

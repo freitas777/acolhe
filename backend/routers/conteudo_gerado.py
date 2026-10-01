@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
+from backend.config import settings
 from backend.dependencies import AuthData, get_current_usuario, require_napne, require_admin
 from backend.models.conteudo_gerado import ConteudoGerado
 from backend.repositories.aluno import AlunoRepository
@@ -172,7 +173,7 @@ async def criar_iteracao(
     tema=conteudo_pai.tema,
     prompt_utilizado=prompt_completo,
     conteudo=conteudo_gerado,
-    modelo_ia="gemini-2.5-flash",
+    modelo_ia=settings.gemini_model,
     versao=conteudo_pai.versao + 1,
     conteudo_pai_id=conteudo_id,
   )

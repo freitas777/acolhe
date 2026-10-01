@@ -20,10 +20,16 @@ const ChatUI = {
       emptyState: document.getElementById('empty-state'),
       messageInput: document.getElementById('message-input'),
       btnSend: document.getElementById('btn-send'),
+      btnAnexo: document.getElementById('btn-anexo'),
+      anexoFileInput: document.getElementById('anexo-file-input'),
+      anexosChipsArea: document.getElementById('anexos-chips-area'),
+      anexosConversaArea: document.getElementById('anexos-conversa-area'),
+      anexosConversaLista: document.getElementById('anexos-conversa-lista'),
       btnNewChat: document.getElementById('btn-new-chat'),
       btnMenuMobile: document.getElementById('btn-menu-mobile'),
       btnLogout: document.getElementById('btn-logout'),
       chatTitle: document.getElementById('chat-title'),
+      btnRenomear: document.getElementById('btn-renomear'),
       userAvatarSmall: document.getElementById('user-avatar-small'),
       userNameSmall: document.getElementById('user-name-small'),
       userRoleSmall: document.getElementById('user-role-small'),
@@ -39,8 +45,6 @@ const ChatUI = {
       disciplinaContextBar: document.getElementById('disciplina-context-bar'),
       disciplinaBadgeName: document.getElementById('disciplina-badge-name'),
       disciplinaBadgeSigla: document.getElementById('disciplina-badge-sigla'),
-      disciplinaSelector: document.getElementById('disciplina-selector'),
-      disciplinaSelect: document.getElementById('disciplina-select'),
       ementaModal: document.getElementById('ementa-modal'),
       ementaTitle: document.getElementById('ementa-modal-title'),
       ementaFileInput: document.getElementById('ementa-file-input'),
@@ -70,38 +74,6 @@ const ChatUI = {
     if (bar) bar.hidden = true;
   },
 
-  populateDisciplinas(disciplinas) {
-    const select = this.elements.disciplinaSelect;
-    if (!select) return;
-    const current = select.value;
-    select.innerHTML = '<option value="">Selecione uma disciplina...</option>';
-    (disciplinas || []).forEach(function(d) {
-      const opt = document.createElement('option');
-      opt.value = d.id;
-      opt.textContent = (d.sigla ? d.sigla + ' - ' : '') + (d.descricao || d.id);
-      select.appendChild(opt);
-    });
-    if (current) select.value = current;
-  },
-
-  selectDisciplina(id) {
-    if (this.elements.disciplinaSelect) {
-      this.elements.disciplinaSelect.value = id ? String(id) : '';
-    }
-  },
-
-  resetDisciplinaSelect() {
-    this.selectDisciplina('');
-  },
-
-  showDisciplinaSelector() {
-    if (this.elements.disciplinaSelector) this.elements.disciplinaSelector.hidden = false;
-  },
-
-  hideDisciplinaSelector() {
-    if (this.elements.disciplinaSelector) this.elements.disciplinaSelector.hidden = true;
-  },
-
   openEmentaModal(descricao, ementa) {
     const modal = this.elements.ementaModal;
     if (!modal) return;
@@ -123,12 +95,21 @@ const ChatUI = {
   },
 
   /**
+   * Renderiza a sidebar filtrada pela disciplina ativa
+   */
+  renderSidebar(activeId) {
+    var discId = (typeof ChatStore !== 'undefined') ? ChatStore.state.activeDisciplinaId : null;
+    var todas = ChatStore.getAllConversations();
+    var lista = discId ? todas.filter(function(c) { return c.disciplina_id === discId; }) : todas;
+    this.renderConversations(lista, activeId);
+  },
+
+  /**
    * Renderiza lista de conversas na sidebar
    */
   renderConversations(conversations, activeId) {
     const list = this.elements.conversationsList;
     if (!list) return;
-
     list.innerHTML = '';
 
     if (conversations.length === 0) {
@@ -163,54 +144,25 @@ const ChatUI = {
           <span class="conversation-item-time">${timeAgo}</span>
         </div>
         ${(!this.isAluno() && conv.aluno_id) ? '<svg class="aluno-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>' : ''}
-        <button class="conversation-more-btn" title="Mais opções" aria-label="Mais opções">
-          <svg viewBox="0 0 24 24" fill="currentColor" stroke="none">
-            <circle cx="12" cy="5" r="1.6"/>
-            <circle cx="12" cy="12" r="1.6"/>
-            <circle cx="12" cy="19" r="1.6"/>
+        <button class="delete-btn" title="Excluir conversa">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
           </svg>
         </button>
-        <div class="conversation-menu" hidden>
-          <button type="button" class="conversation-menu-item" data-action="rename">Editar nome</button>
-          <button type="button" class="conversation-menu-item conversation-menu-danger" data-action="delete">Excluir conversa</button>
-        </div>
       `;
 
-      const moreBtn = item.querySelector('.conversation-more-btn');
-      const menu = item.querySelector('.conversation-menu');
-
-      moreBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const isHidden = menu.hidden;
-        this.closeConversationMenus();
-        if (isHidden) {
-          const rect = moreBtn.getBoundingClientRect();
-          const menuWidth = 160;
-          menu.style.left = Math.max(8, rect.right - menuWidth) + 'px';
-          menu.style.top = (rect.bottom + 4) + 'px';
-          menu.hidden = false;
-        }
-      });
-
-      menu.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const action = e.target.closest('.conversation-menu-item')?.dataset.action;
-        this.closeConversationMenus();
-        if (action === 'delete') this.onConversationDelete(conv.id);
-        else if (action === 'rename') this.onConversationRename(conv.id, conv.title || '');
-      });
-
       item.addEventListener('click', (e) => {
-        if (e.target.closest('.conversation-more-btn') || e.target.closest('.conversation-menu')) return;
+        if (e.target.closest('.delete-btn')) {
+          e.stopPropagation();
+          this.onConversationDelete(conv.id);
+          return;
+        }
         this.onConversationSelect(conv.id);
       });
 
       list.appendChild(item);
     });
-  },
-
-  closeConversationMenus() {
-    document.querySelectorAll('.conversation-menu').forEach(m => { m.hidden = true; });
   },
 
   /**
@@ -400,6 +352,12 @@ const ChatUI = {
   },
 
   onConversationRename(id, currentTitle) {
+  },
+
+  onAnexoRemoved(anexoId) {
+  },
+
+  onAnexoConversaRemoved(anexoId) {
   },
 
     updateAlunoBadge(alunoNome) {
@@ -660,6 +618,88 @@ const ChatUI = {
 
     wrapper.appendChild(errorDiv);
     this.scrollToBottom();
+  },
+
+  showToast(message, type) {
+    const toast = document.getElementById('toast');
+    const toastMsg = document.getElementById('toast-message');
+    const toastIcon = document.getElementById('toast-icon');
+    if (!toast || !toastMsg) return;
+    toast.className = 'toast toast-' + (type || 'error');
+    toastMsg.textContent = message;
+    const icons = { success: '\u2713', error: '\u2717', warning: '\u26A0', info: '\u2139' };
+    if (toastIcon) toastIcon.textContent = icons[type] || icons.error;
+    toast.hidden = false;
+    clearTimeout(window._chatToastTimeout);
+    window._chatToastTimeout = setTimeout(function() { toast.hidden = true; }, 4000);
+  },
+
+  renderAnexosChips(anexos) {
+    const area = this.elements.anexosChipsArea;
+    if (!area) return;
+
+    area.innerHTML = '';
+    if (!anexos || anexos.length === 0) {
+      area.hidden = true;
+      return;
+    }
+
+    area.hidden = false;
+    anexos.forEach(anexo => {
+      const chip = document.createElement('div');
+      chip.className = 'anexo-chip';
+      chip.dataset.anexoId = anexo.id;
+      chip.innerHTML =
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
+        '<path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>' +
+        '</svg>' +
+        '<span class="anexo-chip-nome">' + this.escapeHtml(anexo.nome) + '</span>' +
+        '<button type="button" class="anexo-chip-remove" title="Remover anexo" aria-label="Remover anexo">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
+        '</button>';
+      const removeBtn = chip.querySelector('.anexo-chip-remove');
+      if (removeBtn) {
+        removeBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.onAnexoRemoved(anexo.id);
+        });
+      }
+      area.appendChild(chip);
+    });
+  },
+
+  renderAnexosConversa(anexos) {
+    const area = this.elements.anexosConversaArea;
+    const lista = this.elements.anexosConversaLista;
+    if (!area || !lista) return;
+
+    lista.innerHTML = '';
+    if (!anexos || anexos.length === 0) {
+      area.hidden = true;
+      return;
+    }
+
+    area.hidden = false;
+    anexos.forEach(anexo => {
+      const chip = document.createElement('div');
+      chip.className = 'anexo-conversa-chip';
+      chip.dataset.anexoId = anexo.id;
+      chip.title = 'Arquivo ativo no contexto da conversa';
+      chip.innerHTML =
+        '<span class="anexo-status"></span>' +
+        '<span class="anexo-chip-nome">' + this.escapeHtml(anexo.nome_original) + '</span>' +
+        '<button type="button" class="anexo-chip-remove" title="Remover do contexto" aria-label="Remover do contexto">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
+        '</button>';
+      const removeBtn = chip.querySelector('.anexo-chip-remove');
+      if (removeBtn) {
+        removeBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.onAnexoConversaRemoved(anexo.id);
+        });
+      }
+      lista.appendChild(chip);
+    });
   },
 
   createStreamingMessage() {

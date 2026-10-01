@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import Optional
+
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from starlette.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
@@ -14,6 +16,7 @@ from backend.schemas.chat import (
     ConteudoEducacionalRequisicao,
     ConteudoEducacionalResposta,
     RenomearConversaRequest,
+    AnexoConversaResponse,
 )
 from backend.services.chat_service import ChatService
 
@@ -22,6 +25,48 @@ router = APIRouter(prefix="/api/chat", tags=["Chat"])
 
 def _service(db: Session = Depends(get_db)) -> ChatService:
     return ChatService(db)
+
+
+@router.post(
+    "/anexos",
+    response_model=AnexoConversaResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def enviar_anexo(
+    file: UploadFile = File(...),
+    auth_data: AuthData = Depends(require_napne),
+    service: ChatService = Depends(_service),
+):
+    anexo = await service.enviar_anexo_conversa(
+        usuario_id=auth_data.usuario.id,
+        file=file,
+    )
+    return AnexoConversaResponse.model_validate(anexo)
+
+
+@router.get(
+    "/anexos",
+    response_model=list[AnexoConversaResponse],
+)
+async def listar_anexos(
+    conversa_id: Optional[str] = None,
+    auth_data: AuthData = Depends(require_napne),
+    service: ChatService = Depends(_service),
+):
+    return service.listar_anexos_conversa(conversa_id, auth_data.usuario.id)
+
+
+@router.delete(
+    "/anexos/{anexo_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def remover_anexo(
+    anexo_id: int,
+    auth_data: AuthData = Depends(require_napne),
+    service: ChatService = Depends(_service),
+):
+    service.remover_anexo_conversa(anexo_id, auth_data.usuario.id)
+    return None
 
 
 @router.post(
@@ -63,11 +108,13 @@ async def obter_ou_criar_conversa_disciplina(
 )
 async def listar_conversas(
  auth_data: AuthData = Depends(get_current_usuario),
+ disciplina_id: Optional[int] = None,
  service: ChatService = Depends(_service),
 ):
     return service.listar_conversas(
         usuario_id=auth_data.usuario.id,
         tipo_perfil=auth_data.usuario.tipo_perfil,
+        disciplina_id=disciplina_id,
     )
 
 

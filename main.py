@@ -276,6 +276,7 @@ async def security_headers_middleware(request: Request, call_next):
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
     response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Cache-Control"] = "no-cache"
     return response
 
 # =====================
@@ -306,6 +307,10 @@ async def disciplinas():
 @app.get("/painel")
 async def painel():
     return FileResponse(str(FRONTEND_DIR / "painel.html"))
+
+@app.get("/conversas")
+async def conversas_page():
+    return FileResponse(str(FRONTEND_DIR / "conversas.html"))
 
 @app.get("/importacao")
 async def importacao():

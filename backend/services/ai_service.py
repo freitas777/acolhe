@@ -22,6 +22,16 @@ INSTRUCAO_SISTEMA = (
     "Seja prestativo, claro e sempre focado na inclusão e acessibilidade."
 )
 
+MENSAGEM_COTA_ESGOTADA = (
+    "O limite de uso da IA foi atingido por agora (cota do Google Gemini). "
+    "Tente novamente mais tarde."
+)
+
+
+def _is_quota_error(exc: Exception) -> bool:
+    texto = str(exc)
+    return "429" in texto or "ResourceExhausted" in texto or "quota" in texto.lower()
+
 MAX_SESSOES = 100
 
 # Compactação de histórico (conversas longas)
@@ -235,6 +245,9 @@ class AIService:
                     "Tentativa %d/%d falhou para conversa=%s: %s",
                     tentativa, max_retries, conversa_id, exc,
                 )
+                if _is_quota_error(exc):
+                    logger.error("Cota da IA esgotada para conversa=%s — abortando retries", conversa_id)
+                    raise
             if tentativa < max_retries:
                 await asyncio.sleep(tentativa * 2)
             else:
@@ -254,17 +267,23 @@ class AIService:
 
         def _consume_stream(s, m, q, loop):
             last_exc = None
+            algum_chunk = False
             for tentativa in range(1, 4):
                 try:
                     resposta = s.send_message(m, stream=True)
                     for chunk in resposta:
                         texto = getattr(chunk, "text", None)
                         if texto:
+                            algum_chunk = True
                             loop.call_soon_threadsafe(q.put_nowait, texto)
                     loop.call_soon_threadsafe(q.put_nowait, _STREAM_SENTINEL)
                     return
                 except Exception as exc:
                     last_exc = exc
+                    if algum_chunk:
+                        break
+                    if _is_quota_error(exc):
+                        break
                     if tentativa < 3:
                         time.sleep(tentativa)
             loop.call_soon_threadsafe(q.put_nowait, (_STREAM_ERROR, last_exc))

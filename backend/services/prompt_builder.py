@@ -57,6 +57,9 @@ MAX_MATERIAIS = 20
 MAX_EXCERTO_MATERIAL = 1500
 MAX_TOTAL_MATERIAIS_CHARS = 8000
 MAX_EMENTA_CHARS = 3000
+MAX_EXCERTO_ANEXO = 1500
+MAX_TOTAL_ANEXOS_CHARS = 8000
+MAX_ANEXOS = 10
 
 
 @dataclass
@@ -68,6 +71,7 @@ class PromptContext:
     current_task: str = ""
     discipline_context: str = ""
     materiais_context: str = ""
+    anexos_context: str = ""
     conversas_anteriores_context: str = ""
     metadata: dict = field(default_factory=dict)
 
@@ -181,6 +185,7 @@ class PromptBuilder:
     def build_discipline_context(
         self,
         disciplina: Optional[Disciplina],
+        ementa_texto: Optional[str] = None,
     ) -> str:
         if not disciplina:
             return ""
@@ -203,7 +208,7 @@ class PromptBuilder:
         if codigo_turma:
             secoes.append(f"**Código da Turma:** {codigo_turma}")
 
-        ementa = (getattr(disciplina, "ementa", None) or "").strip()
+        ementa = (ementa_texto or "").strip() or (getattr(disciplina, "ementa", None) or "").strip()
         if ementa:
             if len(ementa) > MAX_EMENTA_CHARS:
                 ementa = ementa[:MAX_EMENTA_CHARS] + "\n...[ementa truncada]"
@@ -282,6 +287,45 @@ class PromptBuilder:
 
         return "\n".join(secoes)
 
+    def build_anexos_context(
+        self,
+        anexos: list,
+    ) -> str:
+        if not anexos:
+            return ""
+
+        secoes = [
+            "## ARQUIVOS ANEXADOS NA CONVERSA",
+            "",
+            "Os seguintes arquivos foram anexados pelo usuário nesta conversa:",
+        ]
+
+        total = 0
+        for a in anexos[:MAX_ANEXOS]:
+            nome = getattr(a, "nome_original", "") or "Sem nome"
+            tipo = getattr(a, "tipo_arquivo", "") or ""
+
+            secoes.append(f"- **{nome}** ({tipo})")
+
+            conteudo = (getattr(a, "conteudo_texto", None) or "").strip()
+            if conteudo:
+                trecho = conteudo[:MAX_EXCERTO_ANEXO]
+                if total + len(trecho) > MAX_TOTAL_ANEXOS_CHARS:
+                    disponivel = max(0, MAX_TOTAL_ANEXOS_CHARS - total)
+                    trecho = trecho[:disponivel] + "\n...[conteúdo truncado]"
+                secoes.append(f"  Conteúdo do arquivo: {trecho}")
+                total += len(trecho)
+            else:
+                secoes.append("  Conteúdo: (sem texto extraído)")
+
+        secoes.append("")
+        secoes.append("### DIRETRIZES PARA OS ANEXOS:")
+        secoes.append("- Use o conteúdo dos arquivos anexados para responder dúvidas específicas")
+        secoes.append("- Ao citar informações dos arquivos, mencione de qual arquivo veio")
+        secoes.append("- Se a pergunta do usuário se referir a um anexo, baseie a resposta no conteúdo dele")
+
+        return "\n".join(secoes)
+
     def build_current_task(
         self,
         mensagem_usuario: str,
@@ -307,9 +351,11 @@ class PromptBuilder:
         aluno: Optional[Aluno] = None,
         perfil: Optional[PerfilAluno] = None,
         disciplina: Optional[Disciplina] = None,
+        ementa_texto: Optional[str] = None,
         observacoes: Optional[list[AcomodacaoObservacao]] = None,
         mensagens: Optional[list[Mensagem]] = None,
         materiais: Optional[list] = None,
+        anexos: Optional[list] = None,
         conversas_anteriores: Optional[list] = None,
         mensagem_usuario: str = "",
     ) -> PromptContext:
@@ -329,10 +375,15 @@ class PromptBuilder:
             context.history_summary = self.build_history_summary(mensagens)
 
         if disciplina:
-            context.discipline_context = self.build_discipline_context(disciplina)
+            context.discipline_context = self.build_discipline_context(
+                disciplina, ementa_texto=ementa_texto
+            )
 
         if materiais:
             context.materiais_context = self.build_materiais_context(materiais)
+
+        if anexos:
+            context.anexos_context = self.build_anexos_context(anexos)
 
         if conversas_anteriores:
             context.conversas_anteriores_context = self.build_conversas_anteriores(
@@ -363,6 +414,10 @@ class PromptBuilder:
 
         if context.materiais_context:
             secoes.append(context.materiais_context)
+            secoes.append("")
+
+        if context.anexos_context:
+            secoes.append(context.anexos_context)
             secoes.append("")
 
         if context.teacher_observations:
@@ -404,9 +459,11 @@ class PromptBuilder:
         aluno: Optional[Aluno] = None,
         perfil: Optional[PerfilAluno] = None,
         disciplina: Optional[Disciplina] = None,
+        ementa_texto: Optional[str] = None,
         observacoes: Optional[list[AcomodacaoObservacao]] = None,
         mensagens: Optional[list[Mensagem]] = None,
         materiais: Optional[list] = None,
+        anexos: Optional[list] = None,
         conversas_anteriores: Optional[list] = None,
         mensagem_usuario: str = "",
     ) -> str:
@@ -414,9 +471,11 @@ class PromptBuilder:
             aluno=aluno,
             perfil=perfil,
             disciplina=disciplina,
+            ementa_texto=ementa_texto,
             observacoes=observacoes,
             mensagens=mensagens,
             materiais=materiais,
+            anexos=anexos,
             conversas_anteriores=conversas_anteriores,
             mensagem_usuario=mensagem_usuario,
         )
@@ -427,18 +486,22 @@ class PromptBuilder:
         aluno: Optional[Aluno] = None,
         perfil: Optional[PerfilAluno] = None,
         disciplina: Optional[Disciplina] = None,
+        ementa_texto: Optional[str] = None,
         observacoes: Optional[list[AcomodacaoObservacao]] = None,
         mensagens: Optional[list[Mensagem]] = None,
         materiais: Optional[list] = None,
+        anexos: Optional[list] = None,
         conversas_anteriores: Optional[list] = None,
     ) -> str:
         context = self.assemble_prompt(
             aluno=aluno,
             perfil=perfil,
             disciplina=disciplina,
+            ementa_texto=ementa_texto,
             observacoes=observacoes,
             mensagens=mensagens,
             materiais=materiais,
+            anexos=anexos,
             conversas_anteriores=conversas_anteriores,
             mensagem_usuario="",
         )

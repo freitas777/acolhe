@@ -156,8 +156,10 @@ if ((suap.isAuthenticated() && hasCallback) || manualToken) {
     if (!response.ok) throw new Error('HTTP ' + response.status);
     return response.json();
   })
- .then(function(data) {
+.then(function(data) {
   console.log('[INDEX] Callback success, saving to localStorage');
+  localStorage.removeItem('acolhe_chat_data');
+  try { sessionStorage.removeItem('acolhe_open_conversa'); } catch(e) {}
   localStorage.setItem('acolhe_user', JSON.stringify(data.usuario));
   localStorage.setItem('acolhe_user_id', data.usuario.id);
   localStorage.setItem('acolhe_access_token', data.token || accessToken);
@@ -166,7 +168,7 @@ if ((suap.isAuthenticated() && hasCallback) || manualToken) {
   localStorage.setItem('acolhe_senha_temporaria', data.usuario.senha_temporaria ? 'true' : 'false');
   console.log('[INDEX] Calling redirectByPerfil()');
   redirectByPerfil();
- })
+})
   .catch(function(error) {
     console.error('[INDEX] Callback failed:', error);
     // Limpar hash inválido para não travar em refresh
@@ -264,7 +266,9 @@ document.getElementById('local-login-form').addEventListener('submit', function(
   }
   return response.json();
  })
- .then(function(data) {
+.then(function(data) {
+  localStorage.removeItem('acolhe_chat_data');
+  try { sessionStorage.removeItem('acolhe_open_conversa'); } catch(e) {}
   localStorage.setItem('acolhe_user', JSON.stringify(data.usuario));
   localStorage.setItem('acolhe_user_id', data.usuario.id);
   localStorage.setItem('acolhe_access_token', data.token);
@@ -272,7 +276,7 @@ document.getElementById('local-login-form').addEventListener('submit', function(
   localStorage.setItem('acolhe_user_nome', data.usuario.nome || '');
   localStorage.setItem('acolhe_senha_temporaria', data.usuario.senha_temporaria ? 'true' : 'false');
   redirectByPerfil();
- })
+})
  .catch(function(error) {
   var msg = error.message;
   if (msg.indexOf('Failed to fetch') !== -1 || msg.indexOf('NetworkError') !== -1 || msg.indexOf('404') !== -1) {

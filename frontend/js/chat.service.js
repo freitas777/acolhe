@@ -8,7 +8,7 @@ const ChatService = {
   /**
    * Envia mensagem e recebe resposta da IA
    */
-  async sendMessageStream(content, alunoId, disciplinaId, callbacks) {
+  async sendMessageStream(content, alunoId, disciplinaId, callbacks, anexos) {
     if (!content || !content.trim()) {
       throw new Error('Mensagem não pode estar vazia');
     }
@@ -18,6 +18,15 @@ const ChatService = {
     var onDone = callbacks.onDone || function() {};
     var onError = callbacks.onError || function() {};
 
+    var controller = new AbortController();
+    var stallTimer = null;
+    var finalizado = false;
+    function resetStall() {
+      if (stallTimer) clearTimeout(stallTimer);
+      stallTimer = setTimeout(function() { controller.abort(); }, 90000);
+    }
+    resetStall();
+
     try {
       var body = {
         message: trimmedContent,
@@ -25,6 +34,7 @@ const ChatService = {
       };
       if (alunoId) body.aluno_id = alunoId;
       if (disciplinaId) body.disciplina_id = disciplinaId;
+      if (anexos && anexos.length > 0) body.anexos = anexos;
 
       var response = await acolheFetch(this.API_BASE_URL + '/api/chat/stream', {
         method: 'POST',
@@ -32,7 +42,8 @@ const ChatService = {
           'Content-Type': 'application/json',
           'Accept': 'text/event-stream'
         },
-        body: JSON.stringify(body)
+        body: JSON.stringify(body),
+        signal: controller.signal
       });
 
       if (!response.ok) {
@@ -78,6 +89,7 @@ const ChatService = {
 
       while (true) {
         var result = await reader.read();
+        resetStall();
         if (result.done) break;
 
         buffer += decoder.decode(result.value, { stream: true });
@@ -108,12 +120,17 @@ const ChatService = {
                 messages: [],
                 created_at: new Date().toISOString(),
                 aluno_id: alunoId || null,
-                aluno_nome: null
+                aluno_nome: null,
+                disciplina_id: disciplinaId || null
               };
               ChatStore.state.conversations.unshift(newConv);
               ChatStore.save();
-              if (typeof ChatUI !== 'undefined' && ChatUI.renderConversations) {
-                ChatUI.renderConversations(ChatStore.getAllConversations(), conversationId);
+              if (typeof ChatUI !== 'undefined') {
+                if (ChatUI.renderSidebar) {
+                  ChatUI.renderSidebar(conversationId);
+                } else if (ChatUI.renderConversations) {
+                  ChatUI.renderConversations(ChatStore.getAllConversations(), conversationId);
+                }
               }
             }
           } else if (event.type === 'meta') {
@@ -126,6 +143,7 @@ const ChatService = {
             fullContent += event.content;
             onError(event.content, fullContent);
           } else if (event.type === 'done') {
+            finalizado = true;
             onDone({
               userMessage: userMessage,
               assistantMessage: event.message || { role: 'assistant', content: fullContent },
@@ -138,6 +156,8 @@ const ChatService = {
       }
     } catch (error) {
       throw error;
+    } finally {
+      if (stallTimer) clearTimeout(stallTimer);
     }
   },
 
@@ -196,7 +216,7 @@ throw error;
         return ChatStore.getAllConversations();
       }
     } catch (error) {
-      ChatUI.showError('Erro ao criar conversa');
+      ChatUI.showToast('Erro ao criar conversa');
     }
     return null;
   },
@@ -231,7 +251,7 @@ throw error;
         return await response.json();
       }
     } catch (error) {
-      ChatUI.showError('Erro ao abrir conversa da disciplina');
+      ChatUI.showToast('Erro ao abrir conversa da disciplina');
     }
     return null;
   },
@@ -277,9 +297,59 @@ throw error;
         return conversation;
       }
     } catch (error) {
-      ChatUI.showError('Erro ao criar conversa');
+      ChatUI.showToast('Erro ao criar conversa');
     }
     return null;
+  },
+
+  /**
+   * Envia um arquivo de anexo para a conversa
+   */
+  async uploadAnexo(file) {
+    try {
+      var formData = new FormData();
+      formData.append('file', file);
+      const response = await acolheFetch(`${this.API_BASE_URL}/api/chat/anexos`, {
+        method: 'POST',
+        body: formData
+      });
+      if (response.ok) {
+        return await response.json();
+      }
+    } catch (error) {
+      console.error('Erro ao enviar anexo:', error);
+    }
+    return null;
+  },
+
+  /**
+   * Remove um anexo ainda nao enviado
+   */
+  async removerAnexo(anexoId) {
+    try {
+      const response = await acolheFetch(`${this.API_BASE_URL}/api/chat/anexos/${anexoId}`, {
+        method: 'DELETE'
+      });
+      if (response.ok) return true;
+    } catch (error) {
+      console.error('Erro ao remover anexo:', error);
+    }
+    return false;
+  },
+
+  /**
+   * Lista os anexos vinculados a uma conversa
+   */
+  async listarAnexosConversa(conversaId) {
+    try {
+      const response = await acolheFetch(`${this.API_BASE_URL}/api/chat/anexos?conversa_id=${encodeURIComponent(conversaId)}`);
+      if (response.ok) {
+        return await response.json();
+      }
+    } catch (error) {
+      console.error('Erro ao listar anexos da conversa:', error);
+    }
+    return [];
   },
 
   /**
@@ -311,13 +381,13 @@ throw error;
       });
       if (!response.ok) {
         console.error('Erro ao deletar conversa:', response.status);
-        ChatUI.showError('Erro ao excluir conversa');
+        ChatUI.showToast('Erro ao excluir conversa');
         return false;
       }
       return true;
     } catch (error) {
       console.error('Erro ao deletar conversa:', error);
-      ChatUI.showError('Erro ao excluir conversa');
+      ChatUI.showToast('Erro ao excluir conversa');
       return false;
     }
   },

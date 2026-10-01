@@ -15,6 +15,7 @@ class ConversaRepository(BaseRepository[Conversa]):
         self,
         *,
         usuario_id: int | None = None,
+        disciplina_id: int | None = None,
         skip: int = 0,
         limit: int = 100,
     ) -> list[Conversa]:
@@ -26,6 +27,8 @@ class ConversaRepository(BaseRepository[Conversa]):
         )
         if usuario_id is not None:
             stmt = stmt.where(Conversa.usuario_id == usuario_id)
+        if disciplina_id is not None:
+            stmt = stmt.where(Conversa.disciplina_id == disciplina_id)
         stmt = stmt.order_by(Conversa.atualizada_em.desc()).offset(skip).limit(limit)
         resultado = self.db.execute(stmt)
         return list(resultado.unique().scalars().all())

@@ -282,6 +282,19 @@ if (!acolheRequireAuth()) return;
     window.location.href = '/chat';
   }
 
+  function irParaChatDisciplinaAluno(disciplinaId, disciplinaDescricao, alunoId, alunoNome) {
+    try {
+      sessionStorage.setItem('acolhe_open_conversa', JSON.stringify({
+        tipo: 'disciplina',
+        disciplina_id: disciplinaId,
+        disciplina_descricao: disciplinaDescricao,
+        aluno_id: alunoId,
+        aluno_nome: alunoNome
+      }));
+    } catch (e) {}
+    window.location.href = '/chat';
+  }
+
   function showAlunosAssistidos(disciplinaId, disciplinaNome) {
     currentView = 'alunos';
     var page = document.querySelector('.disciplinas-page');
@@ -348,18 +361,30 @@ if (!acolheRequireAuth()) return;
           '<span class="aluno-nome">' + escapeHtml(aluno.aluno_nome) + '</span>' +
           (aluno.aluno_matricula ? '<span class="aluno-matricula">' + escapeHtml(aluno.aluno_matricula) + '</span>' : '') +
           '</div>' +
+          '<div class="aluno-actions">' +
+          '<button class="btn-chat-aluno" title="Conversar no chat com este aluno" data-aluno-id="' + aluno.aluno_id + '" data-aluno-nome="' + escapeHtml(aluno.aluno_nome) + '">' +
+          '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>' +
+          '</button>' +
           '<button class="btn-profile" title="Ver detalhes" data-aluno-id="' + aluno.aluno_id + '" data-aluno-nome="' + escapeHtml(aluno.aluno_nome) + '" data-disciplina-id="' + disciplinaId + '">' +
           '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>' +
-          '</button>';
+          '</button>' +
+          '</div>';
         listEl.appendChild(item);
         item.style.cursor = 'pointer';
         item.addEventListener('click', function(e) {
-          if (e.target.closest('.btn-profile')) return;
+          if (e.target.closest('.btn-profile') || e.target.closest('.btn-chat-aluno')) return;
           var alId = parseInt(this.dataset.alunoId);
           var discId = parseInt(this.dataset.disciplinaId);
           var alNome = this.dataset.alunoNome;
           openStudentModal(alId, discId, alNome);
         });
+        var chatBtn = item.querySelector('.btn-chat-aluno');
+        if (chatBtn) {
+          chatBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            irParaChatDisciplinaAluno(disciplinaId, disciplinaNome, parseInt(chatBtn.dataset.alunoId), chatBtn.dataset.alunoNome);
+          });
+        }
         var btn = item.querySelector('.btn-profile');
         if (btn) {
           btn.addEventListener('click', function(e) {

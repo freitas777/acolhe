@@ -7,6 +7,7 @@
     var alunoSearchTimer = null;
     var isAluno = acolheGetTipoPerfil() === 'aluno';
     var isProfessorChat = acolheGetTipoPerfil() === 'professor';
+    var isNapne = ['psicopedagogo', 'admin', 'servidor'].indexOf(acolheGetTipoPerfil()) !== -1;
     var disciplinasCache = [];
 
     if (isAluno) document.body.classList.add('role-aluno');
@@ -14,6 +15,7 @@
     var pendingDisciplina = null;
     var pendingAluno = null;
     var ementaPendente = null;
+    var anexosPendentes = [];
 
     async function handlePendingContext() {
       var raw = null;
@@ -47,6 +49,15 @@
       var disciplinaId = disciplinaData.disciplina_id;
       var disciplinaDescricao = disciplinaData.disciplina_descricao;
 
+      if (isNapne) {
+        ChatStore.clearDisciplinaContext();
+        ChatUI.hideDisciplinaBadge();
+        ChatUI.updateTitle('Nova Conversa');
+        ChatUI.renderMessages([]);
+        ChatUI.showToast('Contexto de disciplina e ementa sao exclusivos do perfil Professor.', 'info');
+        return;
+      }
+
       if (isProfessorChat) {
         var disc = getDisciplinaFromCache(disciplinaId);
         if (disc && !disc.tem_ementa) {
@@ -60,32 +71,41 @@
       var sigla = discInfo ? (discInfo.sigla || '') : '';
 
       ChatStore.setDisciplinaContext(disciplinaId, disciplinaDescricao, sigla);
-      if (isProfessorChat) ChatUI.selectDisciplina(disciplinaId);
+      ChatStore.state.activeConversationId = null;
+      ChatStore.save();
+      if (disciplinaData.aluno_id) {
+        ChatStore.setAlunoContext(disciplinaData.aluno_id, disciplinaData.aluno_nome || null);
+        ChatUI.updateAlunoBadge(disciplinaData.aluno_nome || null);
+      } else {
+        syncAlunoBadge();
+      }
       ChatUI.showDisciplinaBadge(disciplinaDescricao, sigla);
-      ChatUI.updateTitle('Nova Conversa');
+      ChatUI.updateTitle(disciplinaDescricao || 'Nova Conversa');
       ChatUI.renderMessages([]);
-      ChatUI.renderConversations(ChatStore.getAllConversations(), null);
+      renderSidebar(null);
       ChatUI.closeSidebar();
       if (ChatUI.elements.messageInput) ChatUI.elements.messageInput.focus();
     }
 
     function openAlunoContext(alunoData) {
       ChatStore.setAlunoContext(alunoData.aluno_id, alunoData.aluno_nome);
+      ChatStore.state.activeConversationId = null;
+      ChatStore.save();
       ChatUI.updateAlunoBadge(alunoData.aluno_nome);
       ChatUI.updateTitle('Nova Conversa');
       ChatUI.renderMessages([]);
-      ChatUI.renderConversations(ChatStore.getAllConversations(), null);
+      renderSidebar(null);
       ChatUI.closeSidebar();
       if (ChatUI.elements.messageInput) ChatUI.elements.messageInput.focus();
     }
 
   async function init() {
         ChatStore.init();
+        if (isNapne) ChatStore.clearDisciplinaContext();
         ChatUI.init();
         applyRoleVisibility();
         await loadUserData();
         if (isProfessorChat) {
-          ChatUI.showDisciplinaSelector();
           await loadDisciplinas();
         }
         setupEventListeners();
@@ -103,31 +123,13 @@
 
 async function loadDisciplinas() {
   disciplinasCache = await ChatService.listarDisciplinas();
-  ChatUI.populateDisciplinas(disciplinasCache);
-}
-
-async function handleDisciplinaChange(e) {
-  var id = parseInt(e.target.value, 10);
-  if (!id) {
-    ChatStore.clearDisciplinaContext();
-    ChatUI.resetDisciplinaSelect();
-    return;
-  }
-  var descricao = '';
-  for (var i = 0; i < disciplinasCache.length; i++) {
-    if (disciplinasCache[i].id === id) {
-      descricao = disciplinasCache[i].descricao || '';
-      break;
-    }
-  }
-  await openDisciplinaContext({ disciplina_id: id, disciplina_descricao: descricao });
 }
 
 async function handleEmentaSave() {
   var fileInput = ChatUI.elements.ementaFileInput;
   var file = fileInput && fileInput.files && fileInput.files[0];
   if (!file) {
-    ChatUI.showError('Selecione o arquivo da ementa.');
+    ChatUI.showToast('Selecione o arquivo da ementa.', 'warning');
     return;
   }
   if (!ementaPendente) {
@@ -137,7 +139,7 @@ async function handleEmentaSave() {
   var id = ementaPendente.disciplina_id;
   var resp = await ChatService.salvarEmenta(id, file);
   if (!resp) {
-    ChatUI.showError('Erro ao enviar a ementa. Tente novamente.');
+    ChatUI.showToast('Erro ao enviar a ementa. Tente novamente.');
     return;
   }
   for (var k = 0; k < disciplinasCache.length; k++) {
@@ -170,11 +172,13 @@ var navPainel = document.getElementById('nav-painel');
 var navNotificacoes = document.getElementById('nav-notificacoes');
 var navPortal = document.getElementById('nav-portal');
 var navDisciplinas = document.getElementById('nav-disciplinas');
+var btnAnexo = ChatUI.elements.btnAnexo;
 
 if (navPainel) navPainel.style.display = isNapne ? '' : 'none';
 if (navNotificacoes) navNotificacoes.style.display = isNapne ? '' : 'none';
 if (navPortal) navPortal.style.display = isAluno ? '' : 'none';
 if (navDisciplinas) navDisciplinas.style.display = isAluno || perfil === 'professor' ? '' : 'none';
+if (btnAnexo) btnAnexo.hidden = !isNapne;
 }
 
 async function loadUserData() {
@@ -195,12 +199,27 @@ async function loadUserData() {
       ChatUI.elements.messageInput.addEventListener('input', handleInput);
       ChatUI.elements.messageInput.addEventListener('keydown', handleKeydown);
     }
-    if (ChatUI.elements.disciplinaSelect) {
-      ChatUI.elements.disciplinaSelect.addEventListener('change', handleDisciplinaChange);
-    }
     if (ChatUI.elements.ementaSave) {
       ChatUI.elements.ementaSave.addEventListener('click', handleEmentaSave);
     }
+    if (ChatUI.elements.btnAnexo) {
+      ChatUI.elements.btnAnexo.addEventListener('click', function(e) {
+        e.stopPropagation();
+        if (ChatUI.elements.anexoFileInput) ChatUI.elements.anexoFileInput.click();
+      });
+    }
+    if (ChatUI.elements.anexoFileInput) {
+      ChatUI.elements.anexoFileInput.addEventListener('change', async function(e) {
+        var files = e.target.files;
+        if (!files || files.length === 0) return;
+        for (var i = 0; i < files.length; i++) {
+          await handleAnexoUpload(files[i]);
+        }
+        e.target.value = '';
+      });
+    }
+    ChatUI.onAnexoRemoved = handleAnexoRemoved;
+    ChatUI.onAnexoConversaRemoved = handleAnexoConversaRemoved;
     if (ChatUI.elements.ementaFileInput) {
       ChatUI.elements.ementaFileInput.addEventListener('change', function(e) {
         var f = e.target.files && e.target.files[0];
@@ -234,17 +253,12 @@ if (ChatUI.elements.btnLogout) {
     }
     ChatUI.onConversationSelect = handleConversationSelect;
     ChatUI.onConversationDelete = handleConversationDelete;
-    ChatUI.onConversationRename = handleConversationRename;
 
-    document.addEventListener('click', function(e) {
-      if (!e.target.closest('.conversation-menu') && !e.target.closest('.conversation-more-btn')) {
-        ChatUI.closeConversationMenus();
-      }
-    });
-    if (ChatUI.elements.conversationsList) {
-      ChatUI.elements.conversationsList.addEventListener('scroll', function() {
-        ChatUI.closeConversationMenus();
-      });
+    if (ChatUI.elements.chatTitle) {
+      ChatUI.elements.chatTitle.addEventListener('dblclick', handleTitleRename);
+    }
+    if (ChatUI.elements.btnRenomear) {
+      ChatUI.elements.btnRenomear.addEventListener('click', handleTitleRename);
     }
 
     if (!isAluno) {
@@ -297,14 +311,20 @@ function handleNewConversation() {
   ChatStore.state.activeAlunoId = null;
   ChatStore.state.activeAlunoNome = null;
   ChatStore.save();
-  ChatStore.clearDisciplinaContext();
-  ChatUI.updateTitle('Nova conversa');
+  anexosPendentes = [];
+  ChatUI.renderAnexosChips(anexosPendentes);
+  var discNome = ChatStore.state.activeDisciplinaDescricao;
+  ChatUI.updateTitle(discNome || 'Nova conversa');
+  if (discNome) {
+    ChatUI.showDisciplinaBadge(discNome, ChatStore.state.activeDisciplinaSigla || '');
+  } else {
+    ChatUI.hideDisciplinaBadge();
+  }
   ChatUI.renderMessages([]);
-  ChatUI.renderConversations(ChatStore.getAllConversations(), null);
-  ChatUI.hideDisciplinaBadge();
+  renderSidebar(null);
+  ChatUI.renderAnexosConversa([]);
   ChatUI.closeSidebar();
   syncAlunoBadge();
-  if (isProfessorChat) ChatUI.resetDisciplinaSelect();
   if (ChatUI.elements.messageInput) ChatUI.elements.messageInput.focus();
 }
 
@@ -315,7 +335,7 @@ function handleNewConversation() {
     if (!content) return;
 
     if (isProfessorChat && !ChatStore.state.activeDisciplinaId) {
-      ChatUI.showError('Selecione uma disciplina antes de enviar a mensagem.');
+      ChatUI.showToast('Selecione uma disciplina antes de enviar a mensagem.', 'warning');
       return;
     }
 
@@ -329,11 +349,15 @@ function handleNewConversation() {
 
       var textEl = ChatUI.createStreamingMessage();
 
+            var anexosIds = anexosPendentes.map(function(a) { return a.id; });
+      anexosPendentes = [];
+      ChatUI.renderAnexosChips(anexosPendentes);
+
       await ChatService.sendMessageStream(content, ChatStore.state.activeAlunoId, ChatStore.state.activeDisciplinaId, {
         onChunk: function(chunk, fullContent) {
           ChatUI.appendChunk(textEl, chunk);
         },
-        onDone: function(result) {
+        onDone: async function(result) {
           ChatUI.removeTypingIndicator();
 
           if (result.conversationId) {
@@ -346,7 +370,8 @@ function handleNewConversation() {
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
                 aluno_id: result.alunoId || ChatStore.state.activeAlunoId,
-                aluno_nome: result.alunoNome || ChatStore.state.activeAlunoNome
+                aluno_nome: result.alunoNome || ChatStore.state.activeAlunoNome,
+                disciplina_id: ChatStore.state.activeDisciplinaId
               };
               ChatStore.state.conversations.unshift(newConv);
             } else {
@@ -371,17 +396,35 @@ function handleNewConversation() {
           var activeConv = ChatService.getActiveConversation();
           if (activeConv) {
             ChatUI.updateTitle(activeConv.title);
-            ChatUI.renderConversations(ChatService.getConversationsHistory(), activeConv.id);
+            renderSidebar(activeConv.id);
           }
+          await atualizarAnexosConversa();
         },
         onError: function(errorContent, fullContent) {
           ChatUI.appendChunk(textEl, errorContent);
         }
-      });
+      }, anexosIds);
     } catch (error) {
       ChatUI.removeTypingIndicator();
-      ChatUI.removeStreamingMessage();
-      ChatUI.showError('Erro ao enviar: ' + error.message);
+
+      var streamingMsg = document.getElementById('streaming-message');
+      var textoParcialEl = streamingMsg ? streamingMsg.querySelector('.message-text') : null;
+      var conteudoParcial = textoParcialEl ? textoParcialEl.textContent.trim() : '';
+
+      if (conteudoParcial) {
+        ChatUI.finalizeStreamMessage(textoParcialEl, conteudoParcial + '\n\n*[resposta interrompida — tente enviar novamente]*');
+        ChatUI.showToast('A resposta foi interrompida.', 'warning');
+      } else {
+        ChatUI.removeStreamingMessage();
+        if (error.name === 'AbortError') {
+          ChatUI.showToast('A resposta demorou demais e foi cancelada. Tente novamente.', 'error');
+        } else {
+          ChatUI.showToast('Erro ao enviar: ' + error.message, 'error');
+        }
+      }
+
+      anexosPendentes = [];
+      ChatUI.renderAnexosChips(anexosPendentes);
     } finally {
       input.disabled = false;
       input.focus();
@@ -439,11 +482,12 @@ ChatUI.showLoadingMessages();
     console.error('Erro ao carregar histórico:', e);
     ChatUI.renderMessages(conversation.messages);
   }
-  ChatUI.renderConversations(ChatService.getConversationsHistory(), conversation.id);
+  renderSidebar(conversation.id);
   ChatUI.closeSidebar();
   syncAlunoBadge();
   syncDisciplinaFromConversation(conversation);
-if (conversation.disciplina_descricao) {
+  await atualizarAnexosConversa();
+if (!isNapne && conversation.disciplina_descricao) {
 ChatUI.showDisciplinaBadge(conversation.disciplina_descricao, conversation.disciplina_sigla);
 } else {
 ChatUI.hideDisciplinaBadge();
@@ -456,10 +500,9 @@ ChatUI.hideDisciplinaBadge();
 
         var ok = await ChatService.deleteConversation(id);
         if (!ok) {
-            ChatUI.showError('Nao foi possivel excluir a conversa. Tente novamente.');
+            ChatUI.showToast('Nao foi possivel excluir a conversa. Tente novamente.');
             return;
         }
-
         ChatStore.state.conversations = ChatStore.state.conversations.filter(function(c) {
             return c.id !== id;
         });
@@ -478,7 +521,7 @@ ChatUI.hideDisciplinaBadge();
             ChatUI.updateTitle('Nova Conversa');
             ChatUI.renderMessages([]);
         }
-        ChatUI.renderConversations(ChatStore.getAllConversations(), activeConv ? activeConv.id : null);
+        renderSidebar(activeConv ? activeConv.id : null);
     }
 
     async function handleConversationRename(id, currentTitle) {
@@ -486,12 +529,12 @@ ChatUI.hideDisciplinaBadge();
       if (novo === null) return;
       novo = novo.trim();
       if (!novo) {
-        ChatUI.showError('O nome da conversa nao pode ser vazio.');
+        ChatUI.showToast('O nome da conversa nao pode ser vazio.', 'warning');
         return;
       }
       var resp = await ChatService.renomearConversa(id, novo);
       if (!resp) {
-        ChatUI.showError('Nao foi possivel renomear a conversa. Tente novamente.');
+        ChatUI.showToast('Nao foi possivel renomear a conversa. Tente novamente.');
         return;
       }
       var conv = ChatStore.state.conversations.find(function(c) { return c.id === id; });
@@ -502,8 +545,68 @@ ChatUI.hideDisciplinaBadge();
       if (ChatStore.state.activeConversationId === id) {
         ChatUI.updateTitle(conv ? conv.title : novo);
       }
-      ChatUI.renderConversations(ChatStore.getAllConversations(), ChatStore.state.activeConversationId);
+      renderSidebar(ChatStore.state.activeConversationId);
     }
+
+function handleTitleRename() {
+  var conv = ChatStore.getActiveConversation();
+  if (!conv) {
+    ChatUI.showToast('Abra uma conversa para renomear.', 'warning');
+    return;
+  }
+  handleConversationRename(conv.id, conv.title || '');
+}
+
+async function handleAnexoUpload(file) {
+  if (!file) return;
+  var maxSize = 10 * 1024 * 1024;
+  if (file.size > maxSize) {
+    ChatUI.showToast('Arquivo muito grande. Tamanho maximo: 10MB', 'error');
+    return;
+  }
+  var allowedExts = ['pdf', 'txt', 'docx', 'pptx', 'png', 'jpg', 'jpeg'];
+  var ext = (file.name || '').split('.').pop().toLowerCase();
+  if (allowedExts.indexOf(ext) === -1) {
+    ChatUI.showToast('Tipo de arquivo nao permitido', 'error');
+    return;
+  }
+
+  var resp = await ChatService.uploadAnexo(file);
+  if (!resp || !resp.id) {
+    ChatUI.showToast('Erro ao anexar o arquivo. Tente novamente.', 'error');
+    return;
+  }
+
+  anexosPendentes.push({ id: resp.id, nome: resp.nome_original || file.name });
+  ChatUI.renderAnexosChips(anexosPendentes);
+  ChatUI.showToast('Arquivo "' + (resp.nome_original || file.name) + '" anexado.', 'success');
+}
+
+async function handleAnexoRemoved(anexoId) {
+  anexosPendentes = anexosPendentes.filter(function(a) { return a.id !== anexoId; });
+  ChatUI.renderAnexosChips(anexosPendentes);
+  await ChatService.removerAnexo(anexoId);
+}
+
+async function handleAnexoConversaRemoved(anexoId) {
+  var ok = await ChatService.removerAnexo(anexoId);
+  if (ok) {
+    ChatUI.showToast('Arquivo removido do contexto da conversa.', 'success');
+  } else {
+    ChatUI.showToast('Erro ao remover o arquivo.', 'error');
+  }
+  await atualizarAnexosConversa();
+}
+
+async function atualizarAnexosConversa() {
+  var convId = ChatStore.state.activeConversationId;
+  if (!convId) {
+    ChatUI.renderAnexosConversa([]);
+    return;
+  }
+  var anexos = await ChatService.listarAnexosConversa(convId);
+  ChatUI.renderAnexosConversa(anexos);
+}
 
 function handleLogout() {
 if (confirm('Deseja realmente sair?')) {
@@ -514,7 +617,7 @@ acolheLogout();
 async function handleAlunoSelected(alunoId, alunoNome) {
   var conversationId = ChatStore.state.activeConversationId;
   if (!conversationId) {
-    ChatUI.showError('Selecione uma conversa primeiro');
+    ChatUI.showToast('Selecione uma conversa primeiro', 'warning');
     return;
   }
 
@@ -532,11 +635,11 @@ async function handleAlunoSelected(alunoId, alunoNome) {
         ChatStore.save();
       }
     } else {
-      ChatUI.showError('Erro ao vincular aluno');
+      ChatUI.showToast('Erro ao vincular aluno');
     }
   } catch (error) {
     console.error('Erro ao vincular aluno:', error);
-    ChatUI.showError('Erro ao vincular aluno');
+    ChatUI.showToast('Erro ao vincular aluno');
   }
 }
 
@@ -559,11 +662,11 @@ async function handleRemoveAluno() {
         ChatStore.save();
       }
     } else {
-      ChatUI.showError('Erro ao desvincular aluno');
+      ChatUI.showToast('Erro ao desvincular aluno');
     }
   } catch (error) {
     console.error('Erro ao desvincular aluno:', error);
-    ChatUI.showError('Erro ao desvincular aluno');
+    ChatUI.showToast('Erro ao desvincular aluno');
   }
 }
 
@@ -590,17 +693,23 @@ ChatUI.hideAlunoContext();
 }
 }
 
+function renderSidebar(activeId) {
+  ChatUI.renderSidebar(activeId);
+}
+
 function syncDisciplinaFromConversation(conversation) {
+  if (isNapne) {
+    ChatStore.clearDisciplinaContext();
+    return;
+  }
   if (conversation && conversation.disciplina_id) {
     ChatStore.setDisciplinaContext(
       conversation.disciplina_id,
       conversation.disciplina_descricao || null,
       conversation.disciplina_sigla || null
     );
-    if (isProfessorChat) ChatUI.selectDisciplina(conversation.disciplina_id);
   } else {
     ChatStore.clearDisciplinaContext();
-    if (isProfessorChat) ChatUI.resetDisciplinaSelect();
   }
 }
 
@@ -608,7 +717,7 @@ async function renderInitialState() {
 await ChatService.loadConversations();
 ChatUI.updateTitle('Nova Conversa');
 ChatUI.renderMessages([]);
-ChatUI.renderConversations(ChatStore.getAllConversations(), null);
+renderSidebar(null);
 syncAlunoBadge();
 }
 

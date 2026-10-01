@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -44,6 +44,18 @@ class ChatRequisicao(BaseModel):
     conversation_id: Optional[str] = None
     aluno_id: Optional[int] = None
     disciplina_id: Optional[int] = None
+    anexos: Optional[List[int]] = None
+
+
+class AnexoConversaResponse(BaseModel):
+    id: int
+    nome_original: str
+    tipo_arquivo: str
+    tamanho: int
+    conteudo_texto: Optional[str] = None
+    criado_em: datetime
+
+    model_config = {"from_attributes": True}
 
 
 class ChatResposta(BaseModel):

@@ -27,6 +27,13 @@ function acolheIsAuthenticated() {
 
 function acolheLogout() {
  localStorage.removeItem('acolhe_access_token');
+ localStorage.removeItem('acolhe_chat_data');
+ localStorage.removeItem('acolhe_user');
+ localStorage.removeItem('acolhe_user_id');
+ localStorage.removeItem('acolhe_tipo_perfil');
+ localStorage.removeItem('acolhe_user_nome');
+ localStorage.removeItem('acolhe_senha_temporaria');
+ try { sessionStorage.removeItem('acolhe_open_conversa'); } catch(e) {}
  var suap = window._suapClient;
   if (suap && suap.isAuthenticated && suap.isAuthenticated()) {
     suap.logout();
