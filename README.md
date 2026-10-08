@@ -9,7 +9,7 @@ Projeto desenvolvido como Trabalho de Conclusão de Curso de Tecnologia em Anál
 ## Funcionalidades
 
 - Login via **SUAP** (OAuth2) e via conta local para membros convidados do NAPNE.
-- Importação de alunos do SUAP (ou cadastro manual) e **validação de indicações** pela equipe NAPNE.
+- Cadastro manual de alunos e **validação de indicações** pela equipe NAPNE.
 - **Perfil de aprendizado** do aluno: nível de atenção, dificuldade de leitura, preferência, interesses e diagnóstico.
 - **Geração de conteúdo educacional adaptado** por IA, com histórico e versionamento.
 - **Chat com IA** contextualizado ao aluno e/ou à disciplina, com respostas em streaming e anexos.
